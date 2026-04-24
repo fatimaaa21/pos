@@ -1,3 +1,6 @@
+// Es el contrato de datos que usan todos los demás archivos. 
+// Si la base de datos cambia, aquí se refleja primero.
+
 export type Rol = "admin" | "empleado";
 
 export interface Perfil {
@@ -10,9 +13,12 @@ export interface Perfil {
 }
 
 export interface Categoria {
-  id: number;
-  nombre: string;
-  icono?: string;
+    eCodCategory: number;
+    tNameCategory: string;
+    ImgCategory?: string;
+    fhCreateCategory?: string;
+    fhUpdateCategory?: string;
+    bStateCategory?: boolean;
 }
 
 export interface Producto {

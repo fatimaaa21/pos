@@ -1,7 +1,11 @@
+// Página de inicio de sesión
+
 "use client";
 
 import { useState } from "react";
 import { login } from "@/lib/actions/auth";
+import styles from "./page.module.css";
+import modalStyles from "@/components/ui/Modal.module.css";
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
@@ -20,16 +24,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#f8f7f4",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "'DM Sans', sans-serif",
-      padding: 16,
-    }}>
-      <div style={{ width: "100%", maxWidth: 400 }}>
+    <div className={styles.container}>
+      <div className={modalStyles.card}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={{
@@ -39,11 +35,8 @@ export default function LoginPage() {
             fontSize: 30, margin: "0 auto 16px",
             boxShadow: "0 8px 24px rgba(193,127,62,0.25)",
           }}>🥐</div>
-          <h1 style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: 26, fontWeight: 700, color: "#1a1a1a", marginBottom: 6,
-          }}>Bienvenido</h1>
-          <p style={{ color: "#7a6a5e", fontSize: 14 }}>
+          <h1 className={modalStyles.title}>Bienvenido</h1>
+          <p className={styles.subtitulo}>
             Ingresa tus credenciales para continuar
           </p>
         </div>

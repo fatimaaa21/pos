@@ -1,0 +1,25 @@
+.wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 280px;
+}
+
+.icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray);
+  pointer-events: none;
+}
+
+.input {
+    width: 100%;
+    padding: 12px 48px;
+    border-radius: 8px;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--gray);
+    background: white;
+    outline: none;
+}

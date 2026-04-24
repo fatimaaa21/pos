@@ -1,3 +1,9 @@
+// Se ejecuta antes de cargar cualquier página. 
+// Verifica si el usuario tiene sesión y si tiene permiso para estar en esa ruta. 
+// Sin sesión → manda al login
+// Empleado intentando entrar a /admin → lo regresa a su área
+// Admin llendo al login → lo manda a su dashboard
+
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 

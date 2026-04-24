@@ -1,0 +1,15 @@
+.container {
+    min-height: 100vh;
+    background: var(--background);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: "DM Sans", sans-serif;
+    padding: 16px;
+}
+
+.subtitulo {
+  color: var(--gray);
+  font-size: 16px;
+  font-weight: 400;
+}

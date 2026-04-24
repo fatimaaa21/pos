@@ -1,3 +1,6 @@
+// Server Actions de autenticación — login() y logout(). 
+// Se ejecutan en el servidor, nunca exponen credenciales al cliente
+
 "use server";
 
 import { revalidatePath } from "next/cache";

@@ -72,8 +72,16 @@
   color: white;
 }
 
+.navItem:hover .navIcon {
+  color: white;
+}
+
 .navItemActive {
   background: var(--color-primary);
+  color: white;
+}
+
+.navItemActive .navIcon {
   color: white;
 }
 
@@ -82,8 +90,14 @@
     flex-shrink: 0;
 }
 
+.actionsUser {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .user {
-  background: #c17f3e ;
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;

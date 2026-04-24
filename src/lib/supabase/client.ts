@@ -1,3 +1,5 @@
+// Crea la conexión a Supabase para componentes del lado del cliente (navegador)
+
 import { createBrowserClient } from "@supabase/ssr";
 
 export function createClient() {

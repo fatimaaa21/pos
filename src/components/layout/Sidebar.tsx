@@ -5,17 +5,11 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
-import { LayoutDashboard, Package, Grid, BarChart2, Users, ShoppingCart, ClipboardList, LogOut } from "lucide-react";
-
-interface NavItem {
-  icon: React.ElementType;
-  label: string;
-  href: string;
-}
+import { LayoutDashboard, BookOpenText, BarChart2, Users, LogOut } from "lucide-react";
 
 const navAdmin = [
     { icon: LayoutDashboard, label: "Dashboard",  href: "/admin/dashboard" },
-    { icon: Package, label: "Productos",  href: "/admin/productos" },
+    { icon: BookOpenText, label: "Categorías",  href: "/admin/categorias" },
     { icon: BarChart2, label: "Reportes",   href: "/admin/reportes" },
     { icon: Users, label: "Usuarios",   href: "/admin/usuarios" },
 ];
@@ -62,13 +56,13 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
               pathname === item.href ? styles.navItemActive : ""
             }`}
           >
-            <span className={styles.navIcon}><item.icon size={14} className={styles.navIcon} /></span>
+            <span className={styles.navIcon}><item.icon size={14} /></span>
             <span>{item.label}</span>
           </Link>
         ))}
       </nav>
 
-        <div className="actions" >
+        <div className={styles.actionsUser} >
         {/* Usuario */}
         <div className={styles.user}>
             <div className={styles.avatar}>{iniciales}</div>
@@ -80,7 +74,7 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
         {/* Logout */}
         <form action={logout}>
           <button className={styles.navItem}>
-            <LogOut size={14} color="var(--color-primary)" />
+            <LogOut size={14} className={styles.navIcon}/>
             Cerrar Sesión
           </button>
         </form>

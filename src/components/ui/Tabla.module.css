@@ -1,0 +1,54 @@
+.wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+}
+
+.tabla th {
+  padding: 12px;
+  text-align: left;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--gray);
+  white-space: nowrap;
+  background: white;
+  border-radius: 8px;
+}
+
+.tabla td {
+  padding: 14px 20px;
+  font-size: 14px;
+  color: #1a1a1a;
+  background: white;
+}
+
+.tabla tbody tr {
+  background: white;
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.tabla tbody tr:hover {
+  background: #fdf8f2;
+}
+
+.vacio {
+  text-align: center;
+  padding: 60px 20px;
+  color: #9e9590;
+  font-size: 14px;
+}
+
+.cargando {
+  text-align: center;
+  padding: 60px 20px;
+  color: #9e9590;
+  font-size: 14px;
+}
