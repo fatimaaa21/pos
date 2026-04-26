@@ -1,129 +1,150 @@
-// Página de inicio de sesión
-
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { login } from "@/lib/actions/auth";
 import styles from "./page.module.css";
-import modalStyles from "@/components/ui/Modal.module.css";
+import modal from "@/components/ui/Modal.module.css";
 
 export default function LoginPage() {
+  const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  useEffect(() => {
+    inputs.current[0]?.focus();
+  }, []);
+
+  async function handleLogin(codigo: string) {
     setLoading(true);
     setError(null);
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData();
+    formData.append("codigo", codigo);
     const result = await login(formData);
     if (result?.error) {
       setError(result.error);
       setLoading(false);
+      setShake(true);
+      setTimeout(() => {
+        setShake(false);
+        setDigits(["", "", "", ""]);
+        inputs.current[0]?.focus();
+      }, 600);
+    }
+  }
+
+  function handleChange(index: number, value: string) {
+    // Solo acepta un dígito numérico
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const newDigits = [...digits];
+    newDigits[index] = digit;
+    setDigits(newDigits);
+
+    // Avanza al siguiente input automáticamente
+    if (digit && index < 3) {
+      inputs.current[index + 1]?.focus();
+    }
+
+    // Si todos están llenos, hace login
+    if (digit && index === 3) {
+      const codigo = [...newDigits.slice(0, 3), digit].join("");
+      if (codigo.length === 4) handleLogin(codigo);
+    }
+  }
+
+  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace") {
+      if (digits[index]) {
+        // Borra el dígito actual
+        const newDigits = [...digits];
+        newDigits[index] = "";
+        setDigits(newDigits);
+      } else if (index > 0) {
+        // Si ya está vacío, retrocede al anterior
+        const newDigits = [...digits];
+        newDigits[index - 1] = "";
+        setDigits(newDigits);
+        inputs.current[index - 1]?.focus();
+      }
+    }
+    if (e.key === "ArrowLeft" && index > 0) {
+      inputs.current[index - 1]?.focus();
+    }
+    if (e.key === "ArrowRight" && index < 3) {
+      inputs.current[index + 1]?.focus();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (pasted.length === 4) {
+      setDigits(pasted.split(""));
+      inputs.current[3]?.focus();
+      handleLogin(pasted);
     }
   }
 
   return (
     <div className={styles.container}>
-      <div className={modalStyles.card}>
+      <div className={modal.card}>
+
         {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: 20,
-            background: "linear-gradient(135deg, #d4a574, #a86530)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 30, margin: "0 auto 16px",
-            boxShadow: "0 8px 24px rgba(193,127,62,0.25)",
-          }}>🥐</div>
-          <h1 className={modalStyles.title}>Bienvenido</h1>
+        <div style={{ textAlign: "center" }}>
+          <div className={styles.logo}>🥐</div>
+          <h1 className={modal.title}>Bienvenido</h1>
           <p className={styles.subtitulo}>
-            Ingresa tus credenciales para continuar
+            Ingresa tu código de acceso
           </p>
         </div>
 
-        {/* Card */}
-        <div style={{
-          background: "white", borderRadius: 20, padding: 32,
-          border: "1.5px solid #eeebe6",
-          boxShadow: "0 4px 24px rgba(0,0,0,0.06)",
-        }}>
-          <form onSubmit={handleSubmit}>
-            <div style={{ marginBottom: 18 }}>
-              <label style={{
-                display: "block", fontSize: 13,
-                fontWeight: 500, color: "#4a3c34", marginBottom: 6,
-              }}>
-                Correo electrónico
-              </label>
-              <input
-                type="email"
-                name="email"
-                placeholder="tu@correo.com"
-                required
-                autoComplete="email"
-                style={{
-                  width: "100%", padding: "12px 16px",
-                  border: "1.5px solid #e5e0d8", borderRadius: 12,
-                  fontSize: 14, color: "#1a1a1a",
-                  background: "white", outline: "none",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              />
-            </div>
+        {/* PIN inputs */}
+        <div className={`${styles.inputs} ${shake ? styles.shake : ""}`}
+          onPaste={handlePaste}
+        >
+          {digits.map((digit, i) => {
+            const isFilled = !!digit;
+            const isFocused = focusedIndex === i;
+            let inputClass = styles.pinInput;
+            if (isFilled) inputClass += ` ${styles.pinInputFilled}`;
+            else if (isFocused) inputClass += ` ${styles.pinInputFocused}`;
+            else inputClass += ` ${styles.pinInputDefault}`;
 
-            <div style={{ marginBottom: 24 }}>
-              <label style={{
-                display: "block", fontSize: 13,
-                fontWeight: 500, color: "#4a3c34", marginBottom: 6,
-              }}>
-                Contraseña
-              </label>
+            return (
               <input
+                key={i}
+                ref={(el) => { inputs.current[i] = el; }}
                 type="password"
-                name="password"
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-                style={{
-                  width: "100%", padding: "12px 16px",
-                  border: "1.5px solid #e5e0d8", borderRadius: 12,
-                  fontSize: 14, color: "#1a1a1a",
-                  background: "white", outline: "none",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                disabled={loading}
+                onChange={(e) => handleChange(i, e.target.value)}
+                onKeyDown={(e) => handleKeyDown(i, e)}
+                onFocus={() => setFocusedIndex(i)}
+                onBlur={() => setFocusedIndex(null)}
+                onFocus={(e) => e.target.select()}
+                className={inputClass}
               />
-            </div>
-
-            {error && (
-              <div style={{
-                background: "#fef2f2", border: "1px solid #fecaca",
-                borderRadius: 10, padding: "10px 14px",
-                color: "#ef4444", fontSize: 13, marginBottom: 18,
-              }}>
-                ⚠️ {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                width: "100%", padding: 13,
-                background: loading ? "#9e9590" : "#2d2420",
-                color: "white", border: "none", borderRadius: 12,
-                fontSize: 15, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
-                fontFamily: "'DM Sans', sans-serif",
-                transition: "background 0.2s",
-              }}
-            >
-              {loading ? "Ingresando..." : "Iniciar sesión"}
-            </button>
-          </form>
+            );
+          })}
         </div>
 
-        <p style={{ textAlign: "center", color: "#9e9590", fontSize: 12, marginTop: 24 }}>
-          Sistema de gestión · Panadería
-        </p>
+        {/* Error */}
+        {error && (
+          <div className={styles.error}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <p className={styles.loading}>
+            Verificando...
+          </p>
+        )}
       </div>
     </div>
   );

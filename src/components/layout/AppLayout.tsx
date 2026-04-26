@@ -17,7 +17,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
   const { data: perfil } = await supabase
     .from("perfiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("eCodUser", user.id)
     .single();
 
   if (!perfil) redirect("/auth/login");

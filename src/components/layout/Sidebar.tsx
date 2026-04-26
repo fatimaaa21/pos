@@ -5,19 +5,19 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
-import { LayoutDashboard, BookOpenText, BarChart2, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, BarChart2, Users, LogOut } from "lucide-react";
 
 const navAdmin = [
-    { icon: LayoutDashboard, label: "Dashboard",  href: "/admin/dashboard" },
-    { icon: BookOpenText, label: "Categorías",  href: "/admin/categorias" },
-    { icon: BarChart2, label: "Reportes",   href: "/admin/reportes" },
-    { icon: Users, label: "Usuarios",   href: "/admin/usuarios" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
+  { icon: Package,         label: "Productos",  href: "/admin/productos" },
+  { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
+  { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
 ];
 
 const navEmpleado = [
-  { icon: "📦", label: "Inventario",  href: "/empleado/inventario" },
-  { icon: "🛒", label: "Ventas",      href: "/empleado/ventas" },
-  { icon: "📋", label: "Mis ventas",  href: "/empleado/mis-ventas" },
+  { icon: Package,   label: "Inventario", href: "/empleado/inventario" },
+  { icon: BarChart2, label: "Ventas",     href: "/empleado/ventas" },
+  { icon: Users,     label: "Mis ventas", href: "/empleado/mis-ventas" },
 ];
 
 interface SidebarProps {
@@ -27,8 +27,9 @@ interface SidebarProps {
 
 export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) {
   const pathname = usePathname();
-  const nav = perfil.rol === "admin" ? navAdmin : navEmpleado;
-  const iniciales = perfil.nombre
+  const nav = perfil.tRolUser === "admin" ? navAdmin : navEmpleado;
+
+  const iniciales = perfil.tNameUser
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
@@ -56,25 +57,26 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
               pathname === item.href ? styles.navItemActive : ""
             }`}
           >
-            <span className={styles.navIcon}><item.icon size={14} /></span>
+            <item.icon size={14} className={styles.navIcon} />
             <span>{item.label}</span>
           </Link>
         ))}
       </nav>
 
-        <div className={styles.actionsUser} >
+      <div className="actions">
         {/* Usuario */}
         <div className={styles.user}>
-            <div className={styles.avatar}>{iniciales}</div>
-            <div>
-                <div className={styles.userName}>{perfil.nombre}</div>
-                <div className={styles.userRol}>{perfil.rol}</div>
-            </div>
+          <div className={styles.avatar}>{iniciales}</div>
+          <div>
+            <div className={styles.userName}>{perfil.tNameUser}</div>
+            <div className={styles.userRol}>{perfil.tRolUser}</div>
+          </div>
         </div>
+
         {/* Logout */}
         <form action={logout}>
           <button className={styles.navItem}>
-            <LogOut size={14} className={styles.navIcon}/>
+            <LogOut size={14} color="var(--color-primary)" />
             Cerrar Sesión
           </button>
         </form>
