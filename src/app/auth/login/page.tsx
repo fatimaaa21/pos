@@ -125,7 +125,6 @@ export default function LoginPage() {
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 onFocus={() => setFocusedIndex(i)}
                 onBlur={() => setFocusedIndex(null)}
-                onFocus={(e) => e.target.select()}
                 className={inputClass}
               />
             );

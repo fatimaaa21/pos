@@ -32,3 +32,16 @@ body {
   color: var(--foreground);
   font-family: var(--font-family);
 }
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.header {
+  display: flex;
+  width: auto;
+  align-items: flex-start;
+  justify-content: space-between;
+}

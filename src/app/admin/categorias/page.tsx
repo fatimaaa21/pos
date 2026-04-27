@@ -6,7 +6,6 @@ import { useCategorias } from "@/hooks/useCategorias";
 import { Buscador } from "@/components/ui/Buscador";
 import { ModalCategoria } from "@/components/ui/Modal";
 import { Tabla } from "@/components/ui/Tabla";
-import type { Categoria } from "@/types";
 import styles from "./page.module.css";
 
 export default function CatalogoPage() {
@@ -55,7 +54,7 @@ export default function CatalogoPage() {
   }
 
   return (
-  <div className={styles.container}>
+    <div className="container">
 
     <div className={styles.header}>
       <Buscador

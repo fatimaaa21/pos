@@ -12,6 +12,7 @@ const navAdmin = [
   { icon: Package,         label: "Productos",  href: "/admin/productos" },
   { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
   { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
+  { icon: Users,           label: "Categorías",   href: "/admin/categorias" },
 ];
 
 const navEmpleado = [
