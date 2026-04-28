@@ -12,7 +12,6 @@ const navAdmin = [
   { icon: Package,         label: "Productos",  href: "/admin/productos" },
   { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
   { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
-  { icon: Users,           label: "Categorías",   href: "/admin/categorias" },
 ];
 
 const navEmpleado = [
@@ -39,7 +38,6 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
 
   return (
     <aside className={styles.sidebar}>
-      {/* Logo */}
       <div className={styles.logo}>
         <div className={styles.logoIcon}>🥐</div>
         <div>
@@ -48,7 +46,6 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
         </div>
       </div>
 
-      {/* Navegación */}
       <nav className={styles.nav}>
         {nav.map((item) => (
           <Link
@@ -65,7 +62,6 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
       </nav>
 
       <div className="actions">
-        {/* Usuario */}
         <div className={styles.user}>
           <div className={styles.avatar}>{iniciales}</div>
           <div>
@@ -73,8 +69,6 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
             <div className={styles.userRol}>{perfil.tRolUser}</div>
           </div>
         </div>
-
-        {/* Logout */}
         <form action={logout}>
           <button className={styles.navItem}>
             <LogOut size={14} color="var(--color-primary)" />

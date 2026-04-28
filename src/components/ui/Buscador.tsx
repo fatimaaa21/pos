@@ -12,7 +12,7 @@ interface BuscadorProps {
 export function Buscador({ valor, onChange }: BuscadorProps) {
   return (
     <div className={styles.wrapper}>
-      <Search size={24} className={styles.icon} />
+      <Search size={18} className={styles.icon} />
       <input
         className={styles.input}
         type="text"

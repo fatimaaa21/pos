@@ -1,0 +1,122 @@
+.wrapper {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+/* ── Tabla ── */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+/* ── Encabezado ── */
+.headerCell {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gray);
+    white-space: nowrap;
+    background: white;
+    border-bottom: 1px solid var(--background);
+}
+
+/* ── Filas ── */
+.row {
+    transition: background 0.12s ease;
+    cursor: default;
+}
+
+.row:hover {
+    background: var(--background);
+}
+
+.rowSelected {
+    background: var(--color-primary-light);
+}
+
+.rowSelected:hover {
+    background: var(--color-primary-light);
+}
+
+/* ── Celdas ── */
+.cell {
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--dark);
+
+}
+
+/* ── Checkbox ── */
+.checkboxCol {
+    width: 40px;
+    padding: 12px 16px;
+    vertical-align: middle;
+}
+
+.checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid var(--gray);
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.15s ease;
+    background: white;
+}
+
+.checkbox:checked {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.checkbox:checked::after {
+    content: "";
+    width: 9px;
+    height: 6px;
+    border-left: 2px solid white;
+    border-bottom: 2px solid white;
+    transform: rotate(-45deg) translateY(-1px);
+}
+
+.checkbox:hover:not(:checked) {
+    border-color: var(--color-primary);
+}
+
+/* ── Estado vacío ── */
+.emptyCell {
+    padding: 48px 16px;
+    text-align: center;
+}
+
+.emptyText {
+    font-size: 14px;
+    color: var(--gray);
+}
+
+/* ── Skeletons ── */
+.skeletonWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px 0;
+}
+
+.skeleton {
+    height: 20px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #f0ede9 25%, #e8e4df 50%, #f0ede9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
