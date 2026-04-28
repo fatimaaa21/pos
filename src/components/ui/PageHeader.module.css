@@ -1,0 +1,40 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.titulo {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--dark);
+}
+
+.descripcion {
+  color: var(--gray);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.boton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+
+.boton:hover {
+  opacity: 0.9;
+}
+
+.botonIcon {
+    line-height: 1;
+}

@@ -1,0 +1,76 @@
+/* Stats */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.statCard {
+  background: white;
+  border-radius: 14px;
+  padding: 16px 20px;
+  border: 1px solid #f0ebe4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* Filtros */
+.filtros {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.filtroBtn {
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e5e0d8;
+  background: white;
+  color: #7a6a5e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: "Montserrat", sans-serif;
+  text-transform: capitalize;
+  transition: all 0.15s;
+}
+
+.filtroBtn:hover {
+  border-color: #628321;
+  color: #628321;
+}
+
+.filtroBtnActivo {
+  border-color: #628321;
+  background: #f0f5e8;
+  color: #628321;
+  font-weight: 600;
+}
+
+/* Avatar en tabla */
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #a8c97a, #628321);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--color-primary);
+}
+
+.actionBtnDanger {
+    color: #dc2626;
+}

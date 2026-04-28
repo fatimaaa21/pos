@@ -1,18 +1,27 @@
+// Es el contrato de datos que usan todos los demás archivos.
+// Si la base de datos cambia, aquí se refleja primero.
+
 export type Rol = "admin" | "empleado";
 
+// Refleja exactamente las columnas de la tabla "perfiles" en Supabase
 export interface Perfil {
-  id: string;
-  nombre: string;
-  email: string;
-  rol: Rol;
-  activo: boolean;
-  created_at: string;
+  eCodUser: string;       // UUID, PK, linked to auth.users.id
+  tNameUser: string;
+  tEmailUser: string;
+  tRolUser: Rol;
+  bStateUser: boolean;
+  eCodeUser: string;      // Código de 4 dígitos para login
+  fhCreateUser: string;
+  fhUpdateUser?: string;
 }
 
 export interface Categoria {
-  id: number;
-  nombre: string;
-  icono?: string;
+  eCodCategory: number;
+  tNameCategory: string;
+  ImgCategory?: string;
+  fhCreateCategory?: string;
+  fhUpdateCategory?: string;
+  bStateCategory?: boolean;
 }
 
 export interface Producto {

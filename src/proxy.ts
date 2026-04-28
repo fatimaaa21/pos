@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -37,11 +37,11 @@ export async function middleware(request: NextRequest) {
   if (user && pathname.startsWith("/auth")) {
     const { data: perfil } = await supabase
       .from("perfiles")
-      .select("rol")
-      .eq("id", user.id)
+      .select("tRolUser")
+      .eq("eCodUser", user.id)
       .single();
 
-    const destino = perfil?.rol === "admin"
+    const destino = perfil?.tRolUser === "admin"
       ? "/admin/dashboard"
       : "/empleado/inventario";
 
@@ -52,11 +52,11 @@ export async function middleware(request: NextRequest) {
   if (user && pathname.startsWith("/admin")) {
     const { data: perfil } = await supabase
       .from("perfiles")
-      .select("rol")
-      .eq("id", user.id)
+      .select("tRolUser")
+      .eq("eCodUser", user.id)
       .single();
 
-    if (perfil?.rol !== "admin") {
+    if (perfil?.tRolUser !== "admin") {
       return NextResponse.redirect(new URL("/empleado/inventario", request.url));
     }
   }

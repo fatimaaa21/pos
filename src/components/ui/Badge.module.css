@@ -1,0 +1,73 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  width: fit-content;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Verde — activo / publicado / disponible ── */
+.activo,
+.publicado,
+.disponible {
+  background: #EAF3DE;
+  color: #27500A;
+}
+.activo .dot,
+.publicado .dot,
+.disponible .dot {
+  background: #27500A;
+}
+
+/* ── Rojo — inactivo / bloqueado / agotado ── */
+.inactivo,
+.bloqueado,
+.agotado {
+  background: #F1EFE8;
+  color: #444441;
+}
+.inactivo .dot,
+.bloqueado .dot,
+.agotado .dot {
+  background: #444441;
+}
+
+/* ── Amarillo — pendiente / bajo stock ── */
+.pendiente,
+.bajo {
+  background: #fefce8;
+  color: #ca8a04;
+}
+.pendiente .dot,
+.bajo .dot {
+  background: #ca8a04;
+}
+
+/* ── Verde olivo — admin ── */
+.admin {
+  background: #fef3e8;
+  color: #a86530;
+}
+.admin .dot {
+  background: #a86530;
+}
+
+/* ── Verde primario — empleado ── */
+.empleado {
+  background: #f0f5e8;
+  color: #628321;
+}
+.empleado .dot {
+  background: #628321;
+}

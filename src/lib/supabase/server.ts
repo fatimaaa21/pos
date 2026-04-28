@@ -1,3 +1,5 @@
+// Crea la conexión a Supabase para Server Components (servidor de Next.js)
+
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
