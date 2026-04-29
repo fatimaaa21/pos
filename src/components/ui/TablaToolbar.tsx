@@ -14,9 +14,10 @@ interface TablaToolbarProps {
   filtros: FiltrosUsuario;
   onChange: (filtros: FiltrosUsuario) => void;
   total: number;
+  ocultarRol?: boolean;
 }
 
-export function TablaToolbar({ filtros, onChange, total }: TablaToolbarProps) {
+export function TablaToolbar({ filtros, onChange, total, ocultarRol = false }: TablaToolbarProps) {
   const [dropdownAbierto, setDropdownAbierto] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -71,26 +72,24 @@ export function TablaToolbar({ filtros, onChange, total }: TablaToolbarProps) {
   return (
     <div className={styles.wrapper}>
       <div className={styles.toolbar}>
-        {/* Search */}
         <div className={styles.searchWrap}>
-          <Search size={16} className={styles.searchIcon} />
+          <Search size={14} className={styles.searchIcon} />
           <input
             className={styles.searchInput}
             type="text"
-            placeholder="Buscar por nombre o correo"
+            placeholder="Buscar..."
             value={filtros.busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
           />
           {filtros.busqueda && (
             <button className={styles.searchClear} onClick={() => setBusqueda("")}>
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
         </div>
 
         <div className={styles.divider} />
 
-        {/* Botón filtros */}
         <div className={styles.dropdownWrap} ref={dropdownRef}>
           <button
             className={`${styles.filterBtn} ${cantidadFiltros > 0 ? styles.filterBtnActive : ""}`}
@@ -105,19 +104,22 @@ export function TablaToolbar({ filtros, onChange, total }: TablaToolbarProps) {
 
           {dropdownAbierto && (
             <div className={styles.dropdown}>
-              <p className={styles.ddLabel}>Rol</p>
-              {(["admin", "empleado"] as const).map((rol) => (
-                <button
-                  key={rol}
-                  className={`${styles.ddItem} ${filtros.roles.includes(rol) ? styles.ddItemSelected : ""}`}
-                  onClick={() => toggleRol(rol)}
-                >
-                  <span className={`${styles.ddCheck} ${filtros.roles.includes(rol) ? styles.ddCheckOn : ""}`} />
-                  <span style={{ textTransform: "capitalize" }}>{rol}</span>
-                </button>
-              ))}
-
-              <div className={styles.separator} />
+              {!ocultarRol && (
+                <>
+                  <p className={styles.ddLabel}>Rol</p>
+                  {(["admin", "empleado"] as const).map((rol) => (
+                    <button
+                      key={rol}
+                      className={`${styles.ddItem} ${filtros.roles.includes(rol) ? styles.ddItemSelected : ""}`}
+                      onClick={() => toggleRol(rol)}
+                    >
+                      <span className={`${styles.ddCheck} ${filtros.roles.includes(rol) ? styles.ddCheckOn : ""}`} />
+                      <span style={{ textTransform: "capitalize" }}>{rol}</span>
+                    </button>
+                  ))}
+                  <div className={styles.separator} />
+                </>
+              )}
 
               <p className={styles.ddLabel}>Estado</p>
               {(["activo", "inactivo"] as const).map((estado) => (
@@ -142,6 +144,25 @@ export function TablaToolbar({ filtros, onChange, total }: TablaToolbarProps) {
             </div>
           )}
         </div>
+
+        {chips.map((chip) => (
+          <span
+            key={`${chip.tipo}-${chip.valor}`}
+            className={`${styles.chip} ${styles[`chip_${chip.variante}`]}`}
+          >
+            {chip.valor}
+            <button
+              className={styles.chipX}
+              onClick={() => removerChip(chip.tipo, chip.valor)}
+            >
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+
+        <span className={styles.conteo}>
+          {total} {total === 1 ? "resultado" : "resultados"}
+        </span>
       </div>
     </div>
   );

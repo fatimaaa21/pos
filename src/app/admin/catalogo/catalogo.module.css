@@ -1,0 +1,58 @@
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.statCard {
+  background: white;
+  border-radius: 14px;
+  padding: 16px 20px;
+  border: 1px solid #f0ebe4;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.icono {
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f7f4;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.actionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid #e5e0d8;
+  background: white;
+  cursor: pointer;
+  color: var(--color-primary);
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--color-primary);
+  background: #EAF3DE;
+}
+
+.actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionBtnDanger {
+  color: #dc2626;
+}
+
+.actionBtnDanger:hover {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
