@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useCategorias } from "@/hooks/useCategorias";
 import { Buscador } from "@/components/ui/Buscador";
-import { ModalCategoria } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { Tabla } from "@/components/ui/Tabla";
 import styles from "./page.module.css";
 

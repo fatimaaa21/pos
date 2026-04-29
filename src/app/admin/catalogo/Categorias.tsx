@@ -8,6 +8,10 @@ import { ModalCategoria } from "@/components/ui/Modal";
 import type { Categoria } from "@/types";
 import styles from "./Categorias.module.css";
 
+interface Props {
+  categorias: Categoria[];
+}
+
 export function Categorias() {
   const {categorias, loading, crear, actualizar, eliminar } = useCategorias();
   const [busqueda, setBusqueda] = useState("");

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Perfil } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
+import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { ModalCrearUsuario } from "./ModalCrearUsuario";
@@ -11,7 +12,9 @@ import { ModalVerUsuario } from "./ModalVerUsuario";
 import { ModalEditarUsuario } from "./ModalEditarUsuario";
 import { toggleEstadoUsuario, eliminarUsuario } from "@/lib/actions/usuarios";
 import styles from "./usuarios.module.css";
-import { Eye, Pencil } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
+import { formatFechaHora } from "@/lib/utils/fecha";
+
 
 interface Props {
   usuarios: Perfil[];
@@ -20,7 +23,11 @@ interface Props {
 export function UsuariosClient({ usuarios: inicial }: Props) {
   const [usuarios, setUsuarios] = useState<Perfil[]>(inicial);
   const [busqueda, setBusqueda] = useState("");
-  const [filtroRol, setFiltroRol] = useState<"todos" | "admin" | "empleado">("todos");
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    busqueda: "",
+    roles: [],
+    estados: [],
+  });
   const [modalCrear, setModalCrear] = useState(false);
   const [usuarioVer, setUsuarioVer] = useState<Perfil | null>(null);
   const [usuarioEditar, setUsuarioEditar] = useState<Perfil | null>(null);
@@ -29,70 +36,21 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
   const filtrados = usuarios.filter((u) => {
-    const coincideBusqueda =
-      u.tNameUser.toLowerCase().includes(busqueda.toLowerCase()) ||
-      u.tEmailUser.toLowerCase().includes(busqueda.toLowerCase());
-    const coincideRol = filtroRol === "todos" || u.tRolUser === filtroRol;
-    return coincideBusqueda && coincideRol;
+    const texto = filtros.busqueda.toLowerCase();
+    const coincideTexto =
+      !texto ||
+      u.tNameUser.toLowerCase().includes(texto) ||
+      u.tEmailUser.toLowerCase().includes(texto);
+ 
+    const coincideRol =
+      filtros.roles.length === 0 || filtros.roles.includes(u.tRolUser);
+ 
+    const estadoValor = u.bStateUser ? "activo" : "inactivo";
+    const coincideEstado =
+      filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
+ 
+    return coincideTexto && coincideRol && coincideEstado;
   });
-
-  const columnas: ColumnaTabla<Perfil>[] = [
-    {
-      key: "tNameUser",
-      label: "Nombre",
-      render: (p) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className={styles.avatar}>{p.tNameUser[0].toUpperCase()}</div>
-          <span>{p.tNameUser}</span>
-        </div>
-      ),
-    },
-    {
-      key: "tEmailUser",
-      label: "Email",
-    },
-    {
-      key: "tRolUser",
-      label: "Rol",
-      render: (p) => (
-        // variante "admin" o "empleado" según el rol
-        <Badge variante={p.tRolUser} />
-      ),
-    },
-    {
-      key: "bStateUser",
-      label: "Estado",
-      render: (p) => (
-        // atajo booleano: true → "Activo", false → "Inactivo"
-        <Badge activo={p.bStateUser} />
-      ),
-    },
-    {
-      key: "acciones",
-      label: "Acciones",
-      render: (p) => (
-        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-          <ActionBtn title="Ver detalles" onClick={() => setUsuarioVer(p)}><Eye /></ActionBtn>
-          <ActionBtn title="Editar" onClick={() => setUsuarioEditar(p)}><Pencil /></ActionBtn>
-          <ActionBtn
-            title={p.bStateUser ? "Desactivar" : "Activar"}
-            onClick={() => handleToggleEstado(p)}
-            loading={toggleando === p.eCodUser}
-          >
-            {p.bStateUser ? "⏸" : "▶️"}
-          </ActionBtn>
-          <ActionBtn
-            title="Eliminar"
-            onClick={() => handleEliminar(p)}
-            loading={eliminando === p.eCodUser}
-            danger
-          >
-            🗑
-          </ActionBtn>
-        </div>
-      ),
-    },
-  ];
 
   async function handleToggleEstado(usuario: Perfil) {
     setToggleando(usuario.eCodUser);
@@ -129,13 +87,72 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
     setUsuarioEditar(null);
   }
 
+  const columnas: ColumnaTabla<Perfil>[] = [
+    {
+      key: "tNameUser",
+      label: "Nombre",
+      render: (p) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className={styles.avatar}>{p.tNameUser[0].toUpperCase()}</div>
+          <span>{p.tNameUser}</span>
+        </div>
+      ),
+    },
+    {
+        key: "tEmailUser",
+        label: "Email",
+    },
+    {
+        key: "fhCreateUser",
+        label: "Fecha de creación",
+        render: (u) => <span>{formatFechaHora(u.fhCreateUser)}</span>
+    },
+    {
+      key: "tRolUser",
+      label: "Rol",
+      render: (p) => <Badge variante={p.tRolUser} />,
+    },
+    {
+      key: "bStateUser",
+      label: "Estado",
+      render: (p) => (
+        <Badge
+          activo={p.bStateUser}
+          onToggle={() => handleToggleEstado(p)}
+          toggling={toggleando === p.eCodUser}
+        />
+      ),
+    },
+    {
+      key: "acciones",
+      label: "Acciones",
+      render: (p) => (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <ActionBtn title="Ver detalles" onClick={() => setUsuarioVer(p)}>
+            <Eye size={18} />
+          </ActionBtn>
+          <ActionBtn title="Editar" onClick={() => setUsuarioEditar(p)}>
+            <Pencil size={18} />
+          </ActionBtn>
+          <ActionBtn
+            title="Eliminar"
+            onClick={() => handleEliminar(p)}
+            loading={eliminando === p.eCodUser}
+            danger
+          >
+            <Trash2 size={18} />
+          </ActionBtn>
+        </div>
+      ),
+    },
+  ];
+
   const totalActivos = usuarios.filter((u) => u.bStateUser).length;
   const totalAdmins = usuarios.filter((u) => u.tRolUser === "admin").length;
 
   return (
     <div className="container">
 
-      {/* Buscador + Header */}
       <div className="header">
         <Buscador
           valor={busqueda}
@@ -153,29 +170,23 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
       {/* Stats */}
       <div className={styles.stats}>
         {[
-          { label: "Total usuarios",   value: usuarios.length, color: "#628321" },
-          { label: "Activos",          value: totalActivos,    color: "#10b981" },
-          { label: "Administradores",  value: totalAdmins,     color: "#a86530" },
+          { label: "Total usuarios",  value: usuarios.length, color: "var(--color-primary-dark)" },
+          { label: "Activos",         value: totalActivos,    color: "var(--color-primary)" },
+          { label: "Administradores", value: totalAdmins,     color: "#854F0B" },
         ].map((stat) => (
           <div key={stat.label} className={styles.statCard}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 13, color: "#7a6a5e", marginTop: 2 }}>{stat.label}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 400, color: "var(--gray)"}}>{stat.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Filtros de rol */}
-      <div className={styles.filtros}>
-        {(["todos", "admin", "empleado"] as const).map((rol) => (
-          <button
-            key={rol}
-            onClick={() => setFiltroRol(rol)}
-            className={`${styles.filtroBtn} ${filtroRol === rol ? styles.filtroBtnActivo : ""}`}
-          >
-            {rol}
-          </button>
-        ))}
-      </div>
+      {/* Filtros */}
+      <TablaToolbar
+        filtros={filtros}
+        onChange={setFiltros}
+        total={filtrados.length}
+      />
 
       {/* Tabla */}
       <DataTable
@@ -212,7 +223,6 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   );
 }
 
-// ── Botón de acción en tabla ─────────────────────────────────────────────────
 function ActionBtn({
   children, title, onClick, danger, loading,
 }: {

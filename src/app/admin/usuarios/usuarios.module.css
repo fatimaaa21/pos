@@ -2,23 +2,24 @@
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 10px;
 }
 
 .statCard {
-  background: white;
-  border-radius: 14px;
-  padding: 16px 20px;
-  border: 1px solid #f0ebe4;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    background: white;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 /* Filtros */
 .filtros {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+    background-color: red;
+    display: flex;
+    gap: 10px;
 }
 
 .filtroBtn {
@@ -68,9 +69,9 @@
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
-  color: var(--color-primary);
+  color: var(--gray);
 }
 
 .actionBtnDanger {
-    color: #dc2626;
+    color: #93000A;
 }
