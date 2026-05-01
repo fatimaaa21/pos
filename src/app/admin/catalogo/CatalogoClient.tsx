@@ -1,33 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
-import { formatFecha, formatRelativo } from "@/lib/utils/fecha";
+import { formatFechaHora, formatRelativo } from "@/lib/utils/fecha";
 import type { Categoria } from "@/types";
 import styles from "./catalogo.module.css";
+import { toggleEstadoCategoria, eliminarCategoria } from "@/lib/actions/categorias";
+import { ModalCrearCategoria } from "./ModalCrearCategoria";
+import { ModalVerCategoria } from "./ModalVerCategoria";
+import { ModalEditarCategoria } from "./ModalEditarCategoria";
 
 interface Props {
   categorias: Categoria[];
 }
 
 export function CatalogoClient({ categorias: inicial }: Props) {
-  const [categorias, setCategorias] = useState<Categoria[]>(inicial);
-  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    const [categorias, setCategorias] = useState<Categoria[]>(inicial);
+    const [busqueda, setBusqueda] = useState("");
+    const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
     roles: [],
     estados: [],
   });
-  const [modalAbierto, setModalAbierto] = useState(false);
+  const [modalCrear, setModalCrear] = useState(false);
   const [categoriaEditar, setCategoriaEditar] = useState<Categoria | null>(null);
   const [cargando, setCargando] = useState(false);
-  const [toggleando, setToggleando] = useState<number | null>(null);
-  const [eliminando, setEliminando] = useState<number | null>(null);
+  const [categoriaVer, setCategoriaVer] = useState<Categoria | null>(null);
+  const [toggleando, setToggleando] = useState<string | null>(null);
+  const [seleccionados, setSeleccionados] = useState<string[]>([]);
+  const [eliminando, setEliminando] = useState<string | null>(null);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = categorias.filter((c) => {
@@ -52,96 +59,46 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-  function abrirCrear() {
-    setCategoriaEditar(null);
-    setModalAbierto(true);
-  }
-
-  function abrirEditar(categoria: Categoria) {
-    setCategoriaEditar(categoria);
-    setModalAbierto(true);
-  }
-
-  function cerrarModal() {
-    setModalAbierto(false);
-    setCategoriaEditar(null);
-  }
-
-  async function handleGuardar(tNameCategory: string, ImgCategory: string) {
-    setCargando(true);
-    const supabase = createClient();
-    const ahora = new Date().toISOString();
-
-    if (categoriaEditar) {
-      const { data } = await supabase
-        .from("categorias")
-        .update({ tNameCategory, ImgCategory, fhUpdateCategory: ahora })
-        .eq("eCodCategory", categoriaEditar.eCodCategory)
-        .select()
-        .single();
-
-      if (data) {
-        setCategorias((prev) =>
-          prev.map((c) => (c.eCodCategory === categoriaEditar.eCodCategory ? (data as Categoria) : c))
-        );
-      }
-    } else {
-      const { data } = await supabase
-        .from("categorias")
-        .insert({ tNameCategory, ImgCategory, bStateCategory: true, fhCreateCategory: ahora })
-        .select()
-        .single();
-
-      if (data) {
-        setCategorias((prev) => [data as Categoria, ...prev]);
-      }
+  function handleCategoriaCreada(nuevo: Categoria) {
+      setCategorias((prev) => [nuevo, ...prev]);
+      setModalCrear(false);
     }
 
-    setCargando(false);
-    cerrarModal();
-    return { error: null };
-  }
+  function handleCategoriaEditada(actualizado: Categoria) {
+      setCategorias((prev) =>
+        prev.map((c) => (c.eCodCategory === actualizado.eCodCategory ? actualizado : c))
+      );
+      setCategoriaEditar(null);
+    }
 
   async function handleToggleEstado(categoria: Categoria) {
     setToggleando(categoria.eCodCategory);
-    const supabase = createClient();
-    const nuevoEstado = !(categoria.bStateCategory ?? true);
-
-    const { data } = await supabase
-      .from("categorias")
-      .update({ bStateCategory: nuevoEstado, fhUpdateCategory: new Date().toISOString() })
-      .eq("eCodCategory", categoria.eCodCategory)
-      .select()
-      .single();
-
-    if (data) {
+    const result = await toggleEstadoCategoria(categoria.eCodCategory, !categoria.bStateCategory);
+    if (!result?.error) {
       setCategorias((prev) =>
-        prev.map((c) => (c.eCodCategory === categoria.eCodCategory ? (data as Categoria) : c))
+        prev.map((c) =>
+          c.eCodCategory === categoria.eCodCategory ? { ...c, bStateCategory: !c.bStateCategory } : c
+        )
       );
     }
-
     setToggleando(null);
   }
 
   async function handleEliminar(categoria: Categoria) {
-    const confirmar = window.confirm(
-      `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
-    );
-    if (!confirmar) return;
+  const confirmar = window.confirm(
+    `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
+  );
+  if (!confirmar) return;
 
-    setEliminando(categoria.eCodCategory);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("categorias")
-      .delete()
-      .eq("eCodCategory", categoria.eCodCategory);
+  setEliminando(categoria.eCodCategory);
+  const { error } = await eliminarCategoria(categoria.eCodCategory);
 
-    if (!error) {
-      setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
-    }
-
-    setEliminando(null);
+  if (!error) {
+    setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
   }
+
+  setEliminando(null);
+}
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivas = categorias.filter((c) => c.bStateCategory).length;
@@ -152,18 +109,18 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       key: "tNameCategory",
       label: "Categoría",
       render: (c) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className={styles.icono}>{c.ImgCategory}</span>
-          <span style={{ fontWeight: 600 }}>{c.tNameCategory}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className={styles.avatar}>{c.tNameCategory[0].toUpperCase()}</div>
+          <span>{c.tNameCategory}</span>
         </div>
       ),
     },
     {
       key: "fhCreateCategory",
-      label: "Creación",
+      label: "Fecha de creación",
       render: (c) => (
-        <span style={{ color: "var(--gray)", fontSize: 13 }}>
-          {formatFecha(c.fhCreateCategory)}
+        <span>
+          {formatFechaHora(c.fhCreateCategory)}
         </span>
       ),
     },
@@ -171,7 +128,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       key: "fhUpdateCategory",
       label: "Última actualización",
       render: (c) => (
-        <span style={{ color: "var(--gray)", fontSize: 13 }}>
+        <span>
           {c.fhUpdateCategory ? formatRelativo(c.fhUpdateCategory) : "Sin cambios"}
         </span>
       ),
@@ -181,7 +138,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       label: "Estado",
       render: (c) => (
         <Badge
-          activo={c.bStateCategory ?? true}
+          activo={c.bStateCategory}
           onToggle={() => handleToggleEstado(c)}
           toggling={toggleando === c.eCodCategory}
         />
@@ -190,24 +147,22 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     {
       key: "acciones",
       label: "Acciones",
-      width: "100px",
       render: (c) => (
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            className={styles.actionBtn}
-            onClick={() => abrirEditar(c)}
-            title="Editar"
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-            onClick={() => handleEliminar(c)}
-            disabled={eliminando === c.eCodCategory}
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <ActionBtn title="Ver detalles" onClick={() => setCategoriaVer(c)}>
+            <Eye size={18} />
+          </ActionBtn>
+          <ActionBtn title="Editar" onClick={() => setCategoriaEditar(c)}>
+            <Pencil size={18} />
+          </ActionBtn>
+          <ActionBtn
             title="Eliminar"
+            onClick={() => handleEliminar(c)}
+            loading={eliminando === c.eCodCategory}
+            danger
           >
-            {eliminando === c.eCodCategory ? "⏳" : <Trash2 size={14} />}
-          </button>
+            <Trash2 size={18} />
+          </ActionBtn>
         </div>
       ),
     },
@@ -216,22 +171,30 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   return (
     <div className="container">
 
+      <div className="header">
+        <Buscador
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar usuario..."
+        />
+      </div>
+
       <PageHeader
         titulo="Categorías"
         descripcion="Gestiona las categorías de productos"
-        boton={{ label: "Nueva categoría", onClick: abrirCrear }}
+        boton={{ label: "Nueva categoría", onClick: () => setModalCrear(true) }}
       />
 
       {/* Stats */}
       <div className={styles.stats}>
         {[
-          { label: "Total categorías", value: categorias.length,                      color: "#628321" },
-          { label: "Activas",          value: totalActivas,                            color: "#3B6D11" },
-          { label: "Inactivas",        value: categorias.length - totalActivas,        color: "#888780" },
+          { label: "Total categorías", value: categorias.length, color: "var(--color-primary-dark)" },
+          { label: "Activas",          value: totalActivas,      color: "var(--color-primary)" },
+          { label: "Inactivas",        value: categorias.length - totalActivas, color: "#854F0B" },
         ].map((stat) => (
           <div key={stat.label} className={styles.statCard}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 13, color: "#7a6a5e", marginTop: 2 }}>{stat.label}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: stat.color }}>{stat.value}</div>
+            <div style={{ fontSize: 16, fontWeight: 400, color: "var(--gray)" }}>{stat.label}</div>
           </div>
         ))}
       </div>
@@ -249,10 +212,54 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         columnas={columnas}
         datos={filtradas}
         keyExtractor={(c) => String(c.eCodCategory)}
+        seleccionable
+        seleccionados={seleccionados}
+        onSeleccionar={setSeleccionados}
         vacio="No se encontraron categorías"
       />
 
-      
+      {/* Modales */}
+      {modalCrear && (
+        <ModalCrearCategoria
+          onClose={() => setModalCrear(false)}
+          onCreado={handleCategoriaCreada}
+        />
+      )}
+      {categoriaVer && (
+        <ModalVerCategoria
+          categoria={categoriaVer}
+          onClose={() => setCategoriaVer(null)}
+        />
+      )}
+      {categoriaEditar && (
+        <ModalEditarCategoria
+          categoria={categoriaEditar}
+          onClose={() => setCategoriaEditar(null)}
+          onEditado={handleCategoriaEditada}
+        />
+      )}
+
     </div>
+  );
+}
+
+function ActionBtn({
+  children, title, onClick, danger, loading,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  danger?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={loading}
+      className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""} ${loading ? styles.actionBtnLoading : ""}`}
+    >
+      {loading ? "⏳" : children}
+    </button>
   );
 }

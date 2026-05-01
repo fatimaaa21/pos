@@ -144,25 +144,6 @@ export function TablaToolbar({ filtros, onChange, total, ocultarRol = false }: T
             </div>
           )}
         </div>
-
-        {chips.map((chip) => (
-          <span
-            key={`${chip.tipo}-${chip.valor}`}
-            className={`${styles.chip} ${styles[`chip_${chip.variante}`]}`}
-          >
-            {chip.valor}
-            <button
-              className={styles.chipX}
-              onClick={() => removerChip(chip.tipo, chip.valor)}
-            >
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-
-        <span className={styles.conteo}>
-          {total} {total === 1 ? "resultado" : "resultados"}
-        </span>
       </div>
     </div>
   );

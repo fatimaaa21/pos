@@ -61,7 +61,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
         />
       </ModalField>
 
-      <ModalField label="Correo electrónico" required>
+      <ModalField label="Correo electrónico">
         <ModalInput
           type="email"
           placeholder="correo@ejemplo.com"

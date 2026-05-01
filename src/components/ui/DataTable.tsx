@@ -59,25 +59,27 @@ const todosSeleccionados =
         <table className={styles.table}>
             {/* Encabezado */}
             <thead>
+                <tr>
                 {seleccionable && (
-                <th className={styles.checkboxCol}>
+                    <th className={styles.checkboxCol}>
                     <input
-                    type="checkbox"
-                    className={styles.checkbox}
-                    checked={todosSeleccionados}
-                    onChange={toggleTodos}
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={todosSeleccionados}
+                        onChange={toggleTodos}
                     />
-                </th>
+                    </th>
                 )}
                 {columnas.map((col) => (
-                <th
+                    <th
                     key={col.key}
                     className={styles.headerCell}
                     style={{ width: col.width }}
-                >
+                    >
                     {col.label}
-                </th>
+                    </th>
                 ))}
+                </tr>
             </thead>
 
             {/* Cuerpo */}
