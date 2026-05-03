@@ -16,7 +16,7 @@ export interface Perfil {
 }
 
 export interface Categoria {
-  eCodCategory: number;
+  eCodCategory: string;    // UUID, PK
   tNameCategory: string;
   ImgCategory?: string;
   fhCreateCategory?: string;
@@ -25,14 +25,15 @@ export interface Categoria {
 }
 
 export interface Producto {
-  id: number;
-  nombre: string;
-  categoria_id: number;
-  categoria?: Categoria;
-  precio: number;
-  costo: number;
-  imagen_url?: string;
-  activo: boolean;
+  eCodProduct: string;  // UUID, PK
+  tNameProduct: string;
+  fkeCodCategory?: Categoria;
+  ePriceProduct: number;
+  eCostProduct: number;
+  ImgProduct?: string;
+  bStateProduct?: boolean;
+  fhCreateProduct?: string;
+  fhUpdateProduct?: string;
 }
 
 export interface Existencia {

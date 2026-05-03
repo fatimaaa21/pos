@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import type { Perfil } from "@/types";
+import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { editarUsuario } from "@/lib/actions/usuarios";
+import type { Perfil } from "@/types";
 
 interface Props {
   usuario: Perfil;
@@ -19,8 +20,7 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
     tRolUser: usuario.tRolUser,
   });
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleConfirmar() {
     setLoading(true);
     setError(null);
 
@@ -40,109 +40,46 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
     }
   }
 
+  const deshabilitado = !form.tNameUser.trim() || !form.tEmailUser.trim();
+
   return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{
-        position: "fixed", inset: 0,
-        background: "rgba(0,0,0,0.4)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 1000, padding: 20,
-        backdropFilter: "blur(4px)",
-      }}
+    <Modal
+      titulo="Editar usuario"
+      onCerrar={onClose}
+      onConfirmar={handleConfirmar}
+      labelConfirmar="Guardar cambios"
+      cargando={loading}
+      deshabilitado={deshabilitado}
+      error={error}
     >
-      <div style={{
-        background: "white", borderRadius: 20,
-        padding: 28, width: "100%", maxWidth: 440,
-        boxShadow: "0 24px 64px rgba(0,0,0,0.15)",
-      }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 20, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>
-            Editar usuario
-          </h2>
-          <button
-            onClick={onClose}
-            style={{ width: 32, height: 32, borderRadius: 8, border: "1px solid #e5e0d8", background: "#fafaf9", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}
-          >
-            ×
-          </button>
-        </div>
+      <ModalField label="Nombre completo" required>
+        <ModalInput
+          type="text"
+          value={form.tNameUser}
+          onChange={(e) => setForm({ ...form, tNameUser: e.target.value })}
+          autoFocus
+        />
+      </ModalField>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#4a4a4a" }}>Nombre completo</label>
-            <input
-              required
-              value={form.tNameUser}
-              onChange={(e) => setForm({ ...form, tNameUser: e.target.value })}
-              style={inputStyle}
-            />
-          </div>
+      <ModalField label="Correo electrónico" required>
+        <ModalInput
+          type="email"
+          value={form.tEmailUser}
+          onChange={(e) => setForm({ ...form, tEmailUser: e.target.value })}
+        />
+      </ModalField>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#4a4a4a" }}>Correo electrónico</label>
-            <input
-              required
-              type="email"
-              value={form.tEmailUser}
-              onChange={(e) => setForm({ ...form, tEmailUser: e.target.value })}
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#4a4a4a" }}>Rol</label>
-            <select
-              value={form.tRolUser}
-              onChange={(e) => setForm({ ...form, tRolUser: e.target.value as "admin" | "empleado" })}
-              style={inputStyle}
-            >
-              <option value="empleado">Empleado</option>
-              <option value="admin">Administrador</option>
-            </select>
-          </div>
-
-          {error && (
-            <div style={{
-              background: "#fef2f2", border: "1px solid #fecaca",
-              borderRadius: 10, padding: "10px 14px",
-              color: "#dc2626", fontSize: 13,
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ flex: 1, padding: "11px", borderRadius: 10, border: "1.5px solid #e5e0d8", background: "white", color: "#7a6a5e", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{ flex: 2, padding: "11px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #628321, #4a6318)", color: "white", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", opacity: loading ? 0.7 : 1 }}
-            >
-              {loading ? "Guardando..." : "Guardar cambios"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      <ModalField label="Rol">
+        <ModalSelect
+          value={form.tRolUser}
+          onChange={(e) =>
+            setForm({ ...form, tRolUser: e.target.value as "admin" | "empleado" })
+          }
+        >
+          <option value="empleado">Empleado</option>
+          <option value="admin">Administrador</option>
+        </ModalSelect>
+      </ModalField>
+    </Modal>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1.5px solid #e5e0d8",
-  fontSize: 14,
-  color: "#1a1a1a",
-  background: "white",
-  outline: "none",
-  fontFamily: "'DM Sans', sans-serif",
-  width: "100%",
-};

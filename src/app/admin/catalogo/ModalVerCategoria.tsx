@@ -3,16 +3,16 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { formatFechaHora, formatRelativo } from "@/lib/utils/fecha";
-import type { Perfil } from "@/types";
-import styles from "./ModalVerUsuario.module.css";
+import type { Categoria } from "@/types";
+import styles from "./ModalVerCategoria.module.css";
 
 interface Props {
-  usuario: Perfil;
+  categoria: Categoria;
   onClose: () => void;
 }
 
-export function ModalVerUsuario({ usuario, onClose }: Props) {
-  const iniciales = usuario.tNameUser
+export function ModalVerCategoria({ categoria, onClose }: Props) {
+  const iniciales = categoria.tNameCategory
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
@@ -21,7 +21,7 @@ export function ModalVerUsuario({ usuario, onClose }: Props) {
 
   return (
     <Modal
-      titulo="Detalle de usuario"
+      titulo="Detalle de categoría"
       onCerrar={onClose}
       labelCancelar="Cerrar"
       ancho="sm"
@@ -31,26 +31,23 @@ export function ModalVerUsuario({ usuario, onClose }: Props) {
         <div
           className={styles.avatar}
           style={{
-            background: usuario.tRolUser === "admin" ? "#FAEEDA" : "#E1F5EE",
-            color: usuario.tRolUser === "admin" ? "#633806" : "#085041",
+            background: categoria.tNameCategory === "admin" ? "#FAEEDA" : "#E1F5EE",
+            color: categoria.tNameCategory === "admin" ? "#633806" : "#085041",
           }}
         >
           {iniciales}
         </div>
-        <div className={styles.avatarNombre}>{usuario.tNameUser}</div>
+        <div className={styles.avatarNombre}>{categoria.tNameCategory}</div>
         <div style={{ display: "flex", gap: 10 }}>
-          <Badge variante={usuario.tRolUser} dot={false} />
-          <Badge activo={usuario.bStateUser} />
+          <Badge activo={categoria.bStateCategory} />
         </div>
       </div>
 
       {/* Campos */}
       <div className={styles.campos}>
         {[
-          { label: "Correo electrónico",    valor: usuario.tEmailUser },
-          { label: "Código de acceso",    valor: usuario.eCodeUser ?? "—" },
-          { label: "Fecha de Creación",  valor: formatFechaHora(usuario.fhCreateUser) },
-          { label: "Ultima Actualización", valor: formatRelativo(usuario.fhUpdateUser) },
+          { label: "Fecha de Creación",  valor: formatFechaHora(categoria.fhCreateCategory) },
+          { label: "Ultima Actualización", valor: formatRelativo(categoria.fhUpdateCategory) },
         ].map(({ label, valor }) => (
           <div key={label} className={styles.campo}>
             <span className={styles.campoLabel}>{label}</span>

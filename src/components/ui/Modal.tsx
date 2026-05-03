@@ -1,92 +1,166 @@
 "use client";
 
-import { X } from "lucide-react";
-import { useState, useEffect } from "react";
-import type { Categoria } from "@/types";
+import { useEffect } from "react";
+import { Asterisk, X } from "lucide-react";
 import styles from "./Modal.module.css";
 
-const ICONOS = ["🥐", "🥖", "🎂", "🍪", "☕", "🍩", "🌀", "🍞", "🥧", "🍰", "🧁", "🥨", "🫓", "🥯", "🍫", "🧇"];
+// ─── Tipos ───────────────────────────────────────────────────────────────────
 
-interface ModalCategoriaProps {
-  categoria?: Categoria | null;
-  onGuardar: (tNameCategory: string, ImgCategory: string) => Promise<{ error: unknown }>;
+type VarianteConfirmar = "primario" | "peligro";
+
+interface ModalProps {
+  titulo: string;
   onCerrar: () => void;
+
+  // Footer — si no se pasan, no se renderiza el footer
+  onConfirmar?: () => void;
+  labelConfirmar?: string;
+  labelCancelar?: string;
+  varianteConfirmar?: VarianteConfirmar;
   cargando?: boolean;
+  deshabilitado?: boolean;
+
+  // Feedback
+  error?: string | null;
+
+  // Layout
+  ancho?: "sm" | "md" | "lg";
+  children: React.ReactNode;
 }
 
-export function ModalCategoria({ categoria, onGuardar, onCerrar, cargando }: ModalCategoriaProps) {
-  const [nombre, setNombre] = useState("");
-  const [icono, setIcono] = useState("🥐");
+// ─── Componente ──────────────────────────────────────────────────────────────
 
+export function Modal({
+  titulo,
+  onCerrar,
+  onConfirmar,
+  labelConfirmar = "Confirmar",
+  labelCancelar = "Cancelar",
+  varianteConfirmar = "primario",
+  cargando = false,
+  deshabilitado = false,
+  error,
+  ancho = "md",
+  children,
+}: ModalProps) {
+
+  // Cerrar con Escape
   useEffect(() => {
-    if (categoria) {
-      setNombre(categoria.tNameCategory);
-      setIcono(categoria.ImgCategory ?? "🥐");
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCerrar();
     }
-  }, [categoria]);
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onCerrar]);
 
-  async function handleGuardar() {
-    if (!nombre.trim()) return;
-    await onGuardar(nombre.trim(), icono);
-  }
+  // Bloquear scroll del body
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  const anchoClass = {
+    sm: styles.anchoSm,
+    md: styles.anchoMd,
+    lg: styles.anchoLg,
+  }[ancho];
+
+  const btnConfirmarClass = varianteConfirmar === "peligro"
+    ? styles.btnPeligro
+    : styles.btnPrimario;
 
   return (
-    <div className={styles.overlay} onClick={onCerrar}>
-      <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={styles.overlay}
+      onClick={(e) => e.target === e.currentTarget && onCerrar()}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-titulo"
+    >
+      <div className={`${styles.card} ${anchoClass}`}>
 
+        {/* Header */}
         <div className={styles.header}>
-          <h2 className={styles.title}>
-            {categoria ? "Editar categoría" : "Nueva categoría"}
-          </h2>
-          <button className={styles.closeBtn} onClick={onCerrar}>
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className={styles.body}>
-          <div className={styles.field}>
-            <label className={styles.label}>Nombre</label>
-            <input
-              className={styles.input}
-              type="text"
-              placeholder="Ej. Pan Dulce"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              autoFocus
-            />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Ícono</label>
-            <div className={styles.iconGrid}>
-              {ICONOS.map((ic) => (
-                <button
-                  key={ic}
-                  className={`${styles.iconBtn} ${icono === ic ? styles.iconBtnActive : ""}`}
-                  onClick={() => setIcono(ic)}
-                  type="button"
-                >
-                  {ic}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.footer}>
-          <button className={styles.btnSecundario} onClick={onCerrar}>
-            Cancelar
-          </button>
+          <h2 className={styles.titulo}>{titulo}</h2>
           <button
-            className={styles.btnPrimario}
-            onClick={handleGuardar}
-            disabled={!nombre.trim() || cargando}
+            className={styles.btnCerrar}
+            onClick={onCerrar}
+            aria-label="Cerrar"
           >
-            {cargando ? "Guardando..." : "Guardar"}
+            <X size={14} />
           </button>
         </div>
+
+        {/* Body */}
+        <div className={styles.body}>
+          {children}
+
+          {error && (
+            <div className={styles.error} role="alert">
+              <span className={styles.errorIcon}>⚠</span>
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer — solo si hay acción de confirmar O si se quiere solo el cancelar */}
+        {(onConfirmar !== undefined || labelCancelar) && (
+          <div className={styles.footer}>
+            <button
+              type="button"
+              className={styles.btnCancelar}
+              onClick={onCerrar}
+              disabled={cargando}
+            >
+              {labelCancelar}
+            </button>
+
+            {onConfirmar !== undefined && (
+              <button
+                type="button"
+                className={`${styles.btnAccion} ${btnConfirmarClass}`}
+                onClick={onConfirmar}
+                disabled={cargando || deshabilitado}
+              >
+                {cargando ? "Cargando..." : labelConfirmar}
+              </button>
+            )}
+          </div>
+        )}
 
       </div>
     </div>
   );
+}
+
+// ─── Sub-componentes para componer el body ───────────────────────────────────
+
+interface FieldProps {
+  label: string;
+  children: React.ReactNode;
+  required?: boolean;
+}
+
+export function ModalField({ label, children, required }: FieldProps) {
+  return (
+    <div className={styles.field}>
+      <label className={styles.fieldLabel}>
+        {label}
+        {required && <span className={styles.fieldRequired}><Asterisk size={14}/></span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+export function ModalInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={styles.input} />;
+}
+
+export function ModalSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return <select {...props} className={styles.input} />;
+}
+
+export function ModalInfo({ children }: { children: React.ReactNode }) {
+  return <div className={styles.info}>{children}</div>;
 }

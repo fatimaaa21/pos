@@ -1,7 +1,5 @@
 import styles from "./Badge.module.css";
 
-// ─── Variantes predefinidas ──────────────────────────────────────────────────
-
 type Variante =
   | "activo"
   | "inactivo"
@@ -16,9 +14,11 @@ type Variante =
 
 interface BadgeProps {
   variante?: Variante;
-  activo?: boolean;       // atajo: true → "activo", false → "inactivo"
+  activo?: boolean;
   children?: React.ReactNode;
-  dot?: boolean;          // muestra el punto indicador
+  dot?: boolean;
+  onToggle?: () => void;
+  toggling?: boolean;
 }
 
 const CONFIG: Record<Variante, { label: string; clase: string }> = {
@@ -34,15 +34,33 @@ const CONFIG: Record<Variante, { label: string; clase: string }> = {
   disponible:  { label: "Disponible",  clase: styles.disponible },
 };
 
-export function Badge({ variante, activo, children, dot = true }: BadgeProps) {
-  // Si pasan "activo" como booleano, lo convertimos a variante
+export function Badge({ variante, activo, children, dot = true, onToggle, toggling }: BadgeProps) {
   const v: Variante = variante ?? (activo === true ? "activo" : activo === false ? "inactivo" : "activo");
   const config = CONFIG[v];
 
+  const content = (
+    <>
+      {dot && <span className={styles.dot} />}
+      {toggling ? "..." : (children ?? config.label)}
+    </>
+  );
+
+  if (onToggle) {
+    return (
+      <button
+        onClick={onToggle}
+        disabled={toggling}
+        className={`${styles.badge} ${config.clase} ${styles.togglable}`}
+        title={v === "activo" ? "Clic para desactivar" : "Clic para activar"}
+      >
+        {content}
+      </button>
+    );
+  }
+
   return (
     <span className={`${styles.badge} ${config.clase}`}>
-      {dot && <span className={styles.dot} />}
-      {children ?? config.label}
+      {content}
     </span>
   );
 }
