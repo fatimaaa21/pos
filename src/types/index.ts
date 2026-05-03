@@ -27,7 +27,6 @@ export interface Categoria {
 export interface Producto {
   eCodProduct: string;  // UUID, PK
   tNameProduct: string;
-  categoria_id: string;
   fkeCodCategory?: Categoria;
   ePriceProduct: number;
   eCostProduct: number;

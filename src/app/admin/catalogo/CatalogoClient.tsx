@@ -54,7 +54,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     const { data } = await supabase
       .from("categorias")
       .select("*")
-      .order("tNameCategory");
+      .order("eCodCategory", { ascending: true });
     if (data) setCategorias(data as Categoria[]);
   }
 
@@ -91,10 +91,12 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   if (!confirmar) return;
 
   setEliminando(categoria.eCodCategory);
-  const { error } = await eliminarCategoria(categoria.eCodCategory);
+  const result = await eliminarCategoria(categoria.eCodCategory);
 
-  if (!error) {
+  if (!result?.error) {
     setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
+  } else {
+    alert(`Error al eliminar categoría: ${result.error}`);
   }
 
   setEliminando(null);

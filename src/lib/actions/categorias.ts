@@ -87,6 +87,21 @@ export async function eliminarCategoria(eCodCategory: string) {
   try {
     const adminClient = createAdminClient();
 
+    // Verificar si hay productos asociados a esta categoría
+    const { data: productosAsociados, error: errorConsulta } = await adminClient
+      .from("productos")
+      .select("eCodProduct")
+      .eq("fkeCodCategory", eCodCategory)
+      .limit(1);
+
+    if (errorConsulta) {
+      return { error: `Error al verificar productos asociados: ${errorConsulta.message}` };
+    }
+
+    if (productosAsociados && productosAsociados.length > 0) {
+      return { error: "No se puede eliminar la categoría porque tiene productos asociados. Desactívela en su lugar." };
+    }
+
     const { error } = await adminClient
       .from("categorias")
       .delete()
