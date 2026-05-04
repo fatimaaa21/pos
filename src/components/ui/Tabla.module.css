@@ -1,54 +1,67 @@
 .wrapper {
   width: 100%;
   overflow-x: auto;
+  background: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
 }
 
 .tabla {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 8px;
+  border-collapse: collapse;
 }
 
 .tabla th {
-  padding: 12px;
+  padding: 10px var(--space-4);
   text-align: left;
-  font-size: 16px;
-  font-weight: 400;
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 700;
   color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   white-space: nowrap;
-  background: white;
-  border-radius: 8px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .tabla td {
-  padding: 14px 20px;
-  font-size: 14px;
-  color: #1a1a1a;
+  padding: 12px var(--space-4);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dark);
   background: white;
-}
-
-.tabla tbody tr {
-  background: white;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .tabla tbody tr:last-child td {
   border-bottom: none;
 }
 
-.tabla tbody tr:hover {
-  background: #fdf8f2;
+.tabla tbody tr {
+  transition: background 0.12s ease;
+}
+
+.tabla tbody tr:hover td {
+  background: var(--color-primary-50);
 }
 
 .vacio {
   text-align: center;
-  padding: 60px 20px;
-  color: #9e9590;
-  font-size: 14px;
+  padding: var(--space-12) var(--space-5);
+  color: var(--gray);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .cargando {
   text-align: center;
-  padding: 60px 20px;
-  color: #9e9590;
-  font-size: 14px;
+  padding: var(--space-12) var(--space-5);
+  color: var(--gray);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 500;
 }

@@ -172,3 +172,22 @@ export async function eliminarUsuario(eCodUser: string) {
     return { error: `Error inesperado: ${e?.message}` };
   }
 }
+
+export async function actualizarAvatar(eCodUser: string, ImgUser: string) {
+  try {
+    const adminClient = createAdminClient();
+
+    const { error } = await adminClient
+      .from("perfiles")
+      .update({ ImgUser, fhUpdateUser: new Date().toISOString() })
+      .eq("eCodUser", eCodUser);
+
+    if (error) return { error: error.message };
+
+    revalidatePath("/admin/usuarios");
+    revalidatePath("/empleado/inventario");
+    return { ok: true };
+  } catch (e: any) {
+    return { error: e?.message };
+  }
+}

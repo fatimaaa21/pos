@@ -43,7 +43,7 @@ export async function editarProducto(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
-    const eCodProduct = formData.get("eCodProduct   ") as string;
+    const eCodProduct = formData.get("eCodProduct") as string;
     const tNameProduct = formData.get("tNameProduct") as string;
     const ImgProduct = formData.get("ImgProduct") as string;
     const ePriceProduct = parseFloat(formData.get("ePriceProduct") as string);

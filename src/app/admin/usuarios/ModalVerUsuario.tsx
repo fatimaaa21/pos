@@ -19,6 +19,8 @@ export function ModalVerUsuario({ usuario, onClose }: Props) {
     .join("")
     .toUpperCase();
 
+  const esAdmin = usuario.tRolUser === "admin";
+
   return (
     <Modal
       titulo="Detalle de usuario"
@@ -31,14 +33,14 @@ export function ModalVerUsuario({ usuario, onClose }: Props) {
         <div
           className={styles.avatar}
           style={{
-            background: usuario.tRolUser === "admin" ? "#FAEEDA" : "#E1F5EE",
-            color: usuario.tRolUser === "admin" ? "#633806" : "#085041",
+            background: esAdmin ? "var(--color-accent-bg)"    : "var(--color-primary-50)",
+            color:      esAdmin ? "var(--color-accent)"        : "var(--color-primary-dark)",
           }}
         >
           {iniciales}
         </div>
         <div className={styles.avatarNombre}>{usuario.tNameUser}</div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className={styles.badges}>
           <Badge variante={usuario.tRolUser} dot={false} />
           <Badge activo={usuario.bStateUser} />
         </div>
@@ -47,10 +49,10 @@ export function ModalVerUsuario({ usuario, onClose }: Props) {
       {/* Campos */}
       <div className={styles.campos}>
         {[
-          { label: "Correo electrónico",    valor: usuario.tEmailUser },
-          { label: "Código de acceso",    valor: usuario.eCodeUser ?? "—" },
-          { label: "Fecha de Creación",  valor: formatFechaHora(usuario.fhCreateUser) },
-          { label: "Ultima Actualización", valor: formatRelativo(usuario.fhUpdateUser) },
+          { label: "Correo electrónico", valor: usuario.tEmailUser },
+          { label: "Código de acceso",   valor: usuario.eCodeUser ?? "—" },
+          { label: "Fecha de creación",  valor: formatFechaHora(usuario.fhCreateUser) },
+          { label: "Última actualización", valor: formatRelativo(usuario.fhUpdateUser) },
         ].map(({ label, valor }) => (
           <div key={label} className={styles.campo}>
             <span className={styles.campoLabel}>{label}</span>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Perfil } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
+import { StatCards } from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
@@ -93,7 +94,16 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
       label: "Nombre",
       render: (p) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className={styles.avatar}>{p.tNameUser[0].toUpperCase()}</div>
+          <div
+            className={styles.avatar}
+            style={
+              p.tRolUser === "admin"
+                ? { background: "var(--color-accent-bg)", color: "var(--color-accent)" }
+                : { background: "var(--color-primary-50)", color: "var(--color-primary-dark)" }
+            }
+          >
+            {p.tNameUser[0].toUpperCase()}
+          </div>
           <span>{p.tNameUser}</span>
         </div>
       ),
@@ -168,18 +178,11 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
       />
 
       {/* Stats */}
-      <div className={styles.stats}>
-        {[
-          { label: "Total usuarios",  value: usuarios.length, color: "var(--color-primary-dark)" },
-          { label: "Activos",         value: totalActivos,    color: "var(--color-primary)" },
-          { label: "Administradores", value: totalAdmins,     color: "#854F0B" },
-        ].map((stat) => (
-          <div key={stat.label} className={styles.statCard}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 16, fontWeight: 400, color: "var(--gray)"}}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
+      <StatCards stats={[
+        { label: "Total usuarios",  value: usuarios.length, variante: "primary" },
+        { label: "Activos",         value: totalActivos,    variante: "success" },
+        { label: "Administradores", value: totalAdmins,     variante: "accent"  },
+      ]} />
 
       {/* Filtros */}
       <TablaToolbar

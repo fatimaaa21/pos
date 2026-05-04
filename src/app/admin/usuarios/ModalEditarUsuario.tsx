@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
-import { editarUsuario } from "@/lib/actions/usuarios";
+import { editarUsuario, actualizarAvatar } from "@/lib/actions/usuarios";
 import type { Perfil } from "@/types";
+import { subirAvatar } from "@/lib/supabase/storage";
 
 interface Props {
   usuario: Perfil;

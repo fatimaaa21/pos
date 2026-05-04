@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
+import { useEffect, useState } from "react";
+import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { editarProducto } from "@/lib/actions/productos";
-import type { Producto } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import type { Categoria, Producto } from "@/types";
 
 interface Props {
   producto: Producto;
@@ -14,12 +15,34 @@ interface Props {
 export function ModalEditarProducto({ producto, onClose, onEditado }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [form, setForm] = useState({
     tNameProduct: producto.tNameProduct,
-    bStateProduct: producto.bStateProduct,
-    ImgProduct: producto.ImgProduct,
-    
+    ImgProduct: producto.ImgProduct || "",
+    ePriceProduct: producto.ePriceProduct.toString(),
+    eCostProduct: producto.eCostProduct.toString(),
+    fkeCodCategory: producto.fkeCodCategory ? (typeof producto.fkeCodCategory === 'object' ? producto.fkeCodCategory.eCodCategory : producto.fkeCodCategory) : "",
   });
+
+  useEffect(() => {
+    async function cargarCategorias() {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("categorias")
+        .select("eCodCategory, tNameCategory")
+        .eq("bStateCategory", true)
+        .order("tNameCategory");
+
+      if (data) setCategorias(data as Categoria[]);
+      setCargandoCategorias(false);
+      if (error) {
+        console.error("Error cargando categorías activas:", error.message);
+      }
+    }
+
+    cargarCategorias();
+  }, []);
 
   async function handleConfirmar() {
     setLoading(true);
@@ -28,8 +51,10 @@ export function ModalEditarProducto({ producto, onClose, onEditado }: Props) {
     const formData = new FormData();
     formData.append("eCodProduct", producto.eCodProduct);
     formData.append("tNameProduct", form.tNameProduct);
-    formData.append("bStateProduct", form.bStateProduct.toString());
     formData.append("ImgProduct", form.ImgProduct);
+    formData.append("ePriceProduct", form.ePriceProduct);
+    formData.append("eCostProduct", form.eCostProduct);
+    formData.append("fkeCodCategory", form.fkeCodCategory);
     const result = await editarProducto(formData);
 
     if (result?.error) {
@@ -40,7 +65,7 @@ export function ModalEditarProducto({ producto, onClose, onEditado }: Props) {
     }
   }
 
-  const deshabilitado = !form.tNameProduct.trim() || !form.bStateProduct.toString().trim();
+  const deshabilitado = !form.tNameProduct.trim() || !form.ImgProduct.trim() || !form.ePriceProduct.trim() || !form.eCostProduct.trim() || !form.fkeCodCategory.trim();
 
   return (
     <Modal
@@ -67,6 +92,46 @@ export function ModalEditarProducto({ producto, onClose, onEditado }: Props) {
           value={form.ImgProduct}
           onChange={(e) => setForm({ ...form, ImgProduct: e.target.value })}
         />
+      </ModalField>
+
+      <ModalField label="Precio al público" required>
+        <ModalInput
+          type="number"
+          value={form.ePriceProduct}
+          onChange={(e) => setForm({ ...form, ePriceProduct: e.target.value })}
+        />
+      </ModalField>
+
+      <ModalField label="Costo de producción" required>
+        <ModalInput
+          type="number"
+          value={form.eCostProduct}
+          onChange={(e) => setForm({ ...form, eCostProduct: e.target.value })}
+        />
+      </ModalField>
+
+      <ModalField label="Categoría" required>
+        <ModalSelect
+          value={form.fkeCodCategory}
+        onChange={(e) => setForm({ ...form, fkeCodCategory: e.target.value })}
+        >
+        <option value="">Seleccionar categoría</option>
+        {cargandoCategorias ? (
+            <option value="" disabled>
+            Cargando categorías...
+            </option>
+        ) : categorias.length === 0 ? (
+            <option value="" disabled>
+            No hay categorías activas
+            </option>
+        ) : (
+            categorias.map((categoria) => (
+            <option key={categoria.eCodCategory} value={categoria.eCodCategory}>
+                {categoria.tNameCategory}
+            </option>
+            ))
+        )}
+        </ModalSelect>
       </ModalField>
 
     </Modal>

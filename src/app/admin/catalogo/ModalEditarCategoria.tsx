@@ -26,7 +26,7 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
     const formData = new FormData();
     formData.append("eCodCategory", categoria.eCodCategory);
     formData.append("tNameCategory", form.tNameCategory);
-    formData.append("ImgCategory", form.ImgCategory);
+    formData.append("ImgCategory", form.ImgCategory || "");
 
     const result = await editarCategoria(formData);
 

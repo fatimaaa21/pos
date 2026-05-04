@@ -7,6 +7,7 @@ export type Rol = "admin" | "empleado";
 export interface Perfil {
   eCodUser: string;       // UUID, PK, linked to auth.users.id
   tNameUser: string;
+  ImgUser?: string;
   tEmailUser: string;
   tRolUser: Rol;
   bStateUser: boolean;

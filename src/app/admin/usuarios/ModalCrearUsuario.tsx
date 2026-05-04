@@ -39,7 +39,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
     }
   }
 
-  const deshabilitado = !form.tNameUser.trim() || !form.tEmailUser.trim();
+  const deshabilitado = !form.tNameUser.trim() || !form.tEmailUser.trim() || !form.tRolUser;
 
   return (
     <Modal
@@ -61,7 +61,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
         />
       </ModalField>
 
-      <ModalField label="Correo electrónico">
+      <ModalField label="Correo electrónico" required>
         <ModalInput
           type="email"
           placeholder="correo@ejemplo.com"
@@ -70,7 +70,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
         />
       </ModalField>
 
-      <ModalField label="Rol">
+      <ModalField label="Rol" required>
         <ModalSelect
           value={form.tRolUser}
           style={{ cursor: "pointer" }}
