@@ -157,17 +157,12 @@ export function ModalInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={styles.input} />;
 }
 
-export function ModalSelect({
-  children,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+export function ModalSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <div className={styles.selectWrapper}>
-      <select {...props} className={styles.input}>
-        {children}
-      </select>
+    <div className={styles.selectWrap}>
+      <select {...props} className={styles.input} />
       <span className={styles.selectChevron}>
-        <ChevronDown size={16} />
+        <ChevronDown size={16} strokeWidth={2.5} />
       </span>
     </div>
   );

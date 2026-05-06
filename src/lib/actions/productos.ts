@@ -14,6 +14,7 @@ export async function crearProducto(formData: FormData) {
     const ePriceProduct = parseFloat(formData.get("ePriceProduct") as string);
     const eCostProduct = parseFloat(formData.get("eCostProduct") as string);
     const fkeCodCategory = formData.get("fkeCodCategory") as string;
+
     const { data: producto, error: productoError } = await adminClient
       .from("productos")
       .insert({
@@ -32,6 +33,7 @@ export async function crearProducto(formData: FormData) {
       return { error: `Error al crear producto: ${productoError.message}` };
     }
 
+    revalidatePath("/admin/productos");
     revalidatePath("/admin/catalogo");
     return { producto: producto as Producto };
   } catch (e: any) {
@@ -43,6 +45,7 @@ export async function editarProducto(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
+    // Nota: había un typo en el key original ("eCodProduct   " con espacios)
     const eCodProduct = formData.get("eCodProduct") as string;
     const tNameProduct = formData.get("tNameProduct") as string;
     const ImgProduct = formData.get("ImgProduct") as string;
@@ -58,7 +61,7 @@ export async function editarProducto(formData: FormData) {
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
-        fhUpdateProduct : new Date().toISOString(),
+        fhUpdateProduct: new Date().toISOString(),
       })
       .eq("eCodProduct", eCodProduct)
       .select()
@@ -66,6 +69,7 @@ export async function editarProducto(formData: FormData) {
 
     if (error) return { error: `Error al actualizar producto: ${error.message}` };
 
+    revalidatePath("/admin/productos");
     revalidatePath("/admin/catalogo");
     return { producto: producto as Producto };
   } catch (e: any) {
@@ -87,6 +91,7 @@ export async function toggleEstadoProducto(eCodProduct: string, nuevoEstado: boo
 
     if (error) return { error: `Error al actualizar estado: ${error.message}` };
 
+    revalidatePath("/admin/productos");
     revalidatePath("/admin/catalogo");
     return { ok: true };
   } catch (e: any) {
@@ -98,13 +103,49 @@ export async function eliminarProducto(eCodProduct: string) {
   try {
     const adminClient = createAdminClient();
 
-    const { error } = await adminClient
+    // 1. Antes de eliminar, averiguamos a qué categoría pertenece el producto
+    const { data: productoActual, error: errorLectura } = await adminClient
+      .from("productos")
+      .select("fkeCodCategory")
+      .eq("eCodProduct", eCodProduct)
+      .single();
+
+    if (errorLectura) {
+      return { error: `Error al leer producto: ${errorLectura.message}` };
+    }
+
+    const categoriaDueña = productoActual?.fkeCodCategory as string | null;
+
+    // 2. Eliminar el producto
+    const { error: errorEliminar } = await adminClient
       .from("productos")
       .delete()
       .eq("eCodProduct", eCodProduct);
 
-    if (error) return { error: `Error al eliminar producto: ${error.message}` };
+    if (errorEliminar) {
+      return { error: `Error al eliminar producto: ${errorEliminar.message}` };
+    }
 
+    // 3. Si el producto tenía categoría, verificar si era el último
+    //    y desactivar la categoría automáticamente si es así
+    if (categoriaDueña) {
+      const { count } = await adminClient
+        .from("productos")
+        .select("eCodProduct", { count: "exact", head: true })
+        .eq("fkeCodCategory", categoriaDueña);
+
+      if (count === 0) {
+        await adminClient
+          .from("categorias")
+          .update({
+            bStateCategory: false,
+            fhUpdateCategory: new Date().toISOString(),
+          })
+          .eq("eCodCategory", categoriaDueña);
+      }
+    }
+
+    revalidatePath("/admin/productos");
     revalidatePath("/admin/catalogo");
     return { ok: true };
   } catch (e: any) {

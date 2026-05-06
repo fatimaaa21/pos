@@ -188,6 +188,41 @@
 .input:focus { border-color: var(--color-primary); }
 .input::placeholder { color: var(--gray); font-weight: 400; }
 
+/* ── Select wrapper (chevron) ── */
+.selectWrap {
+  position: relative;
+  width: 100%;
+}
+ 
+.selectWrap .input {
+  padding-right: 40px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+ 
+.selectWrap .input:focus {
+  border-color: var(--color-primary);
+}
+ 
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, transform 0.2s;
+}
+ 
+/* Cuando el select tiene foco, el chevron se vuelve verde y rota */
+.selectWrap:focus-within .selectChevron {
+  color: var(--color-primary);
+  transform: translateY(-50%) rotate(180deg);
+}
+
 /* ── Info block ── */
 .info {
   display: inline-flex;
