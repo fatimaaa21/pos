@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search, ChevronDown, X, Check, RefreshCw } from "lucide-react";
 import styles from "./TablaToolbar.module.css";
 
 export interface FiltrosUsuario {
@@ -17,134 +17,168 @@ interface TablaToolbarProps {
   ocultarRol?: boolean;
 }
 
-export function TablaToolbar({ filtros, onChange, total, ocultarRol = false }: TablaToolbarProps) {
-  const [dropdownAbierto, setDropdownAbierto] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+// ── Dropdown genérico ─────────────────────────────────────────────────────────
 
-  const cantidadFiltros = filtros.roles.length + filtros.estados.length;
+interface DropdownFiltroProps {
+  label: string;
+  opciones: { value: string; label: string }[];
+  seleccionados: string[];
+  onToggle: (value: string) => void;
+  onLimpiar: () => void;
+}
+
+function DropdownFiltro({ label, opciones, seleccionados, onToggle, onLimpiar }: DropdownFiltroProps) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickFuera(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownAbierto(false);
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setAbierto(false);
       }
     }
-    document.addEventListener("mousedown", handleClickFuera);
-    return () => document.removeEventListener("mousedown", handleClickFuera);
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const valorMostrado =
+    seleccionados.length === 0
+      ? "Todos"
+      : seleccionados.length === 1
+      ? opciones.find((o) => o.value === seleccionados[0])?.label ?? seleccionados[0]
+      : `${seleccionados.length} selec.`;
+
+  const activo = seleccionados.length > 0;
+
+  return (
+    <div className={styles.dropWrap} ref={ref}>
+      <button
+        className={`${styles.dropBtn} ${activo ? styles.dropBtnActive : ""}`}
+        onClick={() => setAbierto((v) => !v)}
+      >
+        <span className={styles.dropLabel}>{label}:</span>
+        <span className={styles.dropValor}>{valorMostrado}</span>
+        <ChevronDown
+          size={11}
+          className={`${styles.chevron} ${abierto ? styles.chevronOpen : ""}`}
+        />
+      </button>
+
+      {abierto && (
+        <div className={styles.dropdown}>
+          {/* Opción Todos */}
+          <button
+            className={`${styles.ddItem} ${seleccionados.length === 0 ? styles.ddItemActive : ""}`}
+            onClick={() => { onLimpiar(); setAbierto(false); }}
+          >
+            <span className={`${styles.ddRadio} ${seleccionados.length === 0 ? styles.ddRadioOn : ""}`} />
+            Todos
+          </button>
+
+          <div className={styles.ddSep} />
+
+          {opciones.map((op) => {
+            const sel = seleccionados.includes(op.value);
+            return (
+              <button
+                key={op.value}
+                className={`${styles.ddItem} ${sel ? styles.ddItemActive : ""}`}
+                onClick={() => onToggle(op.value)}
+              >
+                <span className={`${styles.ddCheck} ${sel ? styles.ddCheckOn : ""}`}>
+                  {sel && <Check size={10} strokeWidth={3} color="white" />}
+                </span>
+                {op.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
+
+export function TablaToolbar({ filtros, onChange, total, ocultarRol = false }: TablaToolbarProps) {
   function setBusqueda(busqueda: string) {
     onChange({ ...filtros, busqueda });
   }
 
-  function toggleRol(rol: "admin" | "empleado") {
-    const roles = filtros.roles.includes(rol)
+  function toggleRol(rol: string) {
+    const roles = filtros.roles.includes(rol as "admin" | "empleado")
       ? filtros.roles.filter((r) => r !== rol)
-      : [...filtros.roles, rol];
+      : [...filtros.roles, rol as "admin" | "empleado"];
     onChange({ ...filtros, roles });
   }
 
-  function toggleEstado(estado: "activo" | "inactivo") {
-    const estados = filtros.estados.includes(estado)
+  function toggleEstado(estado: string) {
+    const estados = filtros.estados.includes(estado as "activo" | "inactivo")
       ? filtros.estados.filter((e) => e !== estado)
-      : [...filtros.estados, estado];
+      : [...filtros.estados, estado as "activo" | "inactivo"];
     onChange({ ...filtros, estados });
   }
 
-  function limpiarTodo() {
-    onChange({ ...filtros, roles: [], estados: [] });
-    setDropdownAbierto(false);
-  }
-
-  function removerChip(tipo: "rol" | "estado", valor: string) {
-    if (tipo === "rol") {
-      onChange({ ...filtros, roles: filtros.roles.filter((r) => r !== valor) });
-    } else {
-      onChange({ ...filtros, estados: filtros.estados.filter((e) => e !== valor) });
-    }
-  }
-
-  const chips: { tipo: "rol" | "estado"; valor: string; variante: string }[] = [
-    ...filtros.roles.map((r) => ({ tipo: "rol" as const, valor: r, variante: r })),
-    ...filtros.estados.map((e) => ({ tipo: "estado" as const, valor: e, variante: e })),
-  ];
+  const hayFiltros =
+    filtros.roles.length > 0 || filtros.estados.length > 0 || filtros.busqueda;
 
   return (
-    <div className={styles.wrapper}>
-      <div className={styles.toolbar}>
-        <div className={styles.searchWrap}>
-          <Search size={14} className={styles.searchIcon} />
-          <input
-            className={styles.searchInput}
-            type="text"
-            placeholder="Buscar..."
-            value={filtros.busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
-          {filtros.busqueda && (
-            <button className={styles.searchClear} onClick={() => setBusqueda("")}>
-              <X size={12} />
-            </button>
-          )}
-        </div>
-
-        <div className={styles.divider} />
-
-        <div className={styles.dropdownWrap} ref={dropdownRef}>
-          <button
-            className={`${styles.filterBtn} ${cantidadFiltros > 0 ? styles.filterBtnActive : ""}`}
-            onClick={() => setDropdownAbierto((v) => !v)}
-          >
-            <SlidersHorizontal size={14} />
-            Filtros
-            {cantidadFiltros > 0 && (
-              <span className={styles.badge}>{cantidadFiltros}</span>
-            )}
+    <div className={styles.toolbar}>
+      {/* Buscador */}
+      <div className={styles.searchWrap}>
+        <Search size={13} className={styles.searchIcon} />
+        <input
+          className={styles.searchInput}
+          type="text"
+          placeholder="Buscar..."
+          value={filtros.busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        {filtros.busqueda && (
+          <button className={styles.searchClear} onClick={() => setBusqueda("")}>
+            <X size={11} />
           </button>
-
-          {dropdownAbierto && (
-            <div className={styles.dropdown}>
-              {!ocultarRol && (
-                <>
-                  <p className={styles.ddLabel}>Rol</p>
-                  {(["admin", "empleado"] as const).map((rol) => (
-                    <button
-                      key={rol}
-                      className={`${styles.ddItem} ${filtros.roles.includes(rol) ? styles.ddItemSelected : ""}`}
-                      onClick={() => toggleRol(rol)}
-                    >
-                      <span className={`${styles.ddCheck} ${filtros.roles.includes(rol) ? styles.ddCheckOn : ""}`} />
-                      <span style={{ textTransform: "capitalize" }}>{rol}</span>
-                    </button>
-                  ))}
-                  <div className={styles.separator} />
-                </>
-              )}
-
-              <p className={styles.ddLabel}>Estado</p>
-              {(["activo", "inactivo"] as const).map((estado) => (
-                <button
-                  key={estado}
-                  className={`${styles.ddItem} ${filtros.estados.includes(estado) ? styles.ddItemSelected : ""}`}
-                  onClick={() => toggleEstado(estado)}
-                >
-                  <span className={`${styles.ddCheck} ${filtros.estados.includes(estado) ? styles.ddCheckOn : ""}`} />
-                  <span style={{ textTransform: "capitalize" }}>{estado}</span>
-                </button>
-              ))}
-
-              {cantidadFiltros > 0 && (
-                <>
-                  <div className={styles.separator} />
-                  <button className={styles.ddLimpiar} onClick={limpiarTodo}>
-                    Limpiar todo
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      <div className={styles.divider} />
+
+      {/* Dropdown estado */}
+      <DropdownFiltro
+        label="Estado"
+        opciones={[
+          { value: "activo", label: "Activo" },
+          { value: "inactivo", label: "Inactivo" },
+        ]}
+        seleccionados={filtros.estados}
+        onToggle={toggleEstado}
+        onLimpiar={() => onChange({ ...filtros, estados: [] })}
+      />
+
+      {/* Dropdown rol */}
+      {!ocultarRol && (
+        <DropdownFiltro
+          label="Rol"
+          opciones={[
+            { value: "admin", label: "Admin" },
+            { value: "empleado", label: "Empleado" },
+          ]}
+          seleccionados={filtros.roles}
+          onToggle={toggleRol}
+          onLimpiar={() => onChange({ ...filtros, roles: [] })}
+        />
+      )}
+
+      {/* Limpiar todo */}
+      {hayFiltros && (
+        <button
+          className={styles.limpiarBtn}
+          onClick={() => onChange({ busqueda: "", roles: [], estados: [] })}
+          title="Limpiar filtros"
+        >
+          <RefreshCw size={13} />
+        </button>
+      )}
     </div>
   );
 }

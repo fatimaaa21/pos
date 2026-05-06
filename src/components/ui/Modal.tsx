@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Asterisk, X } from "lucide-react";
+import { Asterisk, ChevronDown, X } from "lucide-react";
 import styles from "./Modal.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -158,7 +158,14 @@ export function ModalInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function ModalSelect(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={styles.input} />;
+  return (
+    <div className={styles.selectWrap}>
+      <select {...props} className={styles.input} />
+      <span className={styles.selectChevron}>
+        <ChevronDown size={16} strokeWidth={2.5} />
+      </span>
+    </div>
+  );
 }
 
 export function ModalInfo({ children }: { children: React.ReactNode }) {

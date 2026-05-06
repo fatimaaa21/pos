@@ -5,6 +5,7 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
+import { StatCards } from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
@@ -21,16 +22,15 @@ interface Props {
 }
 
 export function CatalogoClient({ categorias: inicial }: Props) {
-    const [categorias, setCategorias] = useState<Categoria[]>(inicial);
-    const [busqueda, setBusqueda] = useState("");
-    const [filtros, setFiltros] = useState<FiltrosUsuario>({
+  const [categorias, setCategorias] = useState<Categoria[]>(inicial);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
     roles: [],
     estados: [],
   });
   const [modalCrear, setModalCrear] = useState(false);
   const [categoriaEditar, setCategoriaEditar] = useState<Categoria | null>(null);
-  const [cargando, setCargando] = useState(false);
   const [categoriaVer, setCategoriaVer] = useState<Categoria | null>(null);
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
@@ -40,36 +40,28 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   const filtradas = categorias.filter((c) => {
     const texto = filtros.busqueda.toLowerCase();
     const coincideTexto = !texto || c.tNameCategory.toLowerCase().includes(texto);
-
     const estadoValor = c.bStateCategory ? "activo" : "inactivo";
     const coincideEstado =
       filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-
     return coincideTexto && coincideEstado;
   });
 
-  // ── Helpers Supabase ──────────────────────────────────────────────────────
-  async function recargar() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("categorias")
-      .select("*")
-      .order("eCodCategory", { ascending: true });
-    if (data) setCategorias(data as Categoria[]);
-  }
-
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleCategoriaCreada(nuevo: Categoria) {
-      setCategorias((prev) => [nuevo, ...prev]);
-      setModalCrear(false);
-    }
+    setCategorias((prev) => [{ ...nuevo, productos: [] }, ...prev]);
+    setModalCrear(false);
+  }
 
   function handleCategoriaEditada(actualizado: Categoria) {
-      setCategorias((prev) =>
-        prev.map((c) => (c.eCodCategory === actualizado.eCodCategory ? actualizado : c))
-      );
-      setCategoriaEditar(null);
-    }
+    setCategorias((prev) =>
+      prev.map((c) =>
+        c.eCodCategory === actualizado.eCodCategory
+          ? { ...actualizado, productos: c.productos } // preservar productos del estado local
+          : c
+      )
+    );
+    setCategoriaEditar(null);
+  }
 
   async function handleToggleEstado(categoria: Categoria) {
     setToggleando(categoria.eCodCategory);
@@ -77,7 +69,9 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     if (!result?.error) {
       setCategorias((prev) =>
         prev.map((c) =>
-          c.eCodCategory === categoria.eCodCategory ? { ...c, bStateCategory: !c.bStateCategory } : c
+          c.eCodCategory === categoria.eCodCategory
+            ? { ...c, bStateCategory: !c.bStateCategory }
+            : c
         )
       );
     }
@@ -85,22 +79,21 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   }
 
   async function handleEliminar(categoria: Categoria) {
-  const confirmar = window.confirm(
-    `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
-  );
-  if (!confirmar) return;
+    const confirmar = window.confirm(
+      `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
+    );
+    if (!confirmar) return;
 
-  setEliminando(categoria.eCodCategory);
-  const result = await eliminarCategoria(categoria.eCodCategory);
+    setEliminando(categoria.eCodCategory);
+    const result = await eliminarCategoria(categoria.eCodCategory);
 
-  if (!result?.error) {
-    setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
-  } else {
-    alert(`Error al eliminar categoría: ${result.error}`);
+    if (!result?.error) {
+      setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
+    } else {
+      alert(`Error al eliminar categoría: ${result.error}`);
+    }
+    setEliminando(null);
   }
-
-  setEliminando(null);
-}
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivas = categorias.filter((c) => c.bStateCategory).length;
@@ -112,27 +105,47 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       label: "Categoría",
       render: (c) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className={styles.avatar}>{c.tNameCategory[0].toUpperCase()}</div>
+          <div
+            className={styles.avatar}
+            style={
+              { background: "var(--color-primary-50)", color: "var(--color-primary-dark)" }
+            }
+          >
+            {c.tNameCategory[0].toUpperCase()}
+          </div>
           <span>{c.tNameCategory}</span>
         </div>
       ),
     },
     {
+      key: "productos",
+      label: "Productos",
+      render: (c) => {
+        const total = c.productos?.length ?? 0;
+        const activos = c.productos?.filter((p) => p.bStateProduct).length ?? 0;
+        return (
+          <div className={styles.productosCell}>
+            {activos > 0 ? (
+              <span>
+                {activos} activo{activos !== 1 ? "s" : ""}
+              </span>
+            ) : (
+              <span>Sin productos</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: "fhCreateCategory",
       label: "Fecha de creación",
-      render: (c) => (
-        <span>
-          {formatFechaHora(c.fhCreateCategory)}
-        </span>
-      ),
+      render: (c) => <span>{formatFechaHora(c.fhCreateCategory)}</span>,
     },
     {
       key: "fhUpdateCategory",
       label: "Última actualización",
       render: (c) => (
-        <span>
-          {c.fhUpdateCategory ? formatRelativo(c.fhUpdateCategory) : "Sin cambios"}
-        </span>
+        <span>{c.fhUpdateCategory ? formatRelativo(c.fhUpdateCategory) : "Sin cambios"}</span>
       ),
     },
     {
@@ -172,12 +185,11 @@ export function CatalogoClient({ categorias: inicial }: Props) {
 
   return (
     <div className="container">
-
       <div className="header">
         <Buscador
           valor={busqueda}
           onChange={setBusqueda}
-          placeholder="Buscar usuario..."
+          placeholder="Buscar categoría..."
         />
       </div>
 
@@ -188,20 +200,13 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       />
 
       {/* Stats */}
-      <div className={styles.stats}>
-        {[
-          { label: "Total categorías", value: categorias.length, color: "var(--color-primary-dark)" },
-          { label: "Activas",          value: totalActivas,      color: "var(--color-primary)" },
-          { label: "Inactivas",        value: categorias.length - totalActivas, color: "#854F0B" },
-        ].map((stat) => (
-          <div key={stat.label} className={styles.statCard}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 16, fontWeight: 400, color: "var(--gray)" }}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
+      <StatCards stats={[
+        { label: "Total categorías",  value: categorias.length, variante: "primary" },
+        { label: "Activas",         value: totalActivas, variante: "success" },
+        { label: "Inactivas",         value: categorias.length - totalActivas, variante: "accent" },
+      ]} />
 
-      {/* Toolbar — sin filtro de rol */}
+      {/* Filtros */}
       <TablaToolbar
         filtros={filtros}
         onChange={setFiltros}
@@ -209,7 +214,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         ocultarRol
       />
 
-      {/* Tabla */}
       <DataTable
         columnas={columnas}
         datos={filtradas}
@@ -240,7 +244,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
           onEditado={handleCategoriaEditada}
         />
       )}
-
     </div>
   );
 }

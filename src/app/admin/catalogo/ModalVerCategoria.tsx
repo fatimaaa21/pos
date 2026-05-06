@@ -19,6 +19,11 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
     .join("")
     .toUpperCase();
 
+  const productos  = categoria.productos ?? [];
+  const totalProductos = productos.length;
+  const activos    = productos.filter((p) => p.bStateProduct);
+  const inactivos  = productos.filter((p) => !p.bStateProduct);
+
   return (
     <Modal
       titulo="Detalle de categoría"
@@ -26,34 +31,77 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
       labelCancelar="Cerrar"
       ancho="sm"
     >
-      {/* Avatar */}
+      {/* ── Avatar ── */}
       <div className={styles.avatarWrap}>
-        <div
-          className={styles.avatar}
-          style={{
-            background: categoria.tNameCategory === "admin" ? "#FAEEDA" : "#E1F5EE",
-            color: categoria.tNameCategory === "admin" ? "#633806" : "#085041",
-          }}
-        >
+        <div className={styles.avatar}>
           {iniciales}
         </div>
         <div className={styles.avatarNombre}>{categoria.tNameCategory}</div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div className={styles.badges}>
           <Badge activo={categoria.bStateCategory} />
+          <Badge variante={totalProductos > 0 ? "disponible" : "agotado"}>
+            {totalProductos > 0
+              ? `${totalProductos} producto${totalProductos !== 1 ? "s" : ""}`
+              : "Sin productos"}
+          </Badge>
         </div>
       </div>
 
-      {/* Campos */}
+      {/* ── Metadatos ── */}
       <div className={styles.campos}>
         {[
-          { label: "Fecha de Creación",  valor: formatFechaHora(categoria.fhCreateCategory) },
-          { label: "Ultima Actualización", valor: formatRelativo(categoria.fhUpdateCategory) },
+          { label: "Fecha de creación",    valor: formatFechaHora(categoria.fhCreateCategory) },
+          { label: "Última actualización", valor: formatRelativo(categoria.fhUpdateCategory) },
         ].map(({ label, valor }) => (
           <div key={label} className={styles.campo}>
             <span className={styles.campoLabel}>{label}</span>
             <span className={styles.campoValor}>{valor}</span>
           </div>
         ))}
+      </div>
+
+      {/* ── Lista de productos ── */}
+      <div className={styles.productosSection}>
+        <div className={styles.productosSectionHeader}>
+          <span className={styles.productosSectionTitulo}>Productos</span>
+          <span className={styles.productosSectionConteo}>
+            {totalProductos} en total · {activos.length} activo{activos.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+
+        {totalProductos === 0 ? (
+          <div className={styles.productosVacio}>Sin productos asignados</div>
+        ) : (
+          <div className={styles.productosList}>
+            {/* Activos primero */}
+            {activos.map((p) => (
+              <div key={p.eCodProduct} className={styles.productoItem}>
+                <span className={styles.productoIndicadorActivo} />
+                <span className={styles.productoNombre}>{p.tNameProduct}</span>
+                <span className={styles.productoPrecio}>
+                  {p.ePriceProduct.toLocaleString("es-AR", {
+                    style: "currency",
+                    currency: "ARS",
+                  })}
+                </span>
+              </div>
+            ))}
+            {/* Inactivos al final, atenuados */}
+            {inactivos.map((p) => (
+              <div key={p.eCodProduct} className={`${styles.productoItem} ${styles.productoItemInactivo}`}>
+                <span className={styles.productoIndicadorInactivo} />
+                <span className={styles.productoNombreInactivo}>{p.tNameProduct}</span>
+                <span className={styles.productoPrecioInactivo}>
+                  {p.ePriceProduct.toLocaleString("es-MX", {
+                    style: "currency",
+                    currency: "MXN",
+                    minimumFractionDigits: 0,
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Modal>
   );

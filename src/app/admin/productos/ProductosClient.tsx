@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ModalCrearProducto } from "./ModalCrearProducto";
 import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
+import { eliminarCategoria } from "@/lib/actions/categorias";
 
 interface Props {
   productos: Producto[];
@@ -82,6 +83,24 @@ export function ProductClient({ productos: inicial }: Props) {
           );
         }
         setToggleando(null);
+      }
+
+      async function handleEliminar(categoria: Producto) {
+        const confirmar = window.confirm(
+          `¿Eliminar "${categoria.tNameProduct}"? Esta acción no se puede deshacer.`
+        );
+        if (!confirmar) return;
+      
+        setEliminando(categoria.eCodProduct);
+        const result = await eliminarProducto(categoria.eCodProduct);
+      
+        if (!result?.error) {
+          setProductos((prev) => prev.filter((p) => p.eCodProduct !== categoria.eCodProduct));
+        } else {
+          alert(`Error al eliminar producto: ${result.error}`);
+        }
+      
+        setEliminando(null);
       }
 
     // ── Stats ─────────────────────────────────────────────────────────────────
@@ -215,14 +234,14 @@ export function ProductClient({ productos: inicial }: Props) {
                 producto={productoVer}
                 onClose={() => setProductoVer(null)}
             />
-            )}
-            {productoEditar && (
-            <ModalEditarProducto
-                producto={productoEditar}
-                onClose={() => setProductoEditar(null)}
-                onEditado={handleProductoEditado}
-            />
-            )}
+        )}
+        {productoEditar && (
+        <ModalEditarProducto
+            producto={productoEditar}
+            onClose={() => setProductoEditar(null)}
+            onEditado={handleProductoEditado}
+        />
+        )}
     </div>
 
     

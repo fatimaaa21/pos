@@ -22,12 +22,22 @@ export interface Categoria {
   fhCreateCategory?: string;
   fhUpdateCategory?: string;
   bStateCategory?: boolean;
+  // Relación hydratada desde el join en page.tsx
+  productos?: ProductoResumen[];
+}
+
+// Versión ligera de Producto para mostrar dentro de una categoría
+export interface ProductoResumen {
+  eCodProduct: string;
+  tNameProduct: string;
+  bStateProduct?: boolean;
+  ePriceProduct: number;
 }
 
 export interface Producto {
   eCodProduct: string;  // UUID, PK
   tNameProduct: string;
-  fkeCodCategory?: Categoria;
+  fkeCodCategory?: string;   // FK — UUID de la categoría
   ePriceProduct: number;
   eCostProduct: number;
   ImgProduct?: string;
