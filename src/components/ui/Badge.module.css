@@ -30,15 +30,13 @@
 
 /* ── Verde — activo / publicado / disponible ── */
 .activo,
-.publicado,
-.disponible {
+.publicado {
   background: var(--color-success-bg);
   color: var(--color-success);
   border-color: var(--color-success-border);
 }
 .activo .dot,
-.publicado .dot,
-.disponible .dot {
+.publicado .dot {
   background: var(--color-success);
 }
 
@@ -69,12 +67,12 @@
 }
 
 /* ── Acento — admin ── */
-.admin {
+.admin, .categoria, .disponible {
   background: var(--color-accent-bg);
   color: var(--color-accent);
   border-color: #f5d5b0;
 }
-.admin .dot {
+.admin .dot, .categoria .dot, .disponible .dot {
   background: var(--color-accent);
 }
 

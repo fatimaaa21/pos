@@ -10,7 +10,8 @@ type Variante =
   | "bloqueado"
   | "bajo"
   | "agotado"
-  | "disponible";
+  | "disponible"
+  | "categoria";
 
 interface BadgeProps {
   variante?: Variante;
@@ -32,6 +33,7 @@ const CONFIG: Record<Variante, { label: string; clase: string }> = {
   bajo:        { label: "Stock bajo",  clase: styles.bajo },
   agotado:     { label: "Agotado",     clase: styles.agotado },
   disponible:  { label: "Disponible",  clase: styles.disponible },
+  categoria:  { label: "",           clase: styles.categoria },
 };
 
 export function Badge({ variante, activo, children, dot = true, onToggle, toggling }: BadgeProps) {

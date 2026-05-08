@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { crearProducto } from "@/lib/actions/productos";
 import { createClient } from "@/lib/supabase/client";
 import type { Categoria, Producto } from "@/types";
+import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 
 interface Props {
-onClose: () => void;
-onCreado: (producto: Producto) => void;
+  onClose: () => void;
+  onCreado: (producto: Producto) => void;
+  categorias: Categoria[];
 }
 
 export function ModalCrearProducto({ onClose, onCreado }: Props) {
+// ID único para el path del storage: evita colisiones entre creaciones simultáneas
+  const uid = useId().replace(/:/g, "");
+
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState<string | null>(null);
 const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -76,6 +81,17 @@ return (
     deshabilitado={deshabilitado}
     error={error}
     >
+
+    <ModalField label="Imagen" required>
+        <ImageUploadInput
+        value={form.ImgProduct}
+        onChange={(url) => setForm({ ...form, ImgProduct: url })}
+        placeholder="Subir imagen del producto"
+        bucket="product-images"                        // ← tu bucket de productos
+        storagePath={`productos/new_${Date.now()}`}
+        />
+    </ModalField>
+
     <ModalField label="Nombre del producto" required>
         <ModalInput
         type="text"
@@ -83,33 +99,6 @@ return (
         value={form.tNameProduct}
         onChange={(e) => setForm({ ...form, tNameProduct: e.target.value })}
         autoFocus
-        />
-    </ModalField>
-
-    <ModalField label="Imagen" required>
-        <ModalInput
-        type="text"
-        placeholder="URL de la imagen"
-        value={form.ImgProduct}
-        onChange={(e) => setForm({ ...form, ImgProduct: e.target.value })}
-        />
-    </ModalField>
-
-    <ModalField label="Precio al público" required>
-        <ModalInput
-        type="number"
-        placeholder="0.00"
-        value={form.ePriceProduct}
-        onChange={(e) => setForm({ ...form, ePriceProduct: e.target.value })}
-        />
-    </ModalField>
-
-    <ModalField label="Costo de producción" required>
-        <ModalInput
-        type="number"
-        placeholder="0.00"
-        value={form.eCostProduct}
-        onChange={(e) => setForm({ ...form, eCostProduct: e.target.value })}
         />
     </ModalField>
 
@@ -135,6 +124,24 @@ return (
             ))
         )}
         </ModalSelect>
+    </ModalField>
+
+    <ModalField label="Precio al público" required>
+        <ModalInput
+        type="number"
+        placeholder="0.00"
+        value={form.ePriceProduct}
+        onChange={(e) => setForm({ ...form, ePriceProduct: e.target.value })}
+        />
+    </ModalField>
+
+    <ModalField label="Costo de producción" required>
+        <ModalInput
+        type="number"
+        placeholder="0.00"
+        value={form.eCostProduct}
+        onChange={(e) => setForm({ ...form, eCostProduct: e.target.value })}
+        />
     </ModalField>
 
     </Modal>

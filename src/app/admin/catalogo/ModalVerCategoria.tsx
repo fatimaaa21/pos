@@ -12,18 +12,17 @@ interface Props {
 }
 
 export function ModalVerCategoria({ categoria, onClose }: Props) {
-  const iniciales = categoria.tNameCategory
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   const productos  = categoria.productos ?? [];
   const totalProductos = productos.length;
   const activos    = productos.filter((p) => p.bStateProduct);
   const inactivos  = productos.filter((p) => !p.bStateProduct);
 
+  // Cache-buster para que el browser no sirva una versión anterior
+  const imgSrc = categoria.ImgCategory
+    ? `${categoria.ImgCategory.split("?")[0]}?t=${Date.now()}`
+    : null;
+    
   return (
     <Modal
       titulo="Detalle de categoría"
@@ -31,11 +30,16 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
       labelCancelar="Cerrar"
       ancho="sm"
     >
-      {/* ── Avatar ── */}
+      {/* ── Imagen ── */}
       <div className={styles.avatarWrap}>
-        <div className={styles.avatar}>
-          {iniciales}
-        </div>
+        {imgSrc ? (
+          <div className={styles.avatar}>
+            <img
+              src={imgSrc}
+              alt={categoria.tNameCategory}
+            />
+          </div>
+        ) : null}
         <div className={styles.avatarNombre}>{categoria.tNameCategory}</div>
         <div className={styles.badges}>
           <Badge activo={categoria.bStateCategory} />
