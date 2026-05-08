@@ -6,9 +6,9 @@ export default async function ProductsPage() {
   const supabase = await createClient();
 
   const { data: productos, error } = await supabase
-    .from("productos")
-    .select("*")
-    .order("eCodProduct", { ascending: true });
+  .from("productos")
+  .select(`*, categorias (eCodCategory, tNameCategory)`)
+  .order("eCodProduct", { ascending: true });
 
   if (error) console.error("Error cargando productos:", error);
 

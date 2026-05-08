@@ -1,21 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
-import type { Producto } from "@/types";
+import type { Producto, Categoria } from "@/types";
 import { Buscador } from "@/components/ui/Buscador";
 import { PageHeader } from "@/components/ui/PageHeader";
 import styles from "./productos.module.css";
 import { toggleEstadoProducto, eliminarProducto } from "@/lib/actions/productos";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { ColumnaTabla, DataTable } from "@/components/ui/DataTable";
-import { formatFechaHora, formatRelativo } from "@/lib/utils/fecha";
 import { Badge } from "@/components/ui/Badge";
 import { createClient } from "@/lib/supabase/client";
 import { ModalCrearProducto } from "./ModalCrearProducto";
 import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
-import { eliminarCategoria } from "@/lib/actions/categorias";
+import { StatCards } from "@/components/ui/Statscards";
 
 interface Props {
   productos: Producto[];
@@ -23,6 +22,12 @@ interface Props {
 
 export function ProductClient({ productos: inicial }: Props) {
     const [productos, setProductos] = useState<Producto[]>(inicial);
+     // Map de eCodProduct → timestamp — se actualiza cada vez que se edita un producto.
+    // Fuerza que el <img> recargue la imagen aunque la URL base sea la misma.
+    const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
+        Object.fromEntries(inicial.map((p) => [p.eCodProduct, Date.now()]))
+    );
+    const [categorias, setCategorias] = useState<Categoria[]>([]);
     const [busqueda, setBusqueda] = useState("");
     const [filtros, setFiltros] = useState<FiltrosUsuario>({
         busqueda: "",
@@ -35,6 +40,23 @@ export function ProductClient({ productos: inicial }: Props) {
     const [toggleando, setToggleando] = useState<string | null>(null);
     const [seleccionados, setSeleccionados] = useState<string[]>([]);
     const [eliminando, setEliminando] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function cargarCategorias() {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from("categorias")
+                .select("eCodCategory, tNameCategory")
+                .order("tNameCategory");
+
+            if (data) setCategorias(data as Categoria[]);
+            if (error) {
+                console.error("Error cargando categorías:", error.message);
+            }
+        }
+
+        cargarCategorias();
+    }, []);
 
 
     // ── Filtrado ──────────────────────────────────────────────────────────────
@@ -69,6 +91,8 @@ export function ProductClient({ productos: inicial }: Props) {
           setProductos((prev) =>
             prev.map((p) => (p.eCodProduct === actualizado.eCodProduct ? actualizado : p))
           );
+          // Nuevo timestamp → el <img> recarga la imagen del bucket aunque la URL sea igual
+            setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
           setProductoEditar(null);
         }
     
@@ -106,33 +130,51 @@ export function ProductClient({ productos: inicial }: Props) {
     // ── Stats ─────────────────────────────────────────────────────────────────
     const totalActivos = productos.filter((p) => p.bStateProduct).length;
 
+    // Mapa de categorías para acceso rápido por ID
+    const categoriasMap = new Map(categorias.map(c => [c.eCodCategory, c.tNameCategory]));
+
     // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Producto>[] = [
     {
       key: "tNameProduct",
       label: "Producto",
+      render: (p) => {
+        const ts = imgTimestamps[p.eCodProduct] ?? Date.now();
+        return (
+          <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {p.ImgProduct ? (
+              <img
+                src={`${p.ImgProduct.split("?")[0]}?t=${ts}`}
+                alt={p.tNameProduct}
+              />
+            ) : null }
+            <span>{p.tNameProduct}</span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "fkeCodCategory",
+      label: "Categoría",
       render: (p) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className={styles.avatar}>{p.tNameProduct[0].toUpperCase()}</div>
-          <span>{p.tNameProduct}</span>
-        </div>
+        <span>{p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) || "Categoría no encontrada" : "—"}</span>
       ),
     },
     {
-      key: "fhCreateProduct",
-      label: "Fecha de creación",
+      key: "ePriceProduct",
+      label: "Precio al público",
       render: (p) => (
         <span>
-          {formatFechaHora(p.fhCreateProduct)}
+          {p.ePriceProduct.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
         </span>
       ),
     },
     {
-      key: "fhUpdateProduct",
-      label: "Última actualización",
+      key: "eCostProduct",
+      label: "Costo de producción",
       render: (p) => (
         <span>
-          {p.fhUpdateProduct ? formatRelativo(p.fhUpdateProduct) : "Sin cambios"}
+          {p.eCostProduct.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
         </span>
       ),
     },
@@ -188,20 +230,13 @@ export function ProductClient({ productos: inicial }: Props) {
         />
 
         {/* Stats */}
-      <div className={styles.stats}>
-        {[
-          { label: "Total productos", value: productos.length, color: "var(--color-primary-dark)" },
-          { label: "Activos",          value: totalActivos,      color: "var(--color-primary)" },
-          { label: "Inactivos",        value: productos.length - totalActivos, color: "#854F0B" },
-        ].map((stat) => (
-          <div key={stat.label} className={styles.statCard}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: stat.color }}>{stat.value}</div>
-            <div style={{ fontSize: 16, fontWeight: 400, color: "var(--gray)" }}>{stat.label}</div>
-          </div>
-        ))}
-      </div>
+        <StatCards stats={[
+        { label: "Total productos",  value: productos.length, variante: "primary" },
+        { label: "Activos",         value: totalActivos, variante: "success" },
+        { label: "Inactivos",         value: productos.length - totalActivos, variante: "accent" },
+        ]} />
 
-      {/* Toolbar — sin filtro de rol */}
+        {/* Toolbar — sin filtro de rol */}
         <TablaToolbar
             filtros={filtros}
             onChange={setFiltros}
@@ -225,19 +260,20 @@ export function ProductClient({ productos: inicial }: Props) {
         <ModalCrearProducto
             onClose={() => setModalCrear(false)}
             onCreado={handleProductoCreado}
-            onClose={() => setModalCrear(false)}
-            onCreado={handleProductoCreado}
+            categorias={categorias}
         />
         )}
         {productoVer && (
             <ModalVerProducto
                 producto={productoVer}
+                categorias={categorias}
                 onClose={() => setProductoVer(null)}
             />
         )}
         {productoEditar && (
         <ModalEditarProducto
             producto={productoEditar}
+            categorias={categorias}
             onClose={() => setProductoEditar(null)}
             onEditado={handleProductoEditado}
         />

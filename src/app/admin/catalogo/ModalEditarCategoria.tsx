@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
 import { editarCategoria } from "@/lib/actions/categorias";
+import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 import type { Categoria } from "@/types";
 
 interface Props {
@@ -16,7 +17,8 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     tNameCategory: categoria.tNameCategory,
-    ImgCategory: categoria.ImgCategory,
+    // URL limpia (sin ?t=...) para guardar en DB — el cache-buster lo maneja ImageUploadInput
+    ImgCategory: categoria.ImgCategory?.split("?")[0] ?? "",
   });
 
   async function handleConfirmar() {
@@ -26,7 +28,7 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
     const formData = new FormData();
     formData.append("eCodCategory", categoria.eCodCategory);
     formData.append("tNameCategory", form.tNameCategory);
-    formData.append("ImgCategory", form.ImgCategory || "");
+    formData.append("ImgCategory", form.ImgCategory);
 
     const result = await editarCategoria(formData);
 
@@ -38,7 +40,7 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
     }
   }
 
-  const deshabilitado = !form.tNameCategory.trim() || !form.ImgCategory.trim();
+  const deshabilitado = !form.tNameCategory.trim();
 
   return (
     <Modal
@@ -50,23 +52,24 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
       deshabilitado={deshabilitado}
       error={error}
     >
+      <ModalField label="Imagen">
+        <ImageUploadInput
+        value={form.ImgCategory}
+        onChange={(url) => setForm((prev) => ({ ...prev, ImgCategory: url }))}
+        placeholder="Subir imagen de categoría"
+        bucket="category-images"
+        storagePath={`categorias/${categoria.eCodCategory}`}
+        />
+      </ModalField>
+
       <ModalField label="Nombre de la categoría" required>
         <ModalInput
           type="text"
           value={form.tNameCategory}
-          onChange={(e) => setForm({ ...form, tNameCategory: e.target.value })}
+          onChange={(e) => setForm((prev) => ({ ...prev, tNameCategory: e.target.value }))}
           autoFocus
         />
       </ModalField>
-
-      <ModalField label="Imagen" required>
-        <ModalInput
-          type="text"
-          value={form.ImgCategory}
-          onChange={(e) => setForm({ ...form, ImgCategory: e.target.value })}
-        />
-      </ModalField>
-
     </Modal>
   );
 }

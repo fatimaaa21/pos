@@ -23,6 +23,12 @@ interface Props {
 
 export function CatalogoClient({ categorias: inicial }: Props) {
   const [categorias, setCategorias] = useState<Categoria[]>(inicial);
+  // Map de eCodCategory → timestamp — se actualiza cada vez que se edita una categoría.
+  // Esto fuerza que el <img> recargue la imagen aunque la URL base sea la misma.
+  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
+    Object.fromEntries(inicial.map((c) => [c.eCodCategory, Date.now()]))
+  );
+  
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
@@ -60,6 +66,8 @@ export function CatalogoClient({ categorias: inicial }: Props) {
           : c
       )
     );
+    // Nuevo timestamp → el <img> recarga la imagen del bucket aunque la URL sea igual
+    setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodCategory]: Date.now() }));
     setCategoriaEditar(null);
   }
 
@@ -100,22 +108,25 @@ export function CatalogoClient({ categorias: inicial }: Props) {
 
   // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Categoria>[] = [
+    // Reemplaza la columna "tNameCategory" en el array `columnas` de CatalogoClient.tsx
+
     {
       key: "tNameCategory",
       label: "Categoría",
-      render: (c) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            className={styles.avatar}
-            style={
-              { background: "var(--color-primary-50)", color: "var(--color-primary-dark)" }
-            }
-          >
-            {c.tNameCategory[0].toUpperCase()}
+      render: (c) => {
+        const ts = imgTimestamps[c.eCodCategory] ?? Date.now();
+        return (
+          <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {c.ImgCategory ? (
+              <img
+                src={`${c.ImgCategory.split("?")[0]}?t=${ts}`}
+                alt={c.tNameCategory}
+              />
+            ) : null }
+            <span>{c.tNameCategory}</span>
           </div>
-          <span>{c.tNameCategory}</span>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "productos",

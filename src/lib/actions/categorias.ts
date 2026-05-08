@@ -12,11 +12,14 @@ export async function crearCategoria(formData: FormData) {
     const tNameCategory = formData.get("tNameCategory") as string;
     const ImgCategory = formData.get("ImgCategory") as string;
 
+    console.log("[crearCategoria] tNameCategory:", tNameCategory);
+    console.log("[crearCategoria] ImgCategory:", ImgCategory);
+
     const { data: categoria, error: categoriaError } = await adminClient
       .from("categorias")
       .insert({
         tNameCategory,
-        ImgCategory,
+        ImgCategory: ImgCategory || null,   // null si viene vacío, nunca "EMPTY"
         bStateCategory: true,
         fhCreateCategory: new Date().toISOString(),
       })
@@ -24,6 +27,7 @@ export async function crearCategoria(formData: FormData) {
       .single();
 
     if (categoriaError) {
+      console.error("[crearCategoria] error:", categoriaError);
       return { error: `Error al crear categoría: ${categoriaError.message}` };
     }
 
@@ -41,17 +45,18 @@ export async function editarCategoria(formData: FormData) {
     const eCodCategory = formData.get("eCodCategory") as string;
     const tNameCategory = formData.get("tNameCategory") as string;
     const ImgCategory = formData.get("ImgCategory") as string;
-
     const { data: categoria, error } = await adminClient
       .from("categorias")
       .update({
         tNameCategory,
-        ImgCategory,
+        ImgCategory: ImgCategory || null,   // null si viene vacío
         fhUpdateCategory: new Date().toISOString(),
       })
       .eq("eCodCategory", eCodCategory)
       .select()
       .single();
+
+    // console.log("[editarCategoria] resultado:", categoria, "error:", error);
 
     if (error) return { error: `Error al actualizar categoría: ${error.message}` };
 
@@ -87,7 +92,6 @@ export async function eliminarCategoria(eCodCategory: string) {
   try {
     const adminClient = createAdminClient();
 
-    // Verificar si hay productos asociados a esta categoría
     const { data: productosAsociados, error: errorConsulta } = await adminClient
       .from("productos")
       .select("eCodProduct")

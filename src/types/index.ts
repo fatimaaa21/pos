@@ -46,6 +46,26 @@ export interface Producto {
   fhUpdateProduct?: string;
 }
 
+export interface Inventario {
+  eCodInventory: string;
+  fkeCodProduct: string;          // FK → productos.eCodProduct (uuid)
+  eCantIngresada: number;       // cantidad que el admin metió
+  eCantVendida: number;         // calculada desde detalle_venta
+  eCantRestante: number;        // eCantIngresada - eCantVendida
+  eStockMinimo: number;         // alerta de stock bajo
+  fhCreateInventory?: string;         // fecha del lote
+  fhUpdateInventory?: string;         // fecha de última actualización (ej: para ajustar cantidad)
+  bStateInventory?: boolean;             // activo/inactivo en el menú
+}
+ 
+export type EstadoStock = "disponible" | "bajo" | "agotado";
+ 
+export function getEstadoStock(restante: number, minimo: number): EstadoStock {
+  if (restante === 0) return "agotado";
+  if (restante <= minimo) return "bajo";
+  return "disponible";
+}
+
 export interface Existencia {
   id: number;
   producto_id: number;
@@ -80,12 +100,4 @@ export interface ItemCarrito {
   producto: Producto & { cantidad_disponible: number };
   cantidad: number;
   subtotal: number;
-}
-
-export type EstadoStock = "disponible" | "bajo" | "agotado";
-
-export function getEstadoStock(cantidad: number, minimo: number): EstadoStock {
-  if (cantidad === 0) return "agotado";
-  if (cantidad <= minimo) return "bajo";
-  return "disponible";
 }

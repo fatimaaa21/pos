@@ -6,7 +6,7 @@ export default async function CatalogoPage() {
   const supabase = await createClient();
 
   // Traemos categorías junto con sus productos (solo los campos necesarios)
-  const { data: categorias, error } = await supabase
+  const { data: categorias, data: productos, error } = await supabase
     .from("categorias")
     .select(`
       *,

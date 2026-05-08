@@ -5,13 +5,14 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
-import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut, NotebookPen, ClipboardPenLine } from "lucide-react";
 
 const navAdmin = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
-  { icon: Package,         label: "Productos",  href: "/admin/productos" },
-  { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
   { icon: BookOpenText,    label: "Catálogo",   href: "/admin/catalogo" },
+  { icon: Package,         label: "Productos",  href: "/admin/productos" },
+  { icon: ClipboardPenLine,     label: "Inventario",  href: "/admin/inventario" },
+  { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
   { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
 ];
 
@@ -56,7 +57,7 @@ export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) 
               pathname === item.href ? styles.navItemActive : ""
             }`}
           >
-            <item.icon size={14} className={styles.navIcon} />
+            <item.icon size={16} className={styles.navIcon} />
             <span>{item.label}</span>
           </Link>
         ))}

@@ -19,7 +19,7 @@ export async function crearProducto(formData: FormData) {
       .from("productos")
       .insert({
         tNameProduct,
-        ImgProduct,
+        ImgProduct: ImgProduct || null,   // null si viene vacío
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
@@ -57,7 +57,7 @@ export async function editarProducto(formData: FormData) {
       .from("productos")
       .update({
         tNameProduct,
-        ImgProduct,
+        ImgProduct: ImgProduct || null,   // null si viene vacío
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,

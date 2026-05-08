@@ -8,17 +8,14 @@
   border-bottom: 1px solid var(--border-light);
 }
 
-.avatar {
+.avatar img {
   width: 56px;
   height: 56px;
   border-radius: var(--radius-lg);
-  background: var(--color-success-bg);
-  color: var(--color-success);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  font-weight: 800;
   flex-shrink: 0;
 }
 
