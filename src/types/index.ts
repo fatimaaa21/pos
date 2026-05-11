@@ -47,15 +47,16 @@ export interface Producto {
 }
 
 export interface Inventario {
-  eCodInventory: string;
-  fkeCodProduct: string;          // FK → productos.eCodProduct (uuid)
-  eCantIngresada: number;       // cantidad que el admin metió
-  eCantVendida: number;         // calculada desde detalle_venta
-  eCantRestante: number;        // eCantIngresada - eCantVendida
-  eStockMinimo: number;         // alerta de stock bajo
-  fhCreateInventory?: string;         // fecha del lote
-  fhUpdateInventory?: string;         // fecha de última actualización (ej: para ajustar cantidad)
-  bStateInventory?: boolean;             // activo/inactivo en el menú
+  eCodInventory:     string;       // UUID PK
+  fkeCodProduct:     string;       // UUID FK → productos
+  producto?:         Producto;     // join opcional
+  eCantIngresada:    number;
+  eCantVendida:      number;
+  eCantRestante:     number;
+  eStockMinimo:      number;
+  bStateInventory:   boolean;
+  fhCreateInventory: string;
+  fhUpdateInventory?: string;
 }
  
 export type EstadoStock = "disponible" | "bajo" | "agotado";

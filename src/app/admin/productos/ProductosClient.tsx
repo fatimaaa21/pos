@@ -40,6 +40,7 @@ export function ProductClient({ productos: inicial }: Props) {
     const [toggleando, setToggleando] = useState<string | null>(null);
     const [seleccionados, setSeleccionados] = useState<string[]>([]);
     const [eliminando, setEliminando] = useState<string | null>(null);
+    const [ts] = useState(() => Date.now());
 
     useEffect(() => {
         async function cargarCategorias() {

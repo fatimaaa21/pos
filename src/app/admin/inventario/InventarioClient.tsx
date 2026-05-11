@@ -1,76 +1,328 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
-import { crearInventario } from "@/lib/actions/inventario";
-import type { Inventario } from "@/types";  
+import { Eye, Trash2, Pencil } from "lucide-react";
+import type { Inventario, Producto } from "@/types";
 import { Buscador } from "@/components/ui/Buscador";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCards } from "@/components/ui/Statscards";
-import { FiltrosUsuario, TablaToolbar } from "@/components/ui/TablaToolbar";
+import { type FiltrosUsuario, TablaToolbar } from "@/components/ui/TablaToolbar";
+import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
+import { Badge } from "@/components/ui/Badge";
+import { ModalAgregarStock } from "./ModalAgregarStock";
+import { ModalVerStock } from "./ModalVerStock";
+import { ModalEditarStock } from "./ModalEditarStock";
+import { eliminarInventario, toggleEstadoInventario } from "@/lib/actions/inventario";
+import { getEstadoStock } from "@/types";
+import styles from "./inventario.module.css";
 
-interface Props {
-  inventario: Inventario[];
+// ── Tipo extendido con join ───────────────────────────────────────────────────
+// Supabase devuelve el producto anidado cuando se hace el select con join
+export interface InventarioConProducto extends Inventario {
+  productos?: {
+    tNameProduct: string;
+    ImgProduct?: string;
+    ePriceProduct: number;
+    categorias?: {
+      tNameCategory: string;
+    };
+  };
 }
 
-export function InventarioClient({ inventario }: Props) {
+interface Props {
+  inventario: InventarioConProducto[];
+}
+
+export function InventarioClient({ inventario: inicial }: Props) {
+    const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
     const [busqueda, setBusqueda] = useState("");
     const [filtros, setFiltros] = useState<FiltrosUsuario>({
         busqueda: "",
         roles: [],
         estados: [],
     });
+    const [modalAgregar, setModalAgregar] = useState(false);
+    const [stockVer, setStockVer] = useState<Inventario | null>(null);
+    const [stockEditar, setStockEditar] = useState<Inventario | null>(null);
+    const [seleccionados, setSeleccionados] = useState<string[]>([]);
+    const [eliminando, setEliminando] = useState<string | null>(null);
+    const [toggleando, setToggleando] = useState<string | null>(null);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
-    const filtradas = inventario.filter((c) => {
+  const filtradas = inventario.filter((c) => {
     const texto = filtros.busqueda.toLowerCase();
-    //const coincideTexto = !texto || c.tNameInventory.toLowerCase().includes(texto);
+    const nombreProducto = c.productos?.tNameProduct?.toLowerCase() ?? "";
+    const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
+    const coincideTexto = !texto ||
+      nombreProducto.includes(texto) ||
+      nombreCategoria.includes(texto);
+
     const estadoValor = c.bStateInventory ? "activo" : "inactivo";
     const coincideEstado =
       filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
+
     return coincideTexto && coincideEstado;
   });
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [form, setForm] = useState({
-        fkeCodProduct: "",
-        nCantIngresada: 0,
-        nStockMinimo: 0,
-        fhCreateMov: "",
-    });
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  function handleStockAgregado(nuevo: InventarioConProducto) {
+    setInventario((prev) => [nuevo, ...prev]);
+    setModalAgregar(false);
+  }
+
+  function handleStockEditado(actualizado: Inventario) {
+      setInventario((prev) =>
+        prev.map((c) =>
+          c.eCodInventory === actualizado.eCodInventory
+            ? { ...actualizado } // preservar productos del estado local
+            : c
+        )
+      );
+      setStockEditar(null);
+    }
+
+  async function handleEliminar(item: InventarioConProducto) {
+    if (!confirm(`¿Eliminar este registro de inventario? Esta acción no se puede deshacer.`)) return;
+    setEliminando(item.eCodInventory);
+    const result = await eliminarInventario(item.eCodInventory);
+    if (!result?.error) {
+      setInventario((prev) => prev.filter((i) => i.eCodInventory !== item.eCodInventory));
+    }
+    setEliminando(null);
+  }
+
+  async function handleToggle(item: InventarioConProducto) {
+    setToggleando(item.eCodInventory);
+    const result = await toggleEstadoInventario(item.eCodInventory, !item.bStateInventory);
+    if (!result?.error) {
+      setInventario((prev) =>
+        prev.map((i) =>
+          i.eCodInventory === item.eCodInventory
+            ? { ...i, bStateInventory: !i.bStateInventory }
+            : i
+        )
+      );
+    }
+    setToggleando(null);
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const disponibles = inventario.filter(
+    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "disponible"
+  ).length;
+  const stockBajo = inventario.filter(
+    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "bajo"
+  ).length;
+  const agotados = inventario.filter(
+    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "agotado"
+  ).length;
+
+  // ── Columnas ──────────────────────────────────────────────────────────────
+  const columnas: ColumnaTabla<InventarioConProducto>[] = [
+    {
+  key: "tNameProduct",
+  label: "Producto",
+  render: (c) => {
+    const producto = c.productos;
+
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className={styles.avatar}>
+          {producto?.ImgProduct ? (
+            <img
+              src={producto.ImgProduct}
+              alt={producto.tNameProduct ?? "Producto"}
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+            />
+          ) : (
+            <span>📦</span>
+          )}
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--dark)" }}>
+            {producto?.tNameProduct ?? "Sin nombre"}
+          </div>
+        </div>
+      </div>
+    );
+  },
+},
+    {
+      key: "tNameCategory",
+      label: "Categoría",
+      render: (c) => (
+        <span style={{ fontWeight: 700, color: "var(--dark)" }}>
+            {c.productos?.categorias?.tNameCategory ?? "Sin categoría"}
+        </span>
+      ),
+    },
+    {
+      key: "eCantIngresada",
+      label: "Ingresadas",
+      render: (c) => (
+        <span style={{ fontWeight: 700, color: "var(--dark)" }}>
+          {c.eCantIngresada}
+        </span>
+      ),
+    },
+    {
+      key: "eCantVendida",
+      label: "Vendidas",
+      render: (c) => (
+        <span style={{ fontWeight: 600, color: "var(--gray)" }}>
+          {c.eCantVendida}
+        </span>
+      ),
+    },
+    {
+      key: "eCantRestante",
+      label: "Restantes",
+      render: (c) => {
+        const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+        const colores = {
+          disponible: { bg: "var(--color-success-bg)", color: "var(--color-success)" },
+          bajo:       { bg: "var(--color-warning-bg)", color: "var(--color-warning)" },
+          agotado:    { bg: "var(--color-error-bg)",   color: "var(--color-error)"   },
+        }[estado];
+        return (
+          <span style={{
+            display: "inline-block",
+            padding: "2px 10px",
+            borderRadius: "var(--radius-full)",
+            fontWeight: 800,
+            fontSize: 13,
+            background: colores.bg,
+            color: colores.color,
+          }}>
+            {c.eCantRestante}
+          </span>
+        );
+      },
+    },
+    {
+      key: "ePriceProduct",
+      label: "Precio",
+      render: (c) => (
+        <span style={{ fontWeight: 600 }}>
+          $ {c.productos?.ePriceProduct?.toFixed(2) ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "bStateInventory",
+      label: "Estado",
+      render: (c) => (
+        <Badge
+          activo={c.bStateInventory}
+          onToggle={() => handleToggle(c)}
+          toggling={toggleando === c.eCodInventory}
+        />
+      ),
+    },
+    {
+      key: "acciones",
+      label: "Acciones",
+      render: (c) => (
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <ActionBtn title="Ver detalles" onClick={() => setStockVer(c)}>
+                <Eye size={18} />
+            </ActionBtn>
+            <ActionBtn title="Editar" onClick={() => setStockEditar(c)}>
+                <Pencil size={18} />
+            </ActionBtn>
+            <ActionBtn
+                title="Eliminar"
+                onClick={() => handleEliminar(c)}
+                loading={eliminando === c.eCodInventory}
+                danger
+            >
+                <Trash2 size={18} />
+            </ActionBtn>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="container">
-        <div className="header">
-            <Buscador
-                valor={busqueda}
-                onChange={setBusqueda}
-                placeholder="Buscar usuario..."
+      <div className="header">
+        <Buscador
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar producto..."
+        />
+      </div>
+
+      <PageHeader
+        titulo="Inventario"
+        descripcion="Control de stock por turno"
+        boton={{ label: "Agregar stock", onClick: () => setModalAgregar(true) }}
+      />
+
+      <StatCards stats={[
+        { label: "Productos en inventario", value: inventario.length,  variante: "primary" },
+        { label: "Disponibles",             value: disponibles,         variante: "success" },
+        { label: "Stock bajo",              value: stockBajo,           variante: "warning" },
+        { label: "Agotados",                value: agotados,            variante: "error"   },
+      ]} />
+
+      <TablaToolbar
+        filtros={filtros}
+        onChange={setFiltros}
+        total={filtradas.length}
+        ocultarRol
+      />
+
+      <DataTable
+        columnas={columnas}
+        datos={filtradas}
+        keyExtractor={(c) => c.eCodInventory}
+        seleccionable
+        seleccionados={seleccionados}
+        onSeleccionar={setSeleccionados}
+        vacio="No hay productos en inventario"
+      />
+        {/* Modales */}
+        {modalAgregar && (
+            <ModalAgregarStock
+            onClose={() => setModalAgregar(false)}
+            onAgregado={handleStockAgregado}
             />
-        </div>
-
-        <PageHeader
-            titulo="Inventario"
-            descripcion="Gestiona el inventario"
-            boton={{ label: "Agregar stock", onClick: () => setModalCrear(true)  }}
-        />
-
-        {/* Stats */}
-        <StatCards stats={[
-        { label: "Productos en inventario",  value: inventario.length, variante: "primary" },
-        { label: "Disponibles",         value: inventario.filter((p) => p.nCantIngresada > 0).length, variante: "success" },
-        { label: "Stock bajo",         value: inventario.length - inventario.filter((p) => p.nCantIngresada > 0).length, variante: "accent" },
-        { label: "Agotados",         value: inventario.length - inventario.filter((p) => p.nCantIngresada > 0).length, variante: "accent" },
-        ]} />
-
-        {/* Toolbar — sin filtro de rol */}
-        <TablaToolbar
-            filtros={filtros}
-            onChange={setFiltros}
-            total={filtradas.length}
-            ocultarRol
-        />
+        )}
+        {stockVer && (
+            <ModalVerStock
+                inventario={stockVer}
+                onClose={() => setStockVer(null)}
+            />
+        )}
+        {stockEditar && (
+            <ModalEditarStock
+                inventario={stockEditar}
+                onClose={() => setStockEditar(null)}
+                onEditado={handleStockEditado}
+            />
+        )}
     </div>
-    );
+  );
+}
+
+function ActionBtn({
+  children, title, onClick, danger, loading,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  danger?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={loading}
+      className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""}`}
+    >
+      {loading ? "⏳" : children}
+    </button>
+  );
 }

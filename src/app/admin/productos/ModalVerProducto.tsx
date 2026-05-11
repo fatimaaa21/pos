@@ -21,9 +21,8 @@ const iniciales = producto.tNameProduct
 .toUpperCase();
 
 // Cache-buster para que el browser no sirva una versión anterior
-  const imgSrc = producto.ImgProduct
-    ? `${producto.ImgProduct.split("?")[0]}?t=${Date.now()}`
-    : null;
+  const imgSrc = producto.ImgProduct?.split("?")[0] ?? null;
+
     
   // Mapa de categorías para acceso rápido por ID
   const categoriasMap = new Map(categorias.map(c => [c.eCodCategory, c.tNameCategory]));
