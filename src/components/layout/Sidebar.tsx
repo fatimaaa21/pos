@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
-import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut, NotebookPen, ClipboardPenLine } from "lucide-react";
+import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut, ClipboardList, ClipboardPenLine } from "lucide-react";
 
 const navAdmin = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
@@ -17,7 +17,7 @@ const navAdmin = [
 ];
 
 const navEmpleado = [
-  { icon: Package,   label: "Menú", href: "/empleado/inventario" },
+  { icon: ClipboardList,   label: "Menú", href: "/empleado/menu" },
   { icon: BarChart2, label: "Inventario",     href: "/empleado/ventas" },
   { icon: Users,     label: "Mis ventas", href: "/empleado/mis-ventas" },
 ];

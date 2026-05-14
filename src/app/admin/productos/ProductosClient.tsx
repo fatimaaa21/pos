@@ -217,11 +217,11 @@ export function ProductClient({ productos: inicial }: Props) {
   return (
     <div className="container">
         <div className="header">
-        <Buscador
-            valor={busqueda}
-            onChange={setBusqueda}
-            placeholder="Buscar usuario..."
-        />
+            <Buscador
+                valor={busqueda}
+                onChange={setBusqueda}
+                placeholder="Buscar usuario..."
+            />
         </div>
 
         <PageHeader
