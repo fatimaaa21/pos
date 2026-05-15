@@ -1,32 +1,26 @@
-// Es el contrato de datos que usan todos los demás archivos.
-// Si la base de datos cambia, aquí se refleja primero.
-
 export type Rol = "admin" | "empleado";
 
-// Refleja exactamente las columnas de la tabla "perfiles" en Supabase
 export interface Perfil {
-  eCodUser: string;       // UUID, PK, linked to auth.users.id
+  eCodUser: string;
   tNameUser: string;
   tEmailUser: string;
   tRolUser: Rol;
   bStateUser: boolean;
-  eCodeUser: string;      // Código de 4 dígitos para login
+  eCodeUser: string;
   fhCreateUser: string;
   fhUpdateUser?: string;
 }
 
 export interface Categoria {
-  eCodCategory: string;    // UUID, PK
+  eCodCategory: string;
   tNameCategory: string;
   ImgCategory?: string;
   fhCreateCategory?: string;
   fhUpdateCategory?: string;
   bStateCategory?: boolean;
-  // Relación hydratada desde el join en page.tsx
   productos?: ProductoResumen[];
 }
 
-// Versión ligera de Producto para mostrar dentro de una categoría
 export interface ProductoResumen {
   eCodProduct: string;
   tNameProduct: string;
@@ -35,9 +29,9 @@ export interface ProductoResumen {
 }
 
 export interface Producto {
-  eCodProduct: string;  // UUID, PK
+  eCodProduct: string;
   tNameProduct: string;
-  fkeCodCategory?: string;   // FK — UUID de la categoría
+  fkeCodCategory?: string;
   ePriceProduct: number;
   eCostProduct: number;
   ImgProduct?: string;
@@ -48,22 +42,32 @@ export interface Producto {
 
 export interface Inventario {
   eCodInventory: string;
-  fkeCodProduct: string;          // FK → productos.eCodProduct (uuid)
-  eCantIngresada: number;       // cantidad que el admin metió
-  eCantVendida: number;         // calculada desde detalle_venta
-  eCantRestante: number;        // eCantIngresada - eCantVendida
-  eStockMinimo: number;         // alerta de stock bajo
-  fhCreateInventory?: string;         // fecha del lote
-  fhUpdateInventory?: string;         // fecha de última actualización (ej: para ajustar cantidad)
-  bStateInventory?: boolean;             // activo/inactivo en el menú
+  fkeCodProduct: string;
+  eCantIngresada: number;
+  eCantVendida: number;
+  eCantRestante: number;
+  eStockMinimo: number;
+  fhCreateInventory?: string;
+  fhUpdateInventory?: string;
+  bStateInventory?: boolean;
 }
- 
+
 export type EstadoStock = "disponible" | "bajo" | "agotado";
- 
+
 export function getEstadoStock(restante: number, minimo: number): EstadoStock {
   if (restante === 0) return "agotado";
   if (restante <= minimo) return "bajo";
   return "disponible";
+}
+
+// Producto tal como llega al menú del empleado — con stock calculado
+export interface ProductoConStock {
+  eCodProduct: string;
+  tNameProduct: string;
+  fkeCodCategory?: string;
+  ePriceProduct: number;
+  ImgProduct?: string;
+  stockDisponible: number;   // eCantRestante del inventario
 }
 
 export interface Existencia {

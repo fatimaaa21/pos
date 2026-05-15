@@ -19,9 +19,8 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
   const inactivos  = productos.filter((p) => !p.bStateProduct);
 
   // Cache-buster para que el browser no sirva una versión anterior
-  const imgSrc = categoria.ImgCategory
-    ? `${categoria.ImgCategory.split("?")[0]}?t=${Date.now()}`
-    : null;
+  const imgSrc = categoria.ImgCategory?.split("?")[0] ?? null;
+
     
   return (
     <Modal

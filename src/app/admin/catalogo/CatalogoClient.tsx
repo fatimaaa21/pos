@@ -41,6 +41,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [ts] = useState(() => Date.now());
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = categorias.filter((c) => {
@@ -120,7 +121,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
             {c.ImgCategory ? (
               <img
                 src={`${c.ImgCategory.split("?")[0]}?t=${ts}`}
-                alt={c.tNameCategory}
               />
             ) : null }
             <span>{c.tNameCategory}</span>

@@ -1,0 +1,10 @@
+/* ── Layout del catálogo — ocupa todo el ancho menos el panel fijo ── */
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* deja espacio a la derecha para el PedidoPanel fijo */
+  padding-right: calc(300px + var(--space-4));
+  min-height: 100%;
+  overflow: hidden;
+}
