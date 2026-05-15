@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Categoria, ProductoConStock, MetodoPago } from "@/types";
 import { Buscador } from "@/components/ui/Buscador";
 import { CategoriaCarrusel } from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
@@ -23,6 +24,7 @@ interface Props {
 export function MenuClient({ categorias, productos }: Props) {
   const [categoriaActiva, setCategoriaActiva] = useState<string>("todas");
   const [busqueda, setBusqueda] = useState("");
+  const router = useRouter();
   const [carrito, setCarrito] = useState<ItemCarritoMenu[]>([]);
   const [errorVenta, setErrorVenta] = useState<string | null>(null);
   const [ventaExitosa, setVentaExitosa] = useState<string | null>(null);
@@ -109,6 +111,7 @@ export function MenuClient({ categorias, productos }: Props) {
   function handleNuevoPedido() {
     setVentaExitosa(null);
     limpiarCarrito();
+    router.refresh();
   }
 
   return (

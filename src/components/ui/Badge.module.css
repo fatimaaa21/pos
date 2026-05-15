@@ -30,7 +30,8 @@
 
 /* ── Verde — activo / publicado / disponible ── */
 .activo,
-.publicado {
+.publicado,
+.disponible {
   background: var(--color-success-bg);
   color: var(--color-success);
   border-color: var(--color-success-border);
