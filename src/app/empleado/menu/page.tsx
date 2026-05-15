@@ -1,3 +1,4 @@
+// src/app/empleado/menu/page.tsx
 import { createClient } from "@/lib/supabase/server";
 import { MenuClient } from "./MenuClient";
 import type { Categoria, ProductoConStock } from "@/types";
@@ -5,42 +6,54 @@ import type { Categoria, ProductoConStock } from "@/types";
 export default async function MenuPage() {
   const supabase = await createClient();
 
-  const { data: categorias, error: errorCat } = await supabase
+  // Categorías activas
+  const { data: categorias } = await supabase
     .from("categorias")
-    .select("eCodCategory, tNameCategory, ImgCategory, bStateCategory")
+    .select("eCodCategory, tNameCategory, ImgCategory")
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // Usar el nombre exacto de la FK que indica el hint de Supabase
-  const { data: productosConStock, error: errorProd } = await supabase
+  // 1. IDs de productos que están en inventario y activos
+  const { data: lotes, error } = await supabase
+    .from("inventario")
+    .select("fkeCodProduct, eCantIngresada")
+    .eq("bStateInventory", true);
+
+  if (error) console.error("Error:", JSON.stringify(error));
+
+  if (!lotes || lotes.length === 0) {
+    return <MenuClient categorias={(categorias as Categoria[]) ?? []} productos={[]} />;
+  }
+
+  const idsConStock = [...new Set(lotes.map((l) => l.fkeCodProduct))];
+
+  // 2. Traer esos productos
+  const { data: productos } = await supabase
     .from("productos")
-    .select(`
-      *,
-      inventario!inventario_fkeCodProduct_fkey (
-        eCantRestante,
-        bStateInventory
-      )
-    `)
-    .eq("bStateProduct", true)
-    .order("tNameProduct");
+    .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
+    .in("eCodProduct", idsConStock)
+    .eq("bStateProduct", true);
 
-  if (errorCat)  console.error("Error cargando categorías:", errorCat);
-  if (errorProd) console.error("Error cargando productos:", errorProd);
+  // 3. Usar eCantIngresada como stock por ahora
+  const stockPorProducto = new Map<string, number>();
+  for (const lote of lotes) {
+    const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
+    stockPorProducto.set(lote.fkeCodProduct, actual + lote.eCantIngresada);
+  }
 
-  const productos: ProductoConStock[] = (productosConStock ?? [])
-    .map((p: any) => {
-      const stockTotal = (p.inventario ?? [])
-        .filter((lote: any) => lote.bStateInventory)
-        .reduce((acc: number, lote: any) => acc + (lote.eCantRestante ?? 0), 0);
-
-      return { ...p, stockDisponible: stockTotal };
-    })
-    .filter((p: ProductoConStock) => p.stockDisponible > 0);
+  const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => ({
+    eCodProduct:     p.eCodProduct,
+    tNameProduct:    p.tNameProduct,
+    fkeCodCategory:  p.fkeCodCategory,
+    ePriceProduct:   p.ePriceProduct,
+    ImgProduct:      p.ImgProduct,
+    stockDisponible: stockPorProducto.get(p.eCodProduct) ?? 0,
+  }));
 
   return (
     <MenuClient
       categorias={(categorias as Categoria[]) ?? []}
-      productos={productos}
+      productos={productosConStock}
     />
   );
 }

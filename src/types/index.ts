@@ -40,11 +40,6 @@ export interface Producto {
   fhUpdateProduct?: string;
 }
 
-// Producto enriquecido con stock calculado — exclusivo del menú del empleado
-export interface ProductoConStock extends Producto {
-  stockDisponible: number;  // suma de eCantRestante de todos los lotes activos
-}
-
 export interface Inventario {
   eCodInventory: string;
   fkeCodProduct: string;
@@ -63,6 +58,16 @@ export function getEstadoStock(restante: number, minimo: number): EstadoStock {
   if (restante === 0) return "agotado";
   if (restante <= minimo) return "bajo";
   return "disponible";
+}
+
+// Producto tal como llega al menú del empleado — con stock calculado
+export interface ProductoConStock {
+  eCodProduct: string;
+  tNameProduct: string;
+  fkeCodCategory?: string;
+  ePriceProduct: number;
+  ImgProduct?: string;
+  stockDisponible: number;   // eCantRestante del inventario
 }
 
 export interface Existencia {

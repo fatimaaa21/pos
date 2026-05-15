@@ -18,7 +18,7 @@ const navAdmin = [
 
 const navEmpleado = [
   { icon: ClipboardList,   label: "Menú", href: "/empleado/menu" },
-  { icon: BarChart2, label: "Inventario",     href: "/empleado/ventas" },
+  { icon: ClipboardPenLine, label: "Inventario",     href: "/empleado/inventario" },
   { icon: Users,     label: "Mis ventas", href: "/empleado/mis-ventas" },
 ];
 
