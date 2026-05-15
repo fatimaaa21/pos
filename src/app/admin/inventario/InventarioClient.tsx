@@ -1,6 +1,8 @@
 "use client";
 
+import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, Trash2, Pencil } from "lucide-react";
 import type { Inventario, Producto } from "@/types";
 import { Buscador } from "@/components/ui/Buscador";
@@ -36,6 +38,7 @@ interface Props {
 export function InventarioClient({ inventario: inicial }: Props) {
     const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
     const [busqueda, setBusqueda] = useState("");
+    const router = useRouter();
     const [filtros, setFiltros] = useState<FiltrosUsuario>({
         busqueda: "",
         roles: [],
@@ -68,6 +71,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
   function handleStockAgregado(nuevo: InventarioConProducto) {
     setInventario((prev) => [nuevo, ...prev]);
     setModalAgregar(false);
+    router.refresh();
   }
 
   function handleStockEditado(actualizado: Inventario) {
@@ -79,6 +83,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
         )
       );
       setStockEditar(null);
+      router.refresh();
     }
 
   async function handleEliminar(item: InventarioConProducto) {
@@ -105,6 +110,24 @@ export function InventarioClient({ inventario: inicial }: Props) {
     }
     setToggleando(null);
   }
+
+  async function recargar() {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("vista_inventario")
+    .select(`
+      *,
+      productos!inventario_fkeCodProduct_fkey (
+        tNameProduct,
+        ImgProduct,
+        ePriceProduct,
+        categorias ( tNameCategory )
+      )
+    `)
+    .order("fhCreateInventory", { ascending: false });
+
+  if (data) setInventario(data as InventarioConProducto[]);
+}
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const disponibles = inventario.filter(
@@ -169,7 +192,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "eCantVendida",
       label: "Vendidas",
       render: (c) => (
-        <span style={{ fontWeight: 600, color: "var(--gray)" }}>
+        <span style={{ fontWeight: 600, color: "var(--dark)" }}>
           {c.eCantVendida}
         </span>
       ),
@@ -179,23 +202,11 @@ export function InventarioClient({ inventario: inicial }: Props) {
       label: "Restantes",
       render: (c) => {
         const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-        const colores = {
-          disponible: { bg: "var(--color-success-bg)", color: "var(--color-success)" },
-          bajo:       { bg: "var(--color-warning-bg)", color: "var(--color-warning)" },
-          agotado:    { bg: "var(--color-error-bg)",   color: "var(--color-error)"   },
-        }[estado];
+        const variante = estado === "disponible" ? "disponible" : estado === "bajo" ? "bajo" : "agotado";
         return (
-          <span style={{
-            display: "inline-block",
-            padding: "2px 10px",
-            borderRadius: "var(--radius-full)",
-            fontWeight: 800,
-            fontSize: 13,
-            background: colores.bg,
-            color: colores.color,
-          }}>
+          <Badge variante={variante}>
             {c.eCantRestante}
-          </span>
+          </Badge>
         );
       },
     },

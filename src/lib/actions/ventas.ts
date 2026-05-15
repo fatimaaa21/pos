@@ -16,17 +16,32 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
     const supabase = await createClient();
     const adminClient = createAdminClient();
 
-    // 1. Obtener usuario autenticado
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    // 2. Calcular total
+    // Validar stock antes de proceder
+    for (const item of items) {
+      const { data: lote, error: loteError } = await adminClient
+        .from("vista_inventario")         // ← vista, no tabla
+        .select("eCodInventory, eCantRestante")
+        .eq("fkeCodProduct", item.eCodProduct)
+        .eq("bStateInventory", true)
+        .single();
+
+      if (loteError || !lote) {
+        return { error: "Producto sin inventario activo" };
+      }
+
+      if (lote.eCantRestante < item.cantidad) {
+        return { error: `Stock insuficiente. Solo quedan ${lote.eCantRestante} unidades disponibles` };
+      }
+    }
+
     const eTotal = items.reduce(
       (acc, i) => acc + i.precioUnitario * i.cantidad,
       0
     );
 
-    // 3. Insertar venta
     const { data: venta, error: ventaError } = await adminClient
       .from("ventas")
       .insert({
@@ -41,7 +56,6 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
       return { error: `Error al crear venta: ${ventaError?.message}` };
     }
 
-    // 4. Insertar detalle
     const detalle = items.map((i) => ({
       fkeCodVenta:     venta.eCodVenta,
       fkeCodProduct:   i.eCodProduct,
@@ -58,31 +72,33 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
       return { error: `Error al guardar detalle: ${detalleError.message}` };
     }
 
-    // 5. Descontar del inventario
-    for (const item of items) {
-      const { data: lote, error: loteError } = await adminClient
-        .from("inventario")
-        .select("eCodInventory, eCantIngresada")
-        .eq("fkeCodProduct", item.eCodProduct)
-        .eq("bStateInventory", true)
-        .single();
+    // Descontar del inventario
+for (const item of items) {
+  // Leer el restante real desde la vista
+  const { data: lote } = await adminClient
+    .from("vista_inventario")
+    .select("eCodInventory, eCantRestante")
+    .eq("fkeCodProduct", item.eCodProduct)
+    .eq("bStateInventory", true)
+    .single();
 
-      if (loteError || !lote) continue;
+  if (!lote) continue;
 
-      const nuevaCantidad = lote.eCantIngresada - item.cantidad;
+  const restanteTrasventa = lote.eCantRestante - item.cantidad;
+  const agotado = restanteTrasventa <= 0;
 
-      await adminClient
-        .from("inventario")
-        .update({
-          eCantIngresada:   nuevaCantidad < 0 ? 0 : nuevaCantidad,
-          fhUpdateInventory: new Date().toISOString(),
-          // Si se agotó, desactivar el lote
-          bStateInventory:  nuevaCantidad > 0,
-        })
-        .eq("eCodInventory", lote.eCodInventory);
-    }
+  // Solo actualizar estado y timestamp, NUNCA eCantIngresada
+  await adminClient
+    .from("inventario")
+    .update({
+      bStateInventory:   !agotado,
+      fhUpdateInventory: new Date().toISOString(),
+    })
+    .eq("eCodInventory", lote.eCodInventory);
+}
 
-    revalidatePath("/empleado/menu");
+    revalidatePath("/empleado/menu");     
+    revalidatePath("/admin/inventario");   
     return { eCodVenta: venta.eCodVenta };
 
   } catch (e: any) {
