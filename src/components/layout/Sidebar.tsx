@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/lib/actions/auth";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
-import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut, ClipboardList, ClipboardPenLine } from "lucide-react";
+import { LayoutDashboard, Package, BarChart2, BookOpenText, Users, LogOut, ClipboardList, ClipboardPenLine, Building2 } from "lucide-react";
 
 const navAdmin = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/admin/dashboard" },
@@ -22,6 +22,11 @@ const navEmpleado = [
   { icon: Users,     label: "Mis ventas", href: "/empleado/mis-ventas" },
 ];
 
+const navSistemas = [
+  { icon: LayoutDashboard,   label: "Dashboard",  href: "/sistemas/dashboard" },
+  { icon: Building2,         label: "Negocios",   href: "/sistemas/negocios" },
+];
+
 interface SidebarProps {
   perfil: Perfil;
   nombreNegocio?: string;
@@ -29,7 +34,12 @@ interface SidebarProps {
 
 export function Sidebar({ perfil, nombreNegocio = "Panadería" }: SidebarProps) {
   const pathname = usePathname();
-  const nav = perfil.tRolUser === "admin" ? navAdmin : navEmpleado;
+  const nav =
+    perfil.tRolUser === "admin"    ? navAdmin :
+    perfil.tRolUser === "sistemas" ? navSistemas :
+    navEmpleado;
+
+  const esSistemas = perfil.tRolUser === "sistemas";
 
   const iniciales = perfil.tNameUser
     .split(" ")
