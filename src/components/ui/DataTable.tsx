@@ -59,7 +59,7 @@ const todosSeleccionados =
         <table className={styles.table}>
             {/* Encabezado */}
             <thead>
-                <tr>
+                <tr key="header-row">
                 {seleccionable && (
                     <th className={styles.checkboxCol}>
                     <input

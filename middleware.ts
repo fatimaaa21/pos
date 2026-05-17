@@ -1,7 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Dejar pasar todo lo que sea _next o assets
+  if (
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    /\.(.*)$/.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -26,31 +37,25 @@ export async function proxy(request: NextRequest) {
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  const pathname = request.nextUrl.pathname;
 
-  // Sin sesión y no está en /auth → manda al login
-  if (!user && !pathname.startsWith("/auth")) {
-    return NextResponse.redirect(new URL("/auth/login", request.url));
-  }
-
-  // Ya tiene sesión y va al login → redirige según rol
   if (user && pathname.startsWith("/auth")) {
-    const { data: perfil } = await supabase
-      .from("perfiles")
-      .select("tRolUser")
-      .eq("eCodUser", user.id)
-      .single();
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("tRolUser")
+    .eq("eCodUser", user.id)
+    .single();
 
-    if (perfil?.tRolUser === "sistemas") {
-      return NextResponse.redirect(new URL("/sistemas/dashboard", request.url));
-    }
-    if (perfil?.tRolUser === "admin") {
-      return NextResponse.redirect(new URL("/admin/dashboard", request.url));
-    }
-    return NextResponse.redirect(new URL("/empleado/menu", request.url));
+  console.log("ROL DETECTADO:", perfil?.tRolUser, "| USER ID:", user.id); // ← agrega esto
+
+  if (perfil?.tRolUser === "sistemas") {
+    return NextResponse.redirect(new URL("/sistemas/dashboard", request.url));
   }
+  if (perfil?.tRolUser === "admin") {
+    return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+  }
+  return NextResponse.redirect(new URL("/empleado/menu", request.url));
+}
 
-  // Rutas /sistemas solo para sistemas
   if (user && pathname.startsWith("/sistemas")) {
     const { data: perfil } = await supabase
       .from("perfiles")
@@ -63,7 +68,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Rutas /admin solo para admin
   if (user && pathname.startsWith("/admin")) {
     const { data: perfil } = await supabase
       .from("perfiles")
@@ -78,3 +82,7 @@ export async function proxy(request: NextRequest) {
 
   return supabaseResponse;
 }
+
+export const config = {
+  matcher: ["/(.*)",],
+};

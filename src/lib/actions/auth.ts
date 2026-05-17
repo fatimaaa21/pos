@@ -35,11 +35,13 @@ export async function login(formData: FormData) {
 
   revalidatePath("/", "layout");
 
+  if (perfil.tRolUser === "sistemas") {
+  redirect("/sistemas/dashboard");
+  }
   if (perfil.tRolUser === "admin") {
     redirect("/admin/dashboard");
-  } else {
-    redirect("/empleado/inventario");
   }
+  redirect("/empleado/menu");
 }
 
 export async function logout() {

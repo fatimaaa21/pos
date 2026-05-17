@@ -3,6 +3,7 @@ import styles from "./Badge.module.css";
 type Variante =
   | "activo"
   | "inactivo"
+  | "sistemas"
   | "admin"
   | "empleado"
   | "pendiente"
@@ -25,6 +26,7 @@ interface BadgeProps {
 const CONFIG: Record<Variante, { label: string; clase: string }> = {
   activo:      { label: "Activo",      clase: styles.activo },
   inactivo:    { label: "Inactivo",    clase: styles.inactivo },
+  sistemas:    { label: "Sistemas",    clase: styles.sistemas },
   admin:       { label: "Admin",       clase: styles.admin },
   empleado:    { label: "Empleado",    clase: styles.empleado },
   pendiente:   { label: "Pendiente",   clase: styles.pendiente },

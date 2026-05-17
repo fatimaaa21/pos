@@ -1,6 +1,7 @@
-export type Rol = "admin" | "empleado";
+export type Rol = "admin" | "empleado" | "sistemas";
 
 export interface Perfil {
+  fkeCodCompany: string | null;
   eCodUser: string;
   tNameUser: string;
   tEmailUser: string;
@@ -11,7 +12,19 @@ export interface Perfil {
   fhUpdateUser?: string;
 }
 
+export interface Negocio {
+  eCodCompany: string;
+  tNameCompany: string;
+  tSlugCompany: string;
+  imgCompany?: string;
+  moneda: string;
+  zona_horaria: string;
+  bstateCompany: boolean;
+  fhCreateCompany: string;
+}
+
 export interface Categoria {
+  fkeCodCompany: string;
   eCodCategory: string;
   tNameCategory: string;
   ImgCategory?: string;
@@ -29,6 +42,7 @@ export interface ProductoResumen {
 }
 
 export interface Producto {
+  fkeCodCompany: string;
   eCodProduct: string;
   tNameProduct: string;
   fkeCodCategory?: string;
@@ -41,6 +55,7 @@ export interface Producto {
 }
 
 export interface Inventario {
+  fkeCodCompany: string;
   eCodInventory: string;
   fkeCodProduct: string;
   eCantIngresada: number;
@@ -71,6 +86,7 @@ export interface ProductoConStock {
 }
 
 export interface Existencia {
+  fkeCodCompany: string;
   id: number;
   producto_id: number;
   producto?: Producto;
@@ -82,6 +98,7 @@ export interface Existencia {
 export type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
 
 export interface Venta {
+  fkeCodCompany: string;
   id: number;
   empleado_id: string;
   empleado?: Perfil;

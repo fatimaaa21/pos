@@ -5,8 +5,17 @@ import type { Categoria } from "@/types";
 export default async function CatalogoPage() {
   const supabase = await createClient();
 
-  // Traemos categorías junto con sus productos (solo los campos necesarios)
-  const { data: categorias, data: productos, error } = await supabase
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: perfilActual } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user!.id)
+    .single();
+
+  const fkeCodCompany = perfilActual?.fkeCodCompany;
+
+  const { data: categorias, error } = await supabase
     .from("categorias")
     .select(`
       *,
@@ -17,6 +26,7 @@ export default async function CatalogoPage() {
         ePriceProduct
       )
     `)
+    .eq("fkeCodCompany", fkeCodCompany)
     .order("tNameCategory");
 
   if (error) console.error("Error cargando categorías:", error);
