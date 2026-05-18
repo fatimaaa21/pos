@@ -12,14 +12,14 @@ const navAdmin = [
   { icon: BookOpenText,    label: "Catálogo",   href: "/admin/catalogo" },
   { icon: Package,         label: "Productos",  href: "/admin/productos" },
   { icon: ClipboardPenLine,     label: "Inventario",  href: "/admin/inventario" },
-  { icon: BarChart2,       label: "Reportes",   href: "/admin/reportes" },
+  { icon: BarChart2,       label: "Ventas",   href: "/admin/ventas" },
   { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
 ];
 
 const navEmpleado = [
   { icon: ClipboardList,   label: "Menú", href: "/empleado/menu" },
   { icon: ClipboardPenLine, label: "Inventario",     href: "/empleado/inventario" },
-  { icon: Users,     label: "Mis ventas", href: "/empleado/mis-ventas" },
+  { icon: Users,     label: "Mis ventas", href: "/empleado/ventasEmpleado" },
 ];
 
 const navSistemas = [

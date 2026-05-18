@@ -85,36 +85,26 @@ export interface ProductoConStock {
   stockDisponible: number;   // eCantRestante del inventario
 }
 
-export interface Existencia {
-  fkeCodCompany: string;
-  id: number;
-  producto_id: number;
-  producto?: Producto;
-  cantidad: number;
-  stock_minimo: number;
-  actualizado_at: string;
-}
-
 export type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
 
 export interface Venta {
   fkeCodCompany: string;
-  id: number;
-  empleado_id: string;
+  eCodVenta: string;
+  fkeCodUser: string;
   empleado?: Perfil;
-  total: number;
-  metodo_pago: MetodoPago;
-  created_at: string;
+  eTotal: number;
+  eMetodoPago: MetodoPago;
+  fhCreateVenta: string;
 }
 
 export interface DetalleVenta {
-  id: number;
-  venta_id: number;
-  producto_id: number;
+  eCodDetalle: string;
+  fkeCodVenta: string;
+  fkeCodProduct: string;
   producto?: Producto;
-  cantidad: number;
-  precio_unitario: number;
-  subtotal: number;
+  eCantidad: number;
+  ePrecioUnitario: number;
+  eSubtotal: number;
 }
 
 export interface ItemCarrito {
