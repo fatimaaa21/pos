@@ -23,7 +23,6 @@ interface Props {
 
 export function UsuariosClient({ usuarios: inicial }: Props) {
   const [usuarios, setUsuarios] = useState<Perfil[]>(inicial);
-  const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
     roles: [],
@@ -44,7 +43,7 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
       u.tEmailUser.toLowerCase().includes(texto);
  
     const coincideRol =
-      filtros.roles.length === 0 || filtros.roles.includes(u.tRolUser);
+      filtros.roles.length === 0 || filtros.roles.includes(u.tRolUser as "admin" | "empleado");
  
     const estadoValor = u.bStateUser ? "activo" : "inactivo";
     const coincideEstado =
@@ -165,8 +164,8 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
 
       <div className="header">
         <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
+          valor={filtros.busqueda}
+          onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
           placeholder="Buscar usuario..."
         />
       </div>
