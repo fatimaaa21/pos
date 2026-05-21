@@ -21,120 +21,121 @@ interface Props {
 }
 
 export function ProductClient({ productos: inicial }: Props) {
-    const [productos, setProductos] = useState<Producto[]>(inicial);
-     // Map de eCodProduct → timestamp — se actualiza cada vez que se edita un producto.
-    // Fuerza que el <img> recargue la imagen aunque la URL base sea la misma.
-    const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
-        Object.fromEntries(inicial.map((p) => [p.eCodProduct, Date.now()]))
+  const [productos, setProductos] = useState<Producto[]>(inicial);
+  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
+    Object.fromEntries(inicial.map((p) => [p.eCodProduct, Date.now()]))
+  );
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    busqueda: "",
+    roles: [],
+    estados: [],
+    categorias: [],
+  });
+  const [modalCrear, setModalCrear] = useState(false);
+  const [productoVer, setProductoVer] = useState<Producto | null>(null);
+  const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
+  const [toggleando, setToggleando] = useState<string | null>(null);
+  const [seleccionados, setSeleccionados] = useState<string[]>([]);
+  const [eliminando, setEliminando] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function cargarCategorias() {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("categorias")
+        .select("eCodCategory, tNameCategory")
+        .order("tNameCategory");
+
+      if (data) setCategorias(data as Categoria[]);
+      if (error) console.error("Error cargando categorías:", error.message);
+    }
+    cargarCategorias();
+  }, []);
+
+  // ── Mapa de categorías para labels ───────────────────────────────────────
+  const categoriasMap = new Map(categorias.map((c) => [c.eCodCategory, c.tNameCategory]));
+
+  // ── Opciones de categoría: solo las que realmente tienen productos ────────
+  const opcionesCategorias = Array.from(
+    new Map(
+      productos
+        .filter((p) => p.fkeCodCategory)
+        .map((p) => [
+          p.fkeCodCategory!,
+          {
+            value: p.fkeCodCategory!,
+            label: categoriasMap.get(p.fkeCodCategory!) ?? p.fkeCodCategory!,
+          },
+        ])
+    ).values()
+  ).sort((a, b) => a.label.localeCompare(b.label));
+
+  // ── Filtrado ──────────────────────────────────────────────────────────────
+  const filtradas = productos.filter((p) => {
+    const texto = filtros.busqueda.toLowerCase();
+    const coincideTexto = !texto || p.tNameProduct.toLowerCase().includes(texto);
+
+    const estadoValor = p.bStateProduct ? "activo" : "inactivo";
+    const coincideEstado =
+      filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
+
+    const coincideCategoria =
+      !filtros.categorias?.length ||
+      (p.fkeCodCategory != null && filtros.categorias.includes(p.fkeCodCategory));
+
+    return coincideTexto && coincideEstado && coincideCategoria;
+  });
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  function handleProductoCreado(nuevo: Producto) {
+    setProductos((prev) => [nuevo, ...prev]);
+    setModalCrear(false);
+  }
+
+  function handleProductoEditado(actualizado: Producto) {
+    setProductos((prev) =>
+      prev.map((p) => (p.eCodProduct === actualizado.eCodProduct ? actualizado : p))
     );
-    const [categorias, setCategorias] = useState<Categoria[]>([]);
-    const [busqueda, setBusqueda] = useState("");
-    const [filtros, setFiltros] = useState<FiltrosUsuario>({
-        busqueda: "",
-        roles: [],
-        estados: [],
-    });
-    const [modalCrear, setModalCrear] = useState(false);
-    const [productoVer, setProductoVer] = useState<Producto | null>(null);
-    const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
-    const [toggleando, setToggleando] = useState<string | null>(null);
-    const [seleccionados, setSeleccionados] = useState<string[]>([]);
-    const [eliminando, setEliminando] = useState<string | null>(null);
-    const [ts] = useState(() => Date.now());
+    setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
+    setProductoEditar(null);
+  }
 
-    useEffect(() => {
-        async function cargarCategorias() {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from("categorias")
-                .select("eCodCategory, tNameCategory")
-                .order("tNameCategory");
+  async function handleToggleEstado(producto: Producto) {
+    setToggleando(producto.eCodProduct);
+    const result = await toggleEstadoProducto(producto.eCodProduct, !producto.bStateProduct);
+    if (!result?.error) {
+      setProductos((prev) =>
+        prev.map((p) =>
+          p.eCodProduct === producto.eCodProduct ? { ...p, bStateProduct: !p.bStateProduct } : p
+        )
+      );
+    }
+    setToggleando(null);
+  }
 
-            if (data) setCategorias(data as Categoria[]);
-            if (error) {
-                console.error("Error cargando categorías:", error.message);
-            }
-        }
+  async function handleEliminar(producto: Producto) {
+    const confirmar = window.confirm(
+      `¿Eliminar "${producto.tNameProduct}"? Esta acción no se puede deshacer.`
+    );
+    if (!confirmar) return;
 
-        cargarCategorias();
-    }, []);
+    setEliminando(producto.eCodProduct);
+    const result = await eliminarProducto(producto.eCodProduct);
 
+    if (!result?.error) {
+      setProductos((prev) => prev.filter((p) => p.eCodProduct !== producto.eCodProduct));
+    } else {
+      alert(`Error al eliminar producto: ${result.error}`);
+    }
+    setEliminando(null);
+  }
 
-    // ── Filtrado ──────────────────────────────────────────────────────────────
-    const filtradas = productos.filter((p) => {
-        const texto = filtros.busqueda.toLowerCase();
-        const coincideTexto = !texto || p.tNameProduct.toLowerCase().includes(texto);
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const totalActivos = productos.filter((p) => p.bStateProduct).length;
 
-        const estadoValor = p.bStateProduct ? "activo" : "inactivo";
-        const coincideEstado =
-        filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-
-        return coincideTexto && coincideEstado;
-    });
-
-    // ── Helpers Supabase ──────────────────────────────────────────────────────
-      async function recargar() {
-        const supabase = createClient();
-        const { data } = await supabase
-          .from("productos")
-          .select("*")
-          .order("eCodProduct", { ascending: true });
-        if (data) setProductos(data as Producto[]);
-      }
-    
-      // ── Handlers ──────────────────────────────────────────────────────────────
-      function handleProductoCreado(nuevo: Producto) {
-          setProductos((prev) => [nuevo, ...prev]);
-          setModalCrear(false);
-        }
-    
-      function handleProductoEditado(actualizado: Producto) {
-          setProductos((prev) =>
-            prev.map((p) => (p.eCodProduct === actualizado.eCodProduct ? actualizado : p))
-          );
-          // Nuevo timestamp → el <img> recarga la imagen del bucket aunque la URL sea igual
-            setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
-          setProductoEditar(null);
-        }
-    
-      async function handleToggleEstado(producto: Producto) {
-        setToggleando(producto.eCodProduct);
-        const result = await toggleEstadoProducto(producto.eCodProduct, !producto.bStateProduct);
-        if (!result?.error) {
-          setProductos((prev) =>
-            prev.map((p) =>
-              p.eCodProduct === producto.eCodProduct ? { ...p, bStateProduct: !p.bStateProduct } : p
-            )
-          );
-        }
-        setToggleando(null);
-      }
-
-      async function handleEliminar(categoria: Producto) {
-        const confirmar = window.confirm(
-          `¿Eliminar "${categoria.tNameProduct}"? Esta acción no se puede deshacer.`
-        );
-        if (!confirmar) return;
-      
-        setEliminando(categoria.eCodProduct);
-        const result = await eliminarProducto(categoria.eCodProduct);
-      
-        if (!result?.error) {
-          setProductos((prev) => prev.filter((p) => p.eCodProduct !== categoria.eCodProduct));
-        } else {
-          alert(`Error al eliminar producto: ${result.error}`);
-        }
-      
-        setEliminando(null);
-      }
-
-    // ── Stats ─────────────────────────────────────────────────────────────────
-    const totalActivos = productos.filter((p) => p.bStateProduct).length;
-
-    // Mapa de categorías para acceso rápido por ID
-    const categoriasMap = new Map(categorias.map(c => [c.eCodCategory, c.tNameCategory]));
-
-    // ── Columnas ──────────────────────────────────────────────────────────────
+  // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Producto>[] = [
     {
       key: "tNameProduct",
@@ -148,7 +149,7 @@ export function ProductClient({ productos: inicial }: Props) {
                 src={`${p.ImgProduct.split("?")[0]}?t=${ts}`}
                 alt={p.tNameProduct}
               />
-            ) : null }
+            ) : null}
             <span>{p.tNameProduct}</span>
           </div>
         );
@@ -158,7 +159,9 @@ export function ProductClient({ productos: inicial }: Props) {
       key: "fkeCodCategory",
       label: "Categoría",
       render: (p) => (
-        <span>{p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) || "Categoría no encontrada" : "—"}</span>
+        <span>
+          {p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) ?? "—" : "—"}
+        </span>
       ),
     },
     {
@@ -166,7 +169,7 @@ export function ProductClient({ productos: inicial }: Props) {
       label: "Precio al público",
       render: (p) => (
         <span>
-          {p.ePriceProduct.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
+          {p.ePriceProduct.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
         </span>
       ),
     },
@@ -175,7 +178,7 @@ export function ProductClient({ productos: inicial }: Props) {
       label: "Costo de producción",
       render: (p) => (
         <span>
-          {p.eCostProduct.toLocaleString("es-AR", { style: "currency", currency: "ARS" })}
+          {p.eCostProduct.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
         </span>
       ),
     },
@@ -216,37 +219,35 @@ export function ProductClient({ productos: inicial }: Props) {
 
   return (
     <div className="container">
-        <div className="header">
-            <Buscador
-                valor={busqueda}
-                onChange={setBusqueda}
-                placeholder="Buscar usuario..."
-            />
-        </div>
-
-        <PageHeader
-            titulo="Productos"
-            descripcion="Gestiona los productos"
-            boton={{ label: "Nuevo producto", onClick: () => setModalCrear(true)  }}
+      <div className="header">
+        <Buscador
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar producto..."
         />
+      </div>
 
-        {/* Stats */}
-        <StatCards stats={[
-        { label: "Total productos",  value: productos.length, variante: "primary" },
-        { label: "Activos",         value: totalActivos, variante: "success" },
-        { label: "Inactivos",         value: productos.length - totalActivos, variante: "accent" },
-        ]} />
+      <PageHeader
+        titulo="Productos"
+        descripcion="Gestiona los productos"
+        boton={{ label: "Nuevo producto", onClick: () => setModalCrear(true) }}
+      />
 
-        {/* Toolbar — sin filtro de rol */}
-        <TablaToolbar
-            filtros={filtros}
-            onChange={setFiltros}
-            total={filtradas.length}
-            ocultarRol
-        />
+      <StatCards stats={[
+        { label: "Total productos", value: productos.length,                   variante: "primary" },
+        { label: "Activos",         value: totalActivos,                        variante: "success" },
+        { label: "Inactivos",       value: productos.length - totalActivos,     variante: "accent"  },
+      ]} />
 
-        {/* Tabla */}
-        <DataTable
+      <TablaToolbar
+        filtros={filtros}
+        onChange={setFiltros}
+        total={filtradas.length}
+        ocultarRol
+        opcionesCategorias={opcionesCategorias}
+      />
+
+      <DataTable
         columnas={columnas}
         datos={filtradas}
         keyExtractor={(p) => String(p.eCodProduct)}
@@ -254,34 +255,31 @@ export function ProductClient({ productos: inicial }: Props) {
         seleccionados={seleccionados}
         onSeleccionar={setSeleccionados}
         vacio="No se encontraron productos"
-        />
-        
-        {/* Modales */}
-        {modalCrear && (
-        <ModalCrearProducto
-            onClose={() => setModalCrear(false)}
-            onCreado={handleProductoCreado}
-            categorias={categorias}
-        />
-        )}
-        {productoVer && (
-            <ModalVerProducto
-                producto={productoVer}
-                categorias={categorias}
-                onClose={() => setProductoVer(null)}
-            />
-        )}
-        {productoEditar && (
-        <ModalEditarProducto
-            producto={productoEditar}
-            categorias={categorias}
-            onClose={() => setProductoEditar(null)}
-            onEditado={handleProductoEditado}
-        />
-        )}
-    </div>
+      />
 
-    
+      {modalCrear && (
+        <ModalCrearProducto
+          onClose={() => setModalCrear(false)}
+          onCreado={handleProductoCreado}
+          categorias={categorias}
+        />
+      )}
+      {productoVer && (
+        <ModalVerProducto
+          producto={productoVer}
+          categorias={categorias}
+          onClose={() => setProductoVer(null)}
+        />
+      )}
+      {productoEditar && (
+        <ModalEditarProducto
+          producto={productoEditar}
+          categorias={categorias}
+          onClose={() => setProductoEditar(null)}
+          onEditado={handleProductoEditado}
+        />
+      )}
+    </div>
   );
 }
 

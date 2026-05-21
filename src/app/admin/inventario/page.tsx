@@ -37,6 +37,7 @@ export default async function InventarioPage() {
         ImgProduct,
         ePriceProduct,
         categorias (
+          eCodCategory,
           tNameCategory
         )
       )
