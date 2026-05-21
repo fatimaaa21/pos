@@ -33,6 +33,7 @@ export function ProductClient({ productos: inicial }: Props) {
         busqueda: "",
         roles: [],
         estados: [],
+        categorias: [],
     });
     const [modalCrear, setModalCrear] = useState(false);
     const [productoVer, setProductoVer] = useState<Producto | null>(null);
@@ -59,18 +60,34 @@ export function ProductClient({ productos: inicial }: Props) {
         cargarCategorias();
     }, []);
 
+    // ── Mapa de categorías para labels ───────────────────────────────────────
+    const categoriasMap = new Map(categorias.map((c) => [c.eCodCategory, c.tNameCategory]));
+  
+    // Opciones para el dropdown del toolbar
+    const opcionesCategorias = categorias.map((c) => ({
+      value: c.eCodCategory,
+      label: c.tNameCategory,
+    }));
+
 
     // ── Filtrado ──────────────────────────────────────────────────────────────
-    const filtradas = productos.filter((p) => {
-        const texto = filtros.busqueda.toLowerCase();
-        const coincideTexto = !texto || p.tNameProduct.toLowerCase().includes(texto);
-
-        const estadoValor = p.bStateProduct ? "activo" : "inactivo";
-        const coincideEstado =
-        filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-
-        return coincideTexto && coincideEstado;
-    });
+  const filtradas = productos.filter((p) => {
+    // Buscador del toolbar
+    const texto = filtros.busqueda.toLowerCase();
+    const coincideTexto = !texto || p.tNameProduct.toLowerCase().includes(texto);
+ 
+    // Estado
+    const estadoValor = p.bStateProduct ? "activo" : "inactivo";
+    const coincideEstado =
+      filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
+ 
+    // Categoría
+    const coincideCategoria =
+      !filtros.categorias?.length ||
+      (p.fkeCodCategory != null && filtros.categorias.includes(p.fkeCodCategory));
+ 
+    return coincideTexto && coincideEstado && coincideCategoria;
+  });
 
     // ── Helpers Supabase ──────────────────────────────────────────────────────
       async function recargar() {
@@ -131,9 +148,6 @@ export function ProductClient({ productos: inicial }: Props) {
     // ── Stats ─────────────────────────────────────────────────────────────────
     const totalActivos = productos.filter((p) => p.bStateProduct).length;
 
-    // Mapa de categorías para acceso rápido por ID
-    const categoriasMap = new Map(categorias.map(c => [c.eCodCategory, c.tNameCategory]));
-
     // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Producto>[] = [
     {
@@ -158,7 +172,11 @@ export function ProductClient({ productos: inicial }: Props) {
       key: "fkeCodCategory",
       label: "Categoría",
       render: (p) => (
-        <span>{p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) || "Categoría no encontrada" : "—"}</span>
+        <span>
+          {p.fkeCodCategory
+            ? categoriasMap.get(p.fkeCodCategory) ?? "—"
+            : "—"}
+        </span>
       ),
     },
     {
@@ -243,6 +261,7 @@ export function ProductClient({ productos: inicial }: Props) {
             onChange={setFiltros}
             total={filtradas.length}
             ocultarRol
+            opcionesCategorias={opcionesCategorias}
         />
 
         {/* Tabla */}

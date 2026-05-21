@@ -26,6 +26,7 @@ export interface InventarioConProducto extends Inventario {
     ImgProduct?: string;
     ePriceProduct: number;
     categorias?: {
+      eCodCategory: string;
       tNameCategory: string;
     };
   };
@@ -40,9 +41,11 @@ export function InventarioClient({ inventario: inicial }: Props) {
     const [busqueda, setBusqueda] = useState("");
     const router = useRouter();
     const [filtros, setFiltros] = useState<FiltrosUsuario>({
-        busqueda: "",
-        roles: [],
-        estados: [],
+        busqueda:   "",
+        roles:      [],
+        estados:    [],
+        categorias: [],
+        stocks:     [],
     });
     const [modalAgregar, setModalAgregar] = useState(false);
     const [stockVer, setStockVer] = useState<Inventario | null>(null);
@@ -51,20 +54,46 @@ export function InventarioClient({ inventario: inicial }: Props) {
     const [eliminando, setEliminando] = useState<string | null>(null);
     const [toggleando, setToggleando] = useState<string | null>(null);
 
-  // ── Filtrado ──────────────────────────────────────────────────────────────
-  const filtradas = inventario.filter((c) => {
-    const texto = filtros.busqueda.toLowerCase();
-    const nombreProducto = c.productos?.tNameProduct?.toLowerCase() ?? "";
-    const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
-    const coincideTexto = !texto ||
-      nombreProducto.includes(texto) ||
-      nombreCategoria.includes(texto);
+    // ── Opciones de categoría derivadas del inventario ───────────────────────
+  // Extraemos las categorías únicas que realmente están en el inventario actual
+  const opcionesCategorias = Array.from(
+    new Map(
+      inventario
+        .filter((c) => c.productos?.categorias)
+        .map((c) => [
+          c.productos!.categorias!.eCodCategory,
+          {
+            value: c.productos!.categorias!.eCodCategory,
+            label: c.productos!.categorias!.tNameCategory,
+          },
+        ])
+    ).values()
+  ).sort((a, b) => a.label.localeCompare(b.label));
 
-    const estadoValor = c.bStateInventory ? "activo" : "inactivo";
+  /// ── Filtrado ──────────────────────────────────────────────────────────────
+  const filtradas = inventario.filter((c) => {
+    // Búsqueda por texto (nombre producto o categoría)
+    const texto = filtros.busqueda.toLowerCase();
+    const nombreProducto  = c.productos?.tNameProduct?.toLowerCase() ?? "";
+    const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
+    const coincideTexto   = !texto || nombreProducto.includes(texto) || nombreCategoria.includes(texto);
+ 
+    // Estado activo/inactivo
+    const estadoValor   = c.bStateInventory ? "activo" : "inactivo";
     const coincideEstado =
       filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-
-    return coincideTexto && coincideEstado;
+ 
+    // Categoría (por eCodCategory)
+    const codCategoria   = c.productos?.categorias?.eCodCategory ?? "";
+    const coincideCategoria =
+      !filtros.categorias?.length || filtros.categorias.includes(codCategoria);
+ 
+    // Stock (disponible / bajo / agotado)
+    const estadoStock = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+    const coincideStock =
+      !filtros.stocks?.length || filtros.stocks.includes(estadoStock);
+ 
+    return coincideTexto && coincideEstado && coincideCategoria && coincideStock;
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -162,9 +191,9 @@ export function InventarioClient({ inventario: inicial }: Props) {
           )}
         </div>
         <div>
-          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--dark)" }}>
+          <span>
             {producto?.tNameProduct ?? "Sin nombre"}
-          </div>
+          </span>
         </div>
       </div>
     );
@@ -174,7 +203,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "tNameCategory",
       label: "Categoría",
       render: (c) => (
-        <span style={{ fontWeight: 700, color: "var(--dark)" }}>
+        <span>
             {c.productos?.categorias?.tNameCategory ?? "Sin categoría"}
         </span>
       ),
@@ -183,7 +212,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "eCantIngresada",
       label: "Ingresadas",
       render: (c) => (
-        <span style={{ fontWeight: 700, color: "var(--dark)" }}>
+        <span>
           {c.eCantIngresada}
         </span>
       ),
@@ -192,7 +221,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "eCantVendida",
       label: "Vendidas",
       render: (c) => (
-        <span style={{ fontWeight: 600, color: "var(--dark)" }}>
+        <span>
           {c.eCantVendida}
         </span>
       ),
@@ -214,7 +243,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "ePriceProduct",
       label: "Precio",
       render: (c) => (
-        <span style={{ fontWeight: 600 }}>
+        <span>
           $ {c.productos?.ePriceProduct?.toFixed(2) ?? "—"}
         </span>
       ),
@@ -282,6 +311,8 @@ export function InventarioClient({ inventario: inicial }: Props) {
         onChange={setFiltros}
         total={filtradas.length}
         ocultarRol
+        opcionesCategorias={opcionesCategorias}
+        mostrarStock
       />
 
       <DataTable

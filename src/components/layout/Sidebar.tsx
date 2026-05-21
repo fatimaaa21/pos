@@ -12,7 +12,7 @@ const navAdmin = [
   { icon: BookOpenText,    label: "Catálogo",   href: "/admin/catalogo" },
   { icon: Package,         label: "Productos",  href: "/admin/productos" },
   { icon: ClipboardPenLine,     label: "Inventario",  href: "/admin/inventario" },
-  { icon: BarChart2,       label: "Ventas",   href: "/admin/ventas" },
+  { icon: BarChart2,       label: "Ventas",   href: "/admin/ventasAdmin" },
   { icon: Users,           label: "Usuarios",   href: "/admin/usuarios" },
 ];
 
