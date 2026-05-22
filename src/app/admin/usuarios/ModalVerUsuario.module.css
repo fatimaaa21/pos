@@ -54,7 +54,7 @@
 .campoLabel {
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-primary-light);
+  color: var(--color-primary);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

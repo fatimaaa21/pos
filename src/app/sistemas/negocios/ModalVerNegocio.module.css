@@ -7,15 +7,26 @@
   border-bottom: 1px solid var(--border-light);
 }
 
+/* Logo real del negocio */
+.logoImg {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Fallback con iniciales */
 .avatar {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-family);
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
   flex-shrink: 0;
 }

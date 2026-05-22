@@ -26,14 +26,22 @@ export function ModalVerNegocio({ negocio, onClose }: Props) {
       labelCancelar="Cerrar"
       ancho="sm"
     >
-      {/* Avatar */}
+      {/* Avatar / Logo */}
       <div className={styles.avatarWrap}>
-        <div
-          className={styles.avatar}
-          style={{ background: "var(--color-accent-bg)", color: "var(--color-accent)" }}
-        >
-          {iniciales}
-        </div>
+        {negocio.imgCompany ? (
+          <img
+            src={negocio.imgCompany}
+            alt={negocio.tNameCompany}
+            className={styles.logoImg}
+          />
+        ) : (
+          <div
+            className={styles.avatar}
+            style={{ background: "var(--color-accent-bg)", color: "var(--color-accent)" }}
+          >
+            {iniciales}
+          </div>
+        )}
         <div className={styles.avatarNombre}>{negocio.tNameCompany}</div>
         <div className={styles.badges}>
           <Badge activo={negocio.bStateCompany === "activo"} />
@@ -43,8 +51,8 @@ export function ModalVerNegocio({ negocio, onClose }: Props) {
       {/* Campos del negocio */}
       <div className={styles.campos}>
         {[
-          { label: "Fecha de creación",       valor: formatFechaHora(negocio.fhCreateCompany) },
-          { label: "Cantidad de usuarios",     valor: String(negocio.totalUsuarios) },
+          { label: "Fecha de creación",   valor: formatFechaHora(negocio.fhCreateCompany) },
+          { label: "Cantidad de usuarios", valor: String(negocio.totalUsuarios) },
         ].map(({ label, valor }) => (
           <div key={label} className={styles.campo}>
             <span className={styles.campoLabel}>{label}</span>
@@ -59,9 +67,9 @@ export function ModalVerNegocio({ negocio, onClose }: Props) {
           <div className={styles.seccionTitulo}>Administrador</div>
           <div className={styles.campos}>
             {[
-              { label: "Nombre", valor: negocio.admin.tNameUser },
+              { label: "Nombre",            valor: negocio.admin.tNameUser  },
               { label: "Correo electrónico", valor: negocio.admin.tEmailUser },
-              { label: "Código de acceso", valor: negocio.admin.eCodeUser ?? "—" },
+              { label: "Código de acceso",  valor: negocio.admin.eCodeUser ?? "—" },
             ].map(({ label, valor }) => (
               <div key={label} className={styles.campo}>
                 <span className={styles.campoLabel}>{label}</span>

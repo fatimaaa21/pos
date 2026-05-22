@@ -22,9 +22,27 @@ export async function AppLayout({ children }: AppLayoutProps) {
 
   if (!perfil) redirect("/auth/login");
 
+  // Traer datos del negocio si el usuario tiene uno asignado
+  let negocio: { tNameCompany: string; imgCompany: string | null } | null = null;
+
+  if (perfil.fkeCodCompany) {
+    const { data } = await supabase
+      .from("negocios")
+      .select("tNameCompany, imgCompany")
+      .eq("eCodCompany", perfil.fkeCodCompany)
+      .single();
+
+    if (data) {
+      negocio = {
+        tNameCompany: data.tNameCompany,
+        imgCompany:   data.imgCompany ?? null,
+      };
+    }
+  }
+
   return (
     <div className={styles.wrapper}>
-      <Sidebar perfil={perfil as Perfil} />
+      <Sidebar perfil={perfil as Perfil} negocio={negocio} />
       <main className={styles.main}>
         {children}
       </main>

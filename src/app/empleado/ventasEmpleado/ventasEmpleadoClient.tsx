@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import { Banknote, CreditCard, Smartphone, ShoppingBag, TrendingUp } from "lucide-react";
 import { Buscador } from "@/components/ui/Buscador";
 import { StatCards } from "@/components/ui/Statscards";
+import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import styles from "./ventasEmpleado.module.css";
 
@@ -56,25 +57,15 @@ const METODO_CONFIG = {
   },
 } as const;
 
-// ── Filtros de fecha ──────────────────────────────────────────────────────────
-
+// ── Helper de periodo ─────────────────────────────────────────────────────────
+ 
 type FiltroPeriodo = "hoy" | "semana" | "mes" | "todo";
-
-const PERIODOS: { value: FiltroPeriodo; label: string }[] = [
-  { value: "hoy",    label: "Hoy" },
-  { value: "semana", label: "Esta semana" },
-  { value: "mes",    label: "Este mes" },
-  { value: "todo",   label: "Todo" },
-];
-
-// Compara fechas usando la parte de fecha en UTC para evitar
-// problemas de zona horaria entre servidor y navegador
+ 
 function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
-  const d = new Date(fechaISO);
+  const d     = new Date(fechaISO);
   const ahora = new Date();
-
+ 
   if (periodo === "hoy") {
-    // Comparar año/mes/día en UTC
     return (
       d.getUTCFullYear() === ahora.getUTCFullYear() &&
       d.getUTCMonth()    === ahora.getUTCMonth()    &&
@@ -82,10 +73,10 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
     );
   }
   if (periodo === "semana") {
-    const hace7dias = new Date(ahora);
-    hace7dias.setUTCDate(ahora.getUTCDate() - 7);
-    hace7dias.setUTCHours(0, 0, 0, 0);
-    return d >= hace7dias;
+    const hace7 = new Date(ahora);
+    hace7.setUTCDate(ahora.getUTCDate() - 7);
+    hace7.setUTCHours(0, 0, 0, 0);
+    return d >= hace7;
   }
   if (periodo === "mes") {
     return (
@@ -100,25 +91,32 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
 
 export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
   const [busqueda, setBusqueda] = useState("");
-  const [periodo, setPeriodo] = useState<FiltroPeriodo>("hoy");
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    busqueda:  "",
+    roles:     [],
+    estados:   [],
+    periodo:   "hoy",
+    metodo:    "todos",
+    empleado:  "todos",
+  });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
 
+  // ── Filtrado ──────────────────────────────────────────────────────────────
   const ventasFiltradas = useMemo(() => {
     return ventas.filter((v) => {
-      const coincidePeriodo = estaEnPeriodo(v.fhCreateVenta, periodo);
+      const coincidePeriodo = estaEnPeriodo(v.fhCreateVenta, (filtros.periodo ?? "hoy") as FiltroPeriodo);
+ 
       const folio = v.eCodVenta.slice(-8).toUpperCase();
       const coincideBusqueda =
-        !busqueda ||
-        folio.includes(busqueda.toUpperCase()) ||
-        v.detalle_venta.some(
-          (d) =>
-            d.producto?.tNameProduct
-              .toLowerCase()
-              .includes(busqueda.toLowerCase())
+        !filtros.busqueda ||
+        folio.includes(filtros.busqueda.toUpperCase()) ||
+        v.detalle_venta.some((d) =>
+          d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase())
         );
+ 
       return coincidePeriodo && coincideBusqueda;
     });
-  }, [ventas, periodo, busqueda]);
+  }, [ventas, filtros]);
 
   const totalFiltrado = ventasFiltradas.reduce((acc, v) => acc + v.eTotal, 0);
   const totalPiezas = ventasFiltradas.reduce(
@@ -172,21 +170,14 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
       />
 
       {/* ── Toolbar ── */}
-      <div className={styles.toolbar}>
-        <div className={styles.periodos}>
-          {PERIODOS.map((p) => (
-            <button
-              key={p.value}
-              className={`${styles.periodoBtn} ${
-                periodo === p.value ? styles.periodoBtnActivo : ""
-              }`}
-              onClick={() => setPeriodo(p.value)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <TablaToolbar
+        filtros={filtros}
+        onChange={setFiltros}
+        total={ventasFiltradas.length}
+        ocultarRol
+        ocultarEstado
+        mostrarPeriodo
+      />
 
       {/* ── Grid de ventas ── */}
       {ventasFiltradas.length === 0 ? (
