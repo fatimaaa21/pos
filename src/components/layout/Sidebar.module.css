@@ -11,35 +11,53 @@
   gap: 24px;
 }
 
+/* ── Logo del negocio ── */
 .logo {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
-.logoIcon {
+ 
+/* Imagen real del negocio */
+.logoImg {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #d4a574, #c17f3e);
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+}
+ 
+/* Fallback con iniciales cuando no hay imagen */
+.logoFallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--color-primary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.logoText {
-  font-family: "Playfair Display", serif;
+  font-size: 13px;
+  font-weight: 800;
   color: white;
-  font-size: 15px;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+ 
+.logoTextos {
+  min-width: 0;
+}
+ 
+.logoText {
+  font-family: var(--font-family);
+  color: var(--dark);
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
-}
-
-.logoSub {
-  color: #9e8b7a;
-  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 96px;
 }
 
 .nav {
@@ -86,21 +104,48 @@
 }
 
 .navIcon {
-    color: var(--color-primary);
-    flex-shrink: 0;
+  color: var(--color-primary);
+  flex-shrink: 0;
 }
 
+/* ── Footer de usuario ── */
 .actionsUser {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  position: relative;
 }
 
+/* Área clickeable para admin */
+.userBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 8px 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+}
+
+.userBtn:hover {
+  background: var(--color-primary-50);
+}
+
+/* Para empleado/sistemas (sin popup) */
 .user {
   background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.userInfo {
+  flex: 1;
+  min-width: 0;
 }
 
 .avatar {
@@ -121,10 +166,88 @@
   color: var(--dark);
   font-size: 12px;
   font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .userRol {
   color: var(--gray);
-  font-size: 12px;
+  font-size: 11px;
   text-transform: capitalize;
+}
+
+.userChevron {
+  color: var(--gray);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  transform: rotate(180deg); /* apunta abajo por defecto */
+}
+
+.userChevronOpen {
+  transform: rotate(0deg); /* apunta arriba cuando está abierto */
+}
+
+/* ── Popup ── */
+.userPopup {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  z-index: 50;
+  animation: popupIn 0.15s ease;
+}
+
+@keyframes popupIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.userPopupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px;
+}
+
+.userPopupDivider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 0;
+}
+
+.userPopupItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dark);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+
+.userPopupItem:hover {
+  background: var(--color-primary-50);
+  color: var(--color-primary-dark);
+}
+
+.userPopupItemDanger {
+  color: var(--color-error);
+}
+
+.userPopupItemDanger:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
 }

@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from "react";
 import { subirImagen } from "@/lib/supabase/storage";
 import styles from "./ImageUploadInput.module.css";
+import { X } from "lucide-react";
 
 interface ImageUploadInputProps {
   value?: string;
@@ -137,7 +138,7 @@ export function ImageUploadInput({
                   onClick={handleRemove}
                   title="Eliminar imagen"
                 >
-                  ×
+                  <X size={13}/>
                 </button>
                 <div className={styles.previewOverlay}>
                   <CameraIcon />

@@ -15,7 +15,6 @@ import { toggleEstadoNegocio, eliminarNegocio } from "@/lib/actions/sistemas";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import styles from "./negocios.module.css";
 
-// Tipo directo con columnas reales de la DB
 export interface NegocioConAdmin {
   eCodCompany:    string;
   tNameCompany:   string;
@@ -50,7 +49,7 @@ export function NegociosClient({ negocios: inicial }: Props) {
   const [modalCrear, setModalCrear] = useState(false);
   const [negocioVer, setNegocioVer] = useState<NegocioConAdmin | null>(null);
   const [negocioEditar, setNegocioEditar] = useState<NegocioConAdmin | null>(null);
-    const [eliminando, setEliminando] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState<string | null>(null);
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [codigoNuevo, setCodigoNuevo] = useState<{
@@ -75,27 +74,27 @@ export function NegociosClient({ negocios: inicial }: Props) {
   });
 
   function handleNegocioCreado(negocio: NegocioConAdmin, perfil: any, codigo: string) {
-  const nuevo: NegocioConAdmin = {
-    ...negocio,
-    admin: {
-      eCodUser:      perfil.eCodUser,
-      tNameUser:     perfil.tNameUser,
-      tEmailUser:    perfil.tEmailUser,
-      eCodeUser:     codigo,
-      fkeCodCompany: negocio.eCodCompany,
-    },
-    totalUsuarios: 1,
-  };
-  setNegocios((prev) => [nuevo, ...prev]);
-  setModalCrear(false);
-  setTimeout(() => {
-    setCodigoNuevo({
-      negocio: negocio.tNameCompany,
-      admin:   perfil.tNameUser,
-      codigo,
-    });
-  }, 100);
-}
+    const nuevo: NegocioConAdmin = {
+      ...negocio,
+      admin: {
+        eCodUser:      perfil.eCodUser,
+        tNameUser:     perfil.tNameUser,
+        tEmailUser:    perfil.tEmailUser,
+        eCodeUser:     codigo,
+        fkeCodCompany: negocio.eCodCompany,
+      },
+      totalUsuarios: 1,
+    };
+    setNegocios((prev) => [nuevo, ...prev]);
+    setModalCrear(false);
+    setTimeout(() => {
+      setCodigoNuevo({
+        negocio: negocio.tNameCompany,
+        admin:   perfil.tNameUser,
+        codigo,
+      });
+    }, 100);
+  }
 
   function handleEditado(actualizado: NegocioConAdmin) {
     setNegocios((prev) =>
@@ -105,14 +104,14 @@ export function NegociosClient({ negocios: inicial }: Props) {
   }
 
   async function handleEliminar(negocio: NegocioConAdmin) {
-      if (!confirm(`¿Eliminar a ${negocio.tNameCompany}? Esta acción no se puede deshacer.`)) return;
-      setEliminando(negocio.eCodCompany);
-      const result = await eliminarNegocio(negocio.eCodCompany);
-      if (!result?.error) {
-        setNegocios((prev) => prev.filter((n) => n.eCodCompany !== negocio.eCodCompany));
-      }
-      setEliminando(null);
+    if (!confirm(`¿Eliminar a ${negocio.tNameCompany}? Esta acción no se puede deshacer.`)) return;
+    setEliminando(negocio.eCodCompany);
+    const result = await eliminarNegocio(negocio.eCodCompany);
+    if (!result?.error) {
+      setNegocios((prev) => prev.filter((n) => n.eCodCompany !== negocio.eCodCompany));
     }
+    setEliminando(null);
+  }
 
   async function handleToggleEstado(negocio: NegocioConAdmin) {
     setToggleando(negocio.eCodCompany);
@@ -135,19 +134,26 @@ export function NegociosClient({ negocios: inicial }: Props) {
 
   const columnas: ColumnaTabla<NegocioConAdmin>[] = [
     {
-    key: "tNameCompany",
-    label: "Negocio",
-    render: (n) => (
+      key: "tNameCompany",
+      label: "Negocio",
+      render: (n) => (
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div
-            className={styles.avatar}
-            style={{ background: "var(--color-accent-bg)", color: "var(--color-accent)" }}
-        >
-            {n.tNameCompany?.[0]?.toUpperCase() ?? "?"}
+          <div className={styles.avatarNegocio}>
+            {n.imgCompany ? (
+              <img
+                src={n.imgCompany}
+                alt={n.tNameCompany}
+                className={styles.avatarImg}
+              />
+            ) : (
+              <span className={styles.avatarFallback}>
+                {n.tNameCompany?.[0]?.toUpperCase() ?? "?"}
+              </span>
+            )}
+          </div>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{n.tNameCompany ?? "—"}</span>
         </div>
-        <span style={{ fontWeight: 600, fontSize: 13 }}>{n.tNameCompany ?? "—"}</span>
-        </div>
-    ),
+      ),
     },
     {
       key: "admin",
@@ -156,17 +162,13 @@ export function NegociosClient({ negocios: inicial }: Props) {
         n.admin ? (
           <span>{n.admin.tNameUser}</span>
         ) : (
-          <span>
-            Sin admin
-          </span>
+          <span>Sin admin</span>
         ),
     },
     {
       key: "totalUsuarios",
       label: "Usuarios",
-      render: (n) => (
-          <span>{n.totalUsuarios}</span>
-      ),
+      render: (n) => <span>{n.totalUsuarios}</span>,
     },
     {
       key: "bStateCompany",
@@ -182,11 +184,7 @@ export function NegociosClient({ negocios: inicial }: Props) {
     {
       key: "fhCreateCompany",
       label: "Creado",
-      render: (n) => (
-        <span>
-          {formatFechaHora(n.fhCreateCompany)}
-        </span>
-      ),
+      render: (n) => <span>{formatFechaHora(n.fhCreateCompany)}</span>,
     },
     {
       key: "acciones",
