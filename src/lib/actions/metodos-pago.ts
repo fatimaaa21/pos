@@ -1,8 +1,8 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { createClient }      from "@/lib/supabase/server";
+import { revalidatePath }    from "next/cache";
 
 // ── Tipo ─────────────────────────────────────────────────────────────────────
 
@@ -17,20 +17,22 @@ export interface MetodoPagoGlobal {
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
+/** Todos los métodos del catálogo global (para Sistemas) */
 export async function getMetodosPagoGlobal(): Promise<MetodoPagoGlobal[]> {
   const adminClient = createAdminClient();
   const { data, error } = await adminClient
     .from("metodos_pago")
-    .select("*")
+    .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
     .order("orden");
 
   if (error) { console.error(error); return []; }
   return data as MetodoPagoGlobal[];
 }
 
+/** Métodos activos del catálogo + cuáles tiene activados el negocio del admin */
 export async function getMetodosParaAdmin(): Promise<{
   catalogo:   MetodoPagoGlobal[];
-  activados:  string[];
+  activados:  string[];   // array de eCodPay
   codCompany: string;
 }> {
   const supabase    = await createClient();
@@ -47,12 +49,14 @@ export async function getMetodosParaAdmin(): Promise<{
 
   const codCompany = perfil?.fkeCodCompany ?? "";
 
+  // Solo los activos en el catálogo global
   const { data: catalogo } = await adminClient
     .from("metodos_pago")
-    .select("*")
+    .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
     .eq("bStatePay", true)
     .order("orden");
 
+  // Los que el negocio tiene activados (array de eCodPay)
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago")
@@ -74,10 +78,10 @@ export async function crearMetodoPago(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
-    const tNamePay   = formData.get("tNamePay")   as string;
-    const tIconPay   = formData.get("tIconPay")   as string;
+    const tNamePay    = formData.get("tNamePay")    as string;
+    const tIconPay    = formData.get("tIconPay")    as string;
     const descripcion = formData.get("descripcion") as string;
-    const orden      = parseInt(formData.get("orden") as string) || 0;
+    const orden       = parseInt(formData.get("orden") as string) || 0;
 
     const { data, error } = await adminClient
       .from("metodos_pago")
@@ -88,14 +92,12 @@ export async function crearMetodoPago(formData: FormData) {
         orden,
         bStatePay: true,
       })
-      .select()
+      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
       .single();
 
-    if (error) {
-      return { error: `Error al crear: ${error.message}` };
-    }
+    if (error) return { error: `Error al crear: ${error.message}` };
 
-    revalidatePath("/sistemas/metodos-pago");
+    revalidatePath("/sistemas/metodosPago");
     return { metodo: data as MetodoPagoGlobal };
   } catch (e: any) {
     return { error: `Error inesperado: ${e?.message}` };
@@ -106,11 +108,11 @@ export async function editarMetodoPago(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
-    const eCodPay    = formData.get("eCodPay")    as string;
-    const tNamePay   = formData.get("tNamePay")   as string;
-    const tIconPay   = formData.get("tIconPay")   as string;
+    const eCodPay     = formData.get("eCodPay")     as string;
+    const tNamePay    = formData.get("tNamePay")    as string;
+    const tIconPay    = formData.get("tIconPay")    as string;
     const descripcion = formData.get("descripcion") as string;
-    const orden      = parseInt(formData.get("orden") as string) || 0;
+    const orden       = parseInt(formData.get("orden") as string) || 0;
 
     const { data, error } = await adminClient
       .from("metodos_pago")
@@ -121,12 +123,12 @@ export async function editarMetodoPago(formData: FormData) {
         orden,
       })
       .eq("eCodPay", eCodPay)
-      .select()
+      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
       .single();
 
     if (error) return { error: `Error al editar: ${error.message}` };
 
-    revalidatePath("/sistemas/metodos-pago");
+    revalidatePath("/sistemas/metodosPago");
     return { metodo: data as MetodoPagoGlobal };
   } catch (e: any) {
     return { error: `Error inesperado: ${e?.message}` };
@@ -143,7 +145,7 @@ export async function toggleActivoMetodoPago(eCodPay: string, bStatePay: boolean
 
     if (error) return { error: error.message };
 
-    revalidatePath("/sistemas/metodos-pago");
+    revalidatePath("/sistemas/metodosPago");
     return { ok: true };
   } catch (e: any) {
     return { error: e?.message };
@@ -160,7 +162,7 @@ export async function eliminarMetodoPago(eCodPay: string) {
 
     if (error) return { error: error.message };
 
-    revalidatePath("/sistemas/metodos-pago");
+    revalidatePath("/sistemas/metodosPago");
     return { ok: true };
   } catch (e: any) {
     return { error: e?.message };
@@ -169,6 +171,7 @@ export async function eliminarMetodoPago(eCodPay: string) {
 
 // ── Mutations — Admin ─────────────────────────────────────────────────────────
 
+/** Guarda los eCodPay de los métodos activados por el admin para su negocio */
 export async function guardarMetodosNegocio(codCompany: string, metodosPago: string[]) {
   try {
     const adminClient = createAdminClient();

@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ModalConfiguracion } from "./ModalConfiguracion";
-import type { ConfigNegocio } from "@/lib/actions/configuracion";
+import type { ConfigNegocio }    from "@/lib/actions/configuracion";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
 interface Props {
-  config: ConfigNegocio;
+  config:     ConfigNegocio;
+  catalogo:   MetodoPagoGlobal[];
+  activados:  string[];   // eCodPay[] activos para este negocio
+  codCompany: string;
 }
 
-export function ConfiguracionClient({ config }: Props) {
-  const router = useRouter();
+export function ConfiguracionClient({ config, catalogo, activados, codCompany }: Props) {
+  const router  = useRouter();
   const [abierto, setAbierto] = useState(true);
 
   function handleCerrar() {
@@ -18,18 +22,15 @@ export function ConfiguracionClient({ config }: Props) {
     router.back();
   }
 
-  function handleGuardado(nueva: ConfigNegocio) {
-    // Podrías actualizar estado global aquí si usas zustand/context
-    console.log("Configuración guardada:", nueva);
-  }
-
   if (!abierto) return null;
 
   return (
     <ModalConfiguracion
       config={config}
+      catalogo={catalogo}
+      activados={activados}
+      codCompany={codCompany}
       onCerrar={handleCerrar}
-      onGuardado={handleGuardado}
     />
   );
 }

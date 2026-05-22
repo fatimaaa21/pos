@@ -3,21 +3,19 @@
 import { useRef, useState, useCallback } from "react";
 import { subirImagen } from "@/lib/supabase/storage";
 import styles from "./ImageUploadInput.module.css";
-import { X } from "lucide-react";
 
 interface ImageUploadInputProps {
   value?: string;
   onChange: (url: string) => void;
   placeholder?: string;
-  /** Bucket de Supabase Storage donde se sube el archivo */
   bucket: string;
-  /** Path dentro del bucket. Ej: "categorias/uuid" o "productos/uuid" */
   storagePath: string;
 }
 
-function conCacheBuster(url: string): string {
+/** Limpia cualquier cache-buster existente de la URL */
+function urlLimpia(url: string): string {
   if (!url) return url;
-  return `${url.split("?")[0]}?t=${Date.now()}`;
+  return url.split("?")[0];
 }
 
 export function ImageUploadInput({
@@ -28,11 +26,12 @@ export function ImageUploadInput({
   storagePath,
 }: ImageUploadInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState<string | null>(
-    value ? conCacheBuster(value) : null
+  const [dragging,    setDragging]    = useState(false);
+  // Inicializar con URL limpia — sin Date.now() para evitar hydration mismatch
+  const [preview,     setPreview]     = useState<string | null>(
+    value ? urlLimpia(value) : null
   );
-  const [uploading, setUploading] = useState(false);
+  const [uploading,   setUploading]   = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function handleFile(file: File) {
@@ -41,6 +40,7 @@ export function ImageUploadInput({
       return;
     }
 
+    // Preview local inmediato mientras sube
     const blobUrl = URL.createObjectURL(file);
     setPreview(blobUrl);
     setUploadError(null);
@@ -52,12 +52,13 @@ export function ImageUploadInput({
     URL.revokeObjectURL(blobUrl);
 
     if (error || !url || !urlConCache) {
-      setPreview(null);
+      setPreview(value ? urlLimpia(value) : null); // revertir al valor anterior
       setUploadError(error ?? "Error al subir imagen");
       onChange("");
       return;
     }
 
+    // Solo aquí, tras una subida exitosa en el cliente, usamos el cache-buster
     setPreview(urlConCache);
     onChange(url);
   }
@@ -99,12 +100,10 @@ export function ImageUploadInput({
       <div
         className={[
           styles.dropzone,
-          dragging ? styles.dragging : "",
-          preview ? styles.hasPreview : "",
-          uploading ? styles.uploading : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+          dragging  ? styles.dragging   : "",
+          preview   ? styles.hasPreview : "",
+          uploading ? styles.uploading  : "",
+        ].filter(Boolean).join(" ")}
         onClick={() => !uploading && inputRef.current?.click()}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
@@ -138,7 +137,7 @@ export function ImageUploadInput({
                   onClick={handleRemove}
                   title="Eliminar imagen"
                 >
-                  <X size={13}/>
+                  ×
                 </button>
                 <div className={styles.previewOverlay}>
                   <CameraIcon />
@@ -171,7 +170,8 @@ export function ImageUploadInput({
 
 function CameraIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
       <circle cx="12" cy="13" r="4" />
     </svg>
@@ -180,16 +180,9 @@ function CameraIcon() {
 
 function Spinner() {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      style={{ animation: "spin 0.8s linear infinite" }}
-    >
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+      style={{ animation: "spin 0.8s linear infinite" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
     </svg>
