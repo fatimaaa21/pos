@@ -38,6 +38,7 @@ const navEmpleado = [
 const navSistemas = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/sistemas/dashboard" },
   { icon: Building2,       label: "Negocios",  href: "/sistemas/negocios" },
+  { icon: Building2,       label: "Métodos Pagos",  href: "/sistemas/metodosPago" },
 ];
 
 interface NegocioInfo {
