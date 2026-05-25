@@ -75,10 +75,9 @@ export function getEstadoStock(
   minimo: number | null,
   ilimitado?: boolean
 ): EstadoStock {
-  if (ilimitado) return "ilimitado";
-  if (restante === null) return "ilimitado";
-  if (restante === 0) return "agotado";
-  if (minimo !== null && restante <= minimo) return "bajo";
+  if (ilimitado || minimo === 0 || minimo === null) return "ilimitado";
+  if (restante === null || restante === 0) return "agotado";
+  if (restante <= minimo) return "bajo";
   return "disponible";
 }
 
@@ -106,14 +105,19 @@ export interface Venta {
   fhCreateVenta: string;
 }
 
+// Fila pura de la tabla detalle_venta — sin joins
 export interface DetalleVenta {
   eCodDetalle: string;
   fkeCodVenta: string;
   fkeCodProduct: string;
-  producto?: Producto;
   eCantidad: number;
   ePrecioUnitario: number;
   eSubtotal: number;
+}
+ 
+// DetalleVenta con el producto anidado (resultado de join)
+export interface DetalleVentaConProducto extends DetalleVenta {
+  producto?: { tNameProduct: string; ImgProduct?: string } | null;
 }
 
 export interface ItemCarrito {

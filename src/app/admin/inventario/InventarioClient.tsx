@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Trash2, Pencil } from "lucide-react";
-import type { Inventario } from "@/types";
+import type { Inventario, Producto } from "@/types";
 import { Buscador } from "@/components/ui/Buscador";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCards } from "@/components/ui/Statscards";
@@ -36,34 +36,43 @@ interface Props {
 
 export function InventarioClient({ inventario: inicial }: Props) {
   const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
-  const [busqueda, setBusqueda]     = useState("");
+  const [busqueda, setBusqueda] = useState("");
   const router = useRouter();
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
-    busqueda: "", roles: [], estados: [], categorias: [], stocks: [],
+    busqueda:   "",
+    roles:      [],
+    estados:    [],
+    categorias: [],
+    stocks:     [],
   });
-  const [modalAgregar, setModalAgregar]   = useState(false);
-  const [stockVer, setStockVer]           = useState<InventarioConProducto | null>(null);
-  const [stockEditar, setStockEditar]     = useState<InventarioConProducto | null>(null);
+  const [modalAgregar, setModalAgregar] = useState(false);
+  const [stockVer,     setStockVer]     = useState<Inventario | null>(null);
+  const [stockEditar,  setStockEditar]  = useState<Inventario | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [eliminando, setEliminando]       = useState<string | null>(null);
-  const [toggleando, setToggleando]       = useState<string | null>(null);
+  const [eliminando,  setEliminando]    = useState<string | null>(null);
+  const [toggleando,  setToggleando]    = useState<string | null>(null);
 
+  // ── Opciones de categoría derivadas del inventario ────────────────────────
   const opcionesCategorias = Array.from(
     new Map(
       inventario
         .filter((c) => c.productos?.categorias)
         .map((c) => [
           c.productos!.categorias!.eCodCategory,
-          { value: c.productos!.categorias!.eCodCategory, label: c.productos!.categorias!.tNameCategory },
+          {
+            value: c.productos!.categorias!.eCodCategory,
+            label: c.productos!.categorias!.tNameCategory,
+          },
         ])
     ).values()
   ).sort((a, b) => a.label.localeCompare(b.label));
 
+  // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = inventario.filter((c) => {
-    const texto          = filtros.busqueda.toLowerCase();
-    const nombreProducto = c.productos?.tNameProduct?.toLowerCase() ?? "";
+    const texto = filtros.busqueda.toLowerCase();
+    const nombreProducto  = c.productos?.tNameProduct?.toLowerCase() ?? "";
     const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
-    const coincideTexto  = !texto || nombreProducto.includes(texto) || nombreCategoria.includes(texto);
+    const coincideTexto   = !texto || nombreProducto.includes(texto) || nombreCategoria.includes(texto);
 
     const estadoValor    = c.bStateInventory ? "activo" : "inactivo";
     const coincideEstado = filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
@@ -71,21 +80,26 @@ export function InventarioClient({ inventario: inicial }: Props) {
     const codCategoria      = c.productos?.categorias?.eCodCategory ?? "";
     const coincideCategoria = !filtros.categorias?.length || filtros.categorias.includes(codCategoria);
 
-    const estadoStock  = getEstadoStock(c.eCantRestante, c.eStockMinimo, c.bUnlimitedInventory);
-    const coincideStock = !filtros.stocks?.length || filtros.stocks.includes(estadoStock as any);
+    const estadoStock   = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+    // "ilimitado" se trata como "disponible" en el filtro de stock
+    const stockNorm     = estadoStock === "ilimitado" ? "disponible" : estadoStock;
+    const coincideStock = !filtros.stocks?.length || filtros.stocks.includes(stockNorm);
 
     return coincideTexto && coincideEstado && coincideCategoria && coincideStock;
   });
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function handleStockAgregado(nuevo: InventarioConProducto) {
     setInventario((prev) => [nuevo, ...prev]);
     setModalAgregar(false);
     router.refresh();
   }
 
-  function handleStockEditado(actualizado: InventarioConProducto) {
+  function handleStockEditado(actualizado: Inventario) {
     setInventario((prev) =>
-      prev.map((c) => c.eCodInventory === actualizado.eCodInventory ? { ...actualizado } : c)
+      prev.map((c) =>
+        c.eCodInventory === actualizado.eCodInventory ? { ...actualizado } : c
+      )
     );
     setStockEditar(null);
     router.refresh();
@@ -116,49 +130,73 @@ export function InventarioClient({ inventario: inicial }: Props) {
     setToggleando(null);
   }
 
-  const ilimitados   = inventario.filter((p) => p.bUnlimitedInventory).length;
+  async function recargar() {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("vista_inventario")
+      .select(`
+        *,
+        productos!inventario_fkeCodProduct_fkey (
+          tNameProduct,
+          ImgProduct,
+          ePriceProduct,
+          categorias ( tNameCategory )
+        )
+      `)
+      .order("fhCreateInventory", { ascending: false });
+    if (data) setInventario(data as InventarioConProducto[]);
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const disponibles = inventario.filter(
-    (p) => !p.bUnlimitedInventory && getEstadoStock(p.eCantRestante, p.eStockMinimo) === "disponible"
+    (p) => {
+      const e = getEstadoStock(p.eCantRestante, p.eStockMinimo);
+      return e === "disponible" || e === "ilimitado";
+    }
   ).length;
   const stockBajo = inventario.filter(
-    (p) => !p.bUnlimitedInventory && getEstadoStock(p.eCantRestante, p.eStockMinimo) === "bajo"
+    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "bajo"
   ).length;
   const agotados = inventario.filter(
-    (p) => !p.bUnlimitedInventory && getEstadoStock(p.eCantRestante, p.eStockMinimo) === "agotado"
+    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "agotado"
   ).length;
 
+  // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<InventarioConProducto>[] = [
     {
       key: "tNameProduct",
       label: "Producto",
-      render: (c) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className={styles.avatar}>
-            {c.productos?.ImgProduct ? (
-              <img
-                src={c.productos.ImgProduct}
-                alt={c.productos.tNameProduct ?? "Producto"}
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
-              />
-            ) : <span>📦</span>}
+      render: (c) => {
+        const producto = c.productos;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className={styles.avatar}>
+              {producto?.ImgProduct ? (
+                <img
+                  src={producto.ImgProduct}
+                  alt={producto.tNameProduct ?? "Producto"}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span>📦</span>
+              )}
+            </div>
+            <span>{producto?.tNameProduct ?? "Sin nombre"}</span>
           </div>
-          <span>{c.productos?.tNameProduct ?? "Sin nombre"}</span>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: "tNameCategory",
       label: "Categoría",
-      render: (c) => <span>{c.productos?.categorias?.tNameCategory ?? "Sin categoría"}</span>,
+      render: (c) => (
+        <span>{c.productos?.categorias?.tNameCategory ?? "Sin categoría"}</span>
+      ),
     },
     {
       key: "eCantIngresada",
       label: "Ingresadas",
-      render: (c) => (
-        <span style={{ color: c.bUnlimitedInventory ? "var(--gray)" : undefined }}>
-          {c.bUnlimitedInventory ? "—" : c.eCantIngresada}
-        </span>
-      ),
+      render: (c) => <span>{c.eCantIngresada}</span>,
     },
     {
       key: "eCantVendida",
@@ -169,12 +207,17 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "eCantRestante",
       label: "Restantes",
       render: (c) => {
-        if (c.bUnlimitedInventory) {
-          return <Badge variante="ilimitado" dot={false}>Ilimitado</Badge>;
-        }
-        const estado   = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-        const variante = estado === "disponible" ? "disponible" : estado === "bajo" ? "bajo" : "agotado";
-        return <Badge variante={variante} dot={false}>{c.eCantRestante ?? 0}</Badge>;
+        const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+        const variante =
+          estado === "ilimitado" ? "ilimitado"  as const
+          : estado === "bajo"    ? "bajo"        as const
+          : estado === "agotado" ? "agotado"     as const
+          : "disponible"                          as const;
+        return (
+          <Badge variante={variante} dot={false}>
+            {c.eCantRestante}
+          </Badge>
+        );
       },
     },
     {
@@ -222,7 +265,11 @@ export function InventarioClient({ inventario: inicial }: Props) {
   return (
     <div className="container">
       <div className="header">
-        <Buscador valor={busqueda} onChange={setBusqueda} placeholder="Buscar producto..." />
+        <Buscador
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar producto..."
+        />
       </div>
 
       <PageHeader
@@ -232,11 +279,10 @@ export function InventarioClient({ inventario: inicial }: Props) {
       />
 
       <StatCards stats={[
-        { label: "En inventario", value: inventario.length, variante: "primary" },
-        { label: "Disponibles",   value: disponibles,         variante: "success" },
-        { label: "Ilimitados",   value: ilimitados,          variante: "neutral" },
-        { label: "Stock bajo",    value: stockBajo,            variante: "warning" },
-        { label: "Agotados",      value: agotados,             variante: "error"   },
+        { label: "Productos en inventario", value: inventario.length, variante: "primary" },
+        { label: "Disponibles",             value: disponibles,        variante: "success" },
+        { label: "Stock bajo",              value: stockBajo,          variante: "warning" },
+        { label: "Agotados",                value: agotados,           variante: "error"   },
       ]} />
 
       <TablaToolbar
@@ -265,7 +311,10 @@ export function InventarioClient({ inventario: inicial }: Props) {
         />
       )}
       {stockVer && (
-        <ModalVerStock inventario={stockVer} onClose={() => setStockVer(null)} />
+        <ModalVerStock
+          inventario={stockVer}
+          onClose={() => setStockVer(null)}
+        />
       )}
       {stockEditar && (
         <ModalEditarStock
@@ -278,7 +327,9 @@ export function InventarioClient({ inventario: inicial }: Props) {
   );
 }
 
-function ActionBtn({ children, title, onClick, danger, loading }: {
+function ActionBtn({
+  children, title, onClick, danger, loading,
+}: {
   children: React.ReactNode;
   title: string;
   onClick: () => void;

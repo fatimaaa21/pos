@@ -10,7 +10,7 @@ import styles from "./Inventario.module.css";
 
 type ProductoConStockExtendido = ProductoConStock & {
   stockMinimo:    number;
-  stockIngresado: number;   // ← nuevo
+  stockIngresado: number;
 };
 
 interface Props {
@@ -43,7 +43,6 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
 
   return (
     <div className={styles.layout}>
-      {/* Buscador */}
       <div className={styles.buscadorWrap}>
         <Buscador
           valor={busqueda}
@@ -52,7 +51,6 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
         />
       </div>
 
-      {/* Carrusel de categorías */}
       <CategoriaCarrusel
         categorias={categorias}
         categoriaActiva={categoriaActiva}
@@ -60,7 +58,6 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
         onSeleccionar={setCategoriaActiva}
       />
 
-      {/* Grid de productos */}
       {productosFiltrados.length === 0 ? (
         <div className={styles.vacio}>
           <p>No hay productos en inventario</p>
@@ -72,34 +69,39 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
               producto.stockDisponible,
               producto.stockMinimo
             );
-            const variante =
-              estado === "disponible"
-                ? "disponible"
-                : estado === "bajo"
-                ? "bajo"
-                : "agotado";
 
-            const pct = producto.stockIngresado > 0
+            const esIlimitado = estado === "ilimitado";
+
+            const barraColor =
+              esIlimitado          ? "var(--color-primary)"
+              : estado === "bajo"  ? "var(--color-warning)"
+              : estado === "agotado" ? "var(--color-error)"
+              : "var(--color-primary)";
+
+            const pct = esIlimitado
+              ? 100
+              : producto.stockIngresado > 0
               ? Math.min((producto.stockDisponible / producto.stockIngresado) * 100, 100)
               : 100;
 
-            const barraColor =
-              estado === "disponible"
-                ? "var(--color-primary)"
-                : estado === "bajo"
-                ? "var(--color-warning)"
-                : "var(--color-error)";
+            const badgeLabel =
+              esIlimitado            ? "Ilimitado"
+              : estado === "bajo"    ? "Stock bajo"
+              : estado === "agotado" ? "Agotado"
+              : "Disponible";
+
+            const badgeVariante =
+              esIlimitado            ? "ilimitado"  as const
+              : estado === "bajo"    ? "bajo"        as const
+              : estado === "agotado" ? "agotado"     as const
+              : "disponible"                          as const;
 
             return (
               <div key={producto.eCodProduct} className={styles.card}>
                 {/* Badge estado */}
                 <div className={styles.badgeWrap}>
-                  <Badge variante={variante} dot={false}>
-                    {estado === "disponible"
-                      ? "Disponible"
-                      : estado === "bajo"
-                      ? "Stock bajo"
-                      : "Agotado"}
+                  <Badge variante={badgeVariante} dot={false}>
+                    {badgeLabel}
                   </Badge>
                 </div>
 
@@ -139,7 +141,10 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
 
                   <div className={styles.minimoRow}>
                     <span className={styles.minimoLabel}>
-                      Mínimo: <strong>{producto.stockMinimo}</strong> piezas
+                      {esIlimitado
+                        ? "Sin stock mínimo"
+                        : <>Mínimo: <strong>{producto.stockMinimo}</strong> piezas</>
+                      }
                     </span>
                   </div>
                 </div>
