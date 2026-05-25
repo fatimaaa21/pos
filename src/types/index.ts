@@ -75,17 +75,17 @@ export function getEstadoStock(restante: number, minimo: number): EstadoStock {
   return "disponible";
 }
 
-// Producto tal como llega al menú del empleado — con stock calculado
 export interface ProductoConStock {
   eCodProduct: string;
   tNameProduct: string;
   fkeCodCategory?: string;
   ePriceProduct: number;
   ImgProduct?: string;
-  stockDisponible: number;   // eCantRestante del inventario
+  stockDisponible: number;
 }
 
-export type MetodoPago = "efectivo" | "transferencia" | "tarjeta";
+// MetodoPago ahora es string (eCodPay uuid) en lugar de union type hardcodeado
+export type MetodoPago = string;
 
 export interface Venta {
   fkeCodCompany: string;
@@ -93,7 +93,9 @@ export interface Venta {
   fkeCodUser: string;
   empleado?: Perfil;
   eTotal: number;
-  eMetodoPago: MetodoPago;
+  fkeMetodoPago: MetodoPago;
+  metodoPagoNombre:  string;   // ← nombre legible
+  metodoPagoIcono?:  string | null;
   fhCreateVenta: string;
 }
 

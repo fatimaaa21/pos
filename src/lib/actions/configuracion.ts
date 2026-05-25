@@ -1,8 +1,10 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
-import { revalidatePath } from "next/cache";
+import { createClient }      from "@/lib/supabase/server";
+import { revalidatePath }    from "next/cache";
+
+// ── Tipo ─────────────────────────────────────────────────────────────────────
 
 export interface ConfigNegocio {
   eCodCompany:  string;
@@ -10,10 +12,11 @@ export interface ConfigNegocio {
   imgCompany:   string | null;
   moneda:       string;
   zona_horaria: string;
-  metodosPago:  string[];   // guardado como JSON en una columna text[]
+  // metodosPago se gestiona por separado en metodos-pago.ts
 }
 
-/** Lee la config del negocio del admin actual */
+// ── Queries ───────────────────────────────────────────────────────────────────
+
 export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
   try {
     const supabase = await createClient();
@@ -30,7 +33,7 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
 
     const { data: negocio } = await supabase
       .from("negocios")
-      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria, metodosPago")
+      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria")
       .eq("eCodCompany", perfil.fkeCodCompany)
       .single();
 
@@ -42,14 +45,15 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
       imgCompany:   negocio.imgCompany   ?? null,
       moneda:       negocio.moneda       ?? "MXN",
       zona_horaria: negocio.zona_horaria ?? "America/Mexico_City",
-      metodosPago:  negocio.metodosPago  ?? ["efectivo", "tarjeta", "transferencia"],
     };
   } catch {
     return null;
   }
 }
 
-/** Guarda los cambios de configuración */
+// ── Mutations ─────────────────────────────────────────────────────────────────
+
+/** Guarda solo los datos generales del negocio (sin metodosPago) */
 export async function guardarConfigNegocio(formData: FormData) {
   try {
     const adminClient = createAdminClient();
@@ -70,7 +74,6 @@ export async function guardarConfigNegocio(formData: FormData) {
     const imgCompany   = formData.get("imgCompany")   as string;
     const moneda       = formData.get("moneda")        as string;
     const zona_horaria = formData.get("zona_horaria")  as string;
-    const metodosPago  = formData.getAll("metodosPago") as string[];
 
     const { error } = await adminClient
       .from("negocios")
@@ -79,7 +82,6 @@ export async function guardarConfigNegocio(formData: FormData) {
         imgCompany:   imgCompany || null,
         moneda,
         zona_horaria,
-        metodosPago,
       })
       .eq("eCodCompany", perfil.fkeCodCompany);
 

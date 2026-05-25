@@ -89,61 +89,65 @@ export default function LoginPage() {
 
   return (
     <div className={styles.container}>
-      <div className={modal.card}>
+      <div className={styles.cardWrapper}>
+        <div className={modal.card}>
 
-        {/* Header */}
-        <div style={{ textAlign: "center" }}>
-          <div className={styles.logo}>🥐</div>
-          <h1 className={modal.title}>Bienvenido</h1>
-          <p className={styles.subtitulo}>
-            Ingresa tu código de acceso
-          </p>
-        </div>
-
-        {/* PIN inputs */}
-        <div className={`${styles.inputs} ${shake ? styles.shake : ""}`}
-          onPaste={handlePaste}
-        >
-          {digits.map((digit, i) => {
-            const isFilled = !!digit;
-            const isFocused = focusedIndex === i;
-            let inputClass = styles.pinInput;
-            if (isFilled) inputClass += ` ${styles.pinInputFilled}`;
-            else if (isFocused) inputClass += ` ${styles.pinInputFocused}`;
-            else inputClass += ` ${styles.pinInputDefault}`;
-
-            return (
-              <input
-                key={i}
-                ref={(el) => { inputs.current[i] = el; }}
-                type="password"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                disabled={loading}
-                onChange={(e) => handleChange(i, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(i, e)}
-                onFocus={() => setFocusedIndex(i)}
-                onBlur={() => setFocusedIndex(null)}
-                className={inputClass}
-              />
-            );
-          })}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className={styles.error}>
-            ⚠️ {error}
+          {/* Header */}
+          <div style={{ textAlign: "center" }}>
+            <div className={styles.logo}>
+              <img src="/kivi-logo.svg" alt="Kivi" />
+            </div>
+            <h1 className={modal.title}>Bienvenido</h1>
+            <p className={styles.subtitulo}>
+              Ingresa tu código de acceso
+            </p>
           </div>
-        )}
 
-        {/* Loading */}
-        {loading && (
-          <p className={styles.loading}>
-            Verificando...
-          </p>
-        )}
+          {/* PIN inputs */}
+          <div className={`${styles.inputs} ${shake ? styles.shake : ""}`}
+            onPaste={handlePaste}
+          >
+            {digits.map((digit, i) => {
+              const isFilled = !!digit;
+              const isFocused = focusedIndex === i;
+              let inputClass = styles.pinInput;
+              if (isFilled) inputClass += ` ${styles.pinInputFilled}`;
+              else if (isFocused) inputClass += ` ${styles.pinInputFocused}`;
+              else inputClass += ` ${styles.pinInputDefault}`;
+
+              return (
+                <input
+                  key={i}
+                  ref={(el) => { inputs.current[i] = el; }}
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  disabled={loading}
+                  onChange={(e) => handleChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  onFocus={() => setFocusedIndex(i)}
+                  onBlur={() => setFocusedIndex(null)}
+                  className={inputClass}
+                />
+              );
+            })}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className={styles.error}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && (
+            <p className={styles.loading}>
+              Verificando...
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

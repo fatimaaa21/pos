@@ -1,67 +1,77 @@
-import { useEffect, useRef, useState } from "react";
-import { X, CreditCard, Globe, Check, Banknote, Smartphone } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { X, Globe, Check } from "lucide-react";
+import * as Icons from "lucide-react";
 import { guardarConfigNegocio, type ConfigNegocio } from "@/lib/actions/configuracion";
+import { guardarMetodosNegocio, type MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 import styles from "./ModalConfiguracion.module.css";
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 
 const MONEDAS = [
-  { value: "MXN", label: "MXN — Peso mexicano" },
+  { value: "MXN", label: "MXN — Peso mexicano"       },
   { value: "USD", label: "USD — Dólar estadounidense" },
-  { value: "EUR", label: "EUR — Euro" },
-  { value: "COP", label: "COP — Peso colombiano" },
-  { value: "ARS", label: "ARS — Peso argentino" },
+  { value: "EUR", label: "EUR — Euro"                 },
+  { value: "COP", label: "COP — Peso colombiano"      },
+  { value: "ARS", label: "ARS — Peso argentino"       },
 ];
 
 const ZONAS = [
-  { value: "America/Mexico_City", label: "Ciudad de México (UTC-6)" },
-  { value: "America/Monterrey",   label: "Monterrey (UTC-6)" },
-  { value: "America/Tijuana",     label: "Tijuana (UTC-8)" },
-  { value: "America/Bogota",      label: "Bogotá (UTC-5)" },
-  { value: "America/Lima",        label: "Lima (UTC-5)" },
-  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires (UTC-3)" },
-  { value: "America/New_York",    label: "Nueva York (UTC-5)" },
+  { value: "America/Mexico_City",            label: "Ciudad de México (UTC-6)" },
+  { value: "America/Monterrey",              label: "Monterrey (UTC-6)"        },
+  { value: "America/Tijuana",                label: "Tijuana (UTC-8)"          },
+  { value: "America/Bogota",                 label: "Bogotá (UTC-5)"           },
+  { value: "America/Lima",                   label: "Lima (UTC-5)"             },
+  { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires (UTC-3)"     },
+  { value: "America/New_York",               label: "Nueva York (UTC-5)"       },
 ];
-
-const METODOS_PAGO = [
-  { value: "efectivo",      label: "Efectivo",       icon: Banknote },
-  { value: "tarjeta",       label: "Tarjeta",        icon: CreditCard },
-  { value: "transferencia", label: "QR / Transfer",  icon: Smartphone },
-];
-
-// ── Tabs ─────────────────────────────────────────────────────────────────────
 
 type Tab = "general" | "pagos";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "general", label: "General" },
+  { id: "general", label: "General"         },
   { id: "pagos",   label: "Métodos de pago" },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  config:   ConfigNegocio;
-  onCerrar: () => void;
-  onGuardado?: (config: ConfigNegocio) => void;
+  config:     ConfigNegocio;
+  catalogo:   MetodoPagoGlobal[];  // métodos activos definidos por Sistemas
+  activados:  string[];            // eCodPay[] que el negocio tiene seleccionados
+  codCompany: string;
+  onCerrar:   () => void;
+  onGuardado?: () => void;
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
-  const [tab,          setTab]          = useState<Tab>("general");
-  const [loading,      setLoading]      = useState(false);
-  const [error,        setError]        = useState<string | null>(null);
-  const [guardado,     setGuardado]     = useState(false);
+export function ModalConfiguracion({
+  config,
+  catalogo,
+  activados,
+  codCompany,
+  onCerrar,
+  onGuardado,
+}: Props) {
+  const [tab,      setTab]      = useState<Tab>("general");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const [guardado, setGuardado] = useState(false);
 
+  // ── Estado tab General ────────────────────────────────────────────────────
   const [form, setForm] = useState({
     tNameCompany: config.tNameCompany,
     imgCompany:   config.imgCompany ?? "",
-    moneda:       config.moneda,
-    zona_horaria: config.zona_horaria,
-    metodosPago:  config.metodosPago,
+    moneda:       config.moneda      ?? "MXN",
+    zona_horaria: config.zona_horaria ?? "America/Mexico_City",
   });
+
+  // ── Estado tab Métodos de pago ────────────────────────────────────────────
+  // Usamos eCodPay[] como fuente de verdad, con fallback a array vacío
+  const [metodosPago, setMetodosPago] = useState<string[]>(activados ?? []);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -78,18 +88,14 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  // Toggle método de pago
-  function toggleMetodo(value: string) {
-    setForm((prev) => {
-      const ya = prev.metodosPago.includes(value);
-      // Al menos uno debe quedar activo
-      if (ya && prev.metodosPago.length === 1) return prev;
-      return {
-        ...prev,
-        metodosPago: ya
-          ? prev.metodosPago.filter((m) => m !== value)
-          : [...prev.metodosPago, value],
-      };
+  // Toggle método — mínimo uno activo
+  function toggleMetodo(eCodPay: string) {
+    setMetodosPago((prev) => {
+      const yaActivo = prev.includes(eCodPay);
+      if (yaActivo && prev.length === 1) return prev; // al menos uno
+      return yaActivo
+        ? prev.filter((id) => id !== eCodPay)
+        : [...prev, eCodPay];
     });
   }
 
@@ -102,29 +108,43 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
     fd.append("imgCompany",   form.imgCompany);
     fd.append("moneda",       form.moneda);
     fd.append("zona_horaria", form.zona_horaria);
-    form.metodosPago.forEach((m) => fd.append("metodosPago", m));
 
-    const result = await guardarConfigNegocio(fd);
+    const [resConfig, resMetodos] = await Promise.all([
+      guardarConfigNegocio(fd),
+      guardarMetodosNegocio(codCompany, metodosPago),
+    ]);
 
     setLoading(false);
 
-    if (result?.error) {
-      setError(result.error);
-      return;
-    }
+    const err = resConfig?.error ?? resMetodos?.error;
+    if (err) { setError(err); return; }
 
     setGuardado(true);
     setTimeout(() => setGuardado(false), 2000);
-    onGuardado?.({ ...config, ...form });
+    onGuardado?.();
   }
 
-  const hayChanges =
-    form.tNameCompany !== config.tNameCompany ||
-    form.imgCompany   !== (config.imgCompany ?? "") ||
-    form.moneda       !== config.moneda ||
-    form.zona_horaria !== config.zona_horaria ||
-    JSON.stringify(form.metodosPago.slice().sort()) !==
-      JSON.stringify(config.metodosPago.slice().sort());
+  // ── Detectar cambios ──────────────────────────────────────────────────────
+  const hayChangesGeneral =
+    form.tNameCompany !== config.tNameCompany        ||
+    form.imgCompany   !== (config.imgCompany ?? "")  ||
+    form.moneda       !== (config.moneda ?? "MXN")   ||
+    form.zona_horaria !== (config.zona_horaria ?? "America/Mexico_City");
+
+  const activadosBase = activados ?? [];
+  const hayChangesPagos =
+    JSON.stringify([...metodosPago].sort()) !==
+    JSON.stringify([...activadosBase].sort());
+
+  const hayChanges = hayChangesGeneral || hayChangesPagos;
+
+  // ── Iniciales del negocio para el fallback del logo ───────────────────────
+  const inicialesNegocio = (form.tNameCompany || config.tNameCompany)
+    .split(" ")
+    .map((n: string) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "??";
 
   return (
     <div
@@ -147,12 +167,7 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
               />
             ) : (
               <div className={styles.headerLogoFallback}>
-                {(form.tNameCompany || config.tNameCompany)
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .slice(0, 2)
-                  .join("")
-                  .toUpperCase() || "??"}
+                {inicialesNegocio}
               </div>
             )}
             <div>
@@ -160,11 +175,7 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
               <p className={styles.subtitulo}>{form.tNameCompany || config.tNameCompany}</p>
             </div>
           </div>
-          <button
-            className={styles.btnCerrar}
-            onClick={onCerrar}
-            aria-label="Cerrar"
-          >
+          <button className={styles.btnCerrar} onClick={onCerrar} aria-label="Cerrar">
             <X size={14} />
           </button>
         </div>
@@ -175,9 +186,11 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
             <button
               key={t.id}
               className={`${styles.tab} ${tab === t.id ? styles.tabActivo : ""}`}
-              onClick={() => setTab(t.id)}
+              onClick={() => { setTab(t.id); setError(null); }}
             >
               {t.label}
+              {t.id === "general" && hayChangesGeneral && <span className={styles.tabDot} />}
+              {t.id === "pagos"   && hayChangesPagos   && <span className={styles.tabDot} />}
             </button>
           ))}
         </div>
@@ -185,10 +198,9 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
         {/* ── Body ── */}
         <div className={styles.body}>
 
-          {/* ── Tab: General ── */}
+          {/* Tab: General */}
           {tab === "general" && (
             <>
-              {/* Logo */}
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Logo del negocio</label>
                 <ImageUploadInput
@@ -200,7 +212,6 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
                 />
               </div>
 
-              {/* Nombre */}
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>
                   Nombre del negocio
@@ -215,7 +226,6 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
                 />
               </div>
 
-              {/* Moneda */}
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>
                   Moneda
@@ -233,7 +243,6 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
                 </div>
               </div>
 
-              {/* Zona horaria */}
               <div className={styles.field}>
                 <label className={styles.fieldLabel}>Zona horaria</label>
                 <div className={styles.selectWrap}>
@@ -251,35 +260,45 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
             </>
           )}
 
-          {/* ── Tab: Métodos de pago ── */}
+          {/* Tab: Métodos de pago */}
           {tab === "pagos" && (
             <>
               <p className={styles.tabDesc}>
-                Activa los métodos de pago disponibles en el punto de venta.
+                Activa los métodos disponibles en tu punto de venta.
                 Al menos uno debe permanecer activo.
               </p>
 
-              <div className={styles.metodosList}>
-                {METODOS_PAGO.map(({ value, label, icon: Icon }) => {
-                  const activo = form.metodosPago.includes(value);
-                  return (
-                    <button
-                      key={value}
-                      className={`${styles.metodoItem} ${activo ? styles.metodoItemActivo : ""}`}
-                      onClick={() => toggleMetodo(value)}
-                      type="button"
-                    >
-                      <div className={`${styles.metodoIconWrap} ${activo ? styles.metodoIconWrapActivo : ""}`}>
-                        <Icon size={18} />
-                      </div>
-                      <span className={styles.metodoLabel}>{label}</span>
-                      <div className={`${styles.metodoCheck} ${activo ? styles.metodoCheckActivo : ""}`}>
-                        {activo && <Check size={11} strokeWidth={3} color="white" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              {catalogo.length === 0 ? (
+                <div className={styles.infoBox}>
+                  No hay métodos de pago configurados en la plataforma todavía.
+                  Contacta al administrador del sistema.
+                </div>
+              ) : (
+                <div className={styles.metodosList}>
+                  {catalogo.map((m) => {
+                    const activo = metodosPago.includes(m.eCodPay);
+                    const Icono  = (Icons as any)[m.tIconPay] ?? Icons.CreditCard;
+                    return (
+                      <button
+                        key={m.eCodPay}
+                        className={`${styles.metodoItem} ${activo ? styles.metodoItemActivo : ""}`}
+                        onClick={() => toggleMetodo(m.eCodPay)}
+                        type="button"
+                      >
+                        <div className={`${styles.metodoIconWrap} ${activo ? styles.metodoIconWrapActivo : ""}`}>
+                          <Icono size={18} />
+                        </div>
+                        <div className={styles.metodoTextos}>
+                          <span className={styles.metodoLabel}>{m.tNamePay}</span>
+                        </div>
+                        <div className={`${styles.metodoCheck} ${activo ? styles.metodoCheckActivo : ""}`}>
+                          {activo && <Check size={11} strokeWidth={3} color="white" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className={styles.infoBox}>
                 Los métodos activos aparecerán en la pantalla de cobro del empleado.
@@ -287,12 +306,7 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
             </>
           )}
 
-          {/* Error */}
-          {error && (
-            <div className={styles.errorBox}>
-              ⚠ {error}
-            </div>
-          )}
+          {error && <div className={styles.errorBox}>⚠ {error}</div>}
         </div>
 
         {/* ── Footer ── */}
@@ -309,8 +323,8 @@ export function ModalConfiguracion({ config, onCerrar, onGuardado }: Props) {
             onClick={handleGuardar}
             disabled={loading || !hayChanges || !form.tNameCompany.trim()}
           >
-            {loading   ? "Guardando..."     :
-             guardado  ? "✓ Guardado"       :
+            {loading  ? "Guardando..." :
+             guardado ? "✓ Guardado"   :
              "Guardar cambios"}
           </button>
         </div>

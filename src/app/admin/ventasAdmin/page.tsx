@@ -1,14 +1,12 @@
-// src/app/admin/ventas/page.tsx
-
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
+import { createClient }      from "@/lib/supabase/server";
 import { VentasAdminClient } from "./ventasAdminClient";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
 export default async function VentasAdminPage() {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
 
-  // Usuario actual → para obtener su negocio
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
@@ -21,16 +19,22 @@ export default async function VentasAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
-  // ── Paso 1: ventas del negocio ────────────────────────────────────────────
+  // ── Métodos de pago del catálogo global ───────────────────────────────────
+  const { data: metodosPago } = await adminClient
+    .from("metodos_pago")
+    .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
+    .order("orden");
+
+  // ── Ventas ────────────────────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, eMetodoPago, fhCreateVenta, fkeCodUser")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser")
     .eq("fkeCodCompany", fkeCodCompany)
     .order("fhCreateVenta", { ascending: false });
 
   if (ventasError) console.error("Error ventas:", ventasError.message);
 
-  // ── Paso 2: detalles ──────────────────────────────────────────────────────
+  // ── Detalles ──────────────────────────────────────────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);
   let detalles: any[] = [];
 
@@ -44,7 +48,7 @@ export default async function VentasAdminPage() {
     else detalles = det ?? [];
   }
 
-  // ── Paso 3: productos ─────────────────────────────────────────────────────
+  // ── Productos ─────────────────────────────────────────────────────────────
   const productIds = [...new Set(detalles.map((d) => d.fkeCodProduct))];
   let productos: any[] = [];
 
@@ -58,7 +62,7 @@ export default async function VentasAdminPage() {
     else productos = prods ?? [];
   }
 
-  // ── Paso 4: perfiles de empleados ─────────────────────────────────────────
+  // ── Perfiles de empleados ─────────────────────────────────────────────────
   const empleadoIds = [...new Set((ventas ?? []).map((v) => v.fkeCodUser))];
   let perfiles: any[] = [];
 
@@ -72,7 +76,7 @@ export default async function VentasAdminPage() {
     else perfiles = perfs ?? [];
   }
 
-  // ── Paso 5: combinar ──────────────────────────────────────────────────────
+  // ── Combinar ──────────────────────────────────────────────────────────────
   const productosMap = new Map(productos.map((p) => [p.eCodProduct, p]));
   const perfilesMap  = new Map(perfiles.map((p) => [p.eCodUser, p]));
 
@@ -83,11 +87,10 @@ export default async function VentasAdminPage() {
 
   const ventasCompletas = (ventas ?? []).map((v) => ({
     ...v,
-    empleado:     perfilesMap.get(v.fkeCodUser) ?? null,
+    empleado:      perfilesMap.get(v.fkeCodUser) ?? null,
     detalle_venta: detallesConProducto.filter((d) => d.fkeCodVenta === v.eCodVenta),
   }));
 
-  // Lista de empleados para el filtro
   const empleadosFiltro = perfiles.map((p) => ({
     id:     p.eCodUser  as string,
     nombre: p.tNameUser as string,
@@ -97,6 +100,7 @@ export default async function VentasAdminPage() {
     <VentasAdminClient
       ventas={ventasCompletas}
       empleados={empleadosFiltro}
+      metodosPago={(metodosPago as MetodoPagoGlobal[]) ?? []}
     />
   );
 }

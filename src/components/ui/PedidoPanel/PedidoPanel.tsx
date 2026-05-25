@@ -1,29 +1,41 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Minus, Plus, NotebookPen, Banknote, CreditCard, Smartphone } from "lucide-react";
+import { Trash2, Minus, Plus, NotebookPen } from "lucide-react";
+import * as Icons from "lucide-react";
 import type { ItemCarritoMenu } from "@/app/empleado/menu/MenuClient";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import type { MetodoPago }       from "@/types";
 import styles from "./PedidoPanel.module.css";
-import type { MetodoPago } from "@/types";
 
 interface Props {
-  items: ItemCarritoMenu[];
+  items:        ItemCarritoMenu[];
+  metodosPago:  MetodoPagoGlobal[];
   onCambiarCantidad: (eCodProduct: string, delta: number) => void;
-  onLimpiar: () => void;
-  onFinalizar: (metodoPago: MetodoPago) => Promise<void>;
-  error?: string | null;
+  onLimpiar:    () => void;
+  onFinalizar:  (metodoPago: MetodoPago) => Promise<void>;
+  error?:       string | null;
 }
 
 const IVA = 0.16;
 
-const METODOS: { value: MetodoPago; label: string; icon: React.ReactNode }[] = [
-  { value: "efectivo",      label: "Efectivo",      icon: <Banknote size={18} />   },
-  { value: "tarjeta",       label: "Tarjeta",       icon: <CreditCard size={18} /> },
-  { value: "transferencia", label: "QR / Transfer", icon: <Smartphone size={18} /> },
-];
+function IconoMetodo({ nombre, size = 18 }: { nombre: string; size?: number }) {
+  const Icono = (Icons as any)[nombre];
+  return Icono ? <Icono size={size} /> : <Icons.CreditCard size={size} />;
+}
 
-export function PedidoPanel({ items, onCambiarCantidad, onLimpiar, onFinalizar, error }: Props) {
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>("efectivo");
+export function PedidoPanel({
+  items,
+  metodosPago,
+  onCambiarCantidad,
+  onLimpiar,
+  onFinalizar,
+  error,
+}: Props) {
+  // Seleccionar el primer método disponible por defecto
+  const [metodoPago, setMetodoPago] = useState<string>(
+    metodosPago[0]?.eCodPay ?? ""
+  );
   const [cargando, setCargando] = useState(false);
 
   const subtotal = items.reduce(
@@ -34,9 +46,10 @@ export function PedidoPanel({ items, onCambiarCantidad, onLimpiar, onFinalizar, 
   const total = subtotal + iva;
 
   async function handleFinalizar() {
-    if (items.length === 0 || cargando) return;
+    if (items.length === 0 || cargando || !metodoPago) return;
     setCargando(true);
-    await onFinalizar(metodoPago);  // ← pasa el método seleccionado
+    // Pasamos el eCodPay como MetodoPago — el action de ventas lo acepta como string
+    await onFinalizar(metodoPago as MetodoPago);
     setCargando(false);
   }
 
@@ -50,7 +63,11 @@ export function PedidoPanel({ items, onCambiarCantidad, onLimpiar, onFinalizar, 
           <h2 className={styles.titulo}>Pedido Actual</h2>
         </div>
         {items.length > 0 && (
-          <button className={styles.btnLimpiar} onClick={onLimpiar} title="Limpiar pedido">
+          <button
+            className={styles.btnLimpiar}
+            onClick={onLimpiar}
+            title="Limpiar pedido"
+          >
             <Trash2 size={14} />
           </button>
         )}
@@ -120,24 +137,32 @@ export function PedidoPanel({ items, onCambiarCantidad, onLimpiar, onFinalizar, 
         </div>
       )}
 
-      {/* ── Métodos de pago ── */}
+      {/* ── Métodos de pago dinámicos ── */}
       {items.length > 0 && (
         <div className={styles.metodos}>
-          {METODOS.map((m) => (
-            <button
-              key={m.value}
-              className={`${styles.metodoBtn} ${metodoPago === m.value ? styles.metodoBtnActivo : ""}`}
-              onClick={() => setMetodoPago(m.value)}
-              title={m.label}
-            >
-              <span className={styles.metodoIcono}>{m.icon}</span>
-              <span className={styles.metodoLabel}>{m.label}</span>
-            </button>
-          ))}
+          {metodosPago.length === 0 ? (
+            <p style={{ fontSize: 11, color: "var(--gray)", textAlign: "center", padding: "var(--space-2) 0" }}>
+              Sin métodos de pago configurados
+            </p>
+          ) : (
+            metodosPago.map((m) => (
+              <button
+                key={m.eCodPay}
+                className={`${styles.metodoBtn} ${metodoPago === m.eCodPay ? styles.metodoBtnActivo : ""}`}
+                onClick={() => setMetodoPago(m.eCodPay)}
+                title={m.tNamePay}
+              >
+                <span className={styles.metodoIcono}>
+                  <IconoMetodo nombre={m.tIconPay} />
+                </span>
+                <span className={styles.metodoLabel}>{m.tNamePay}</span>
+              </button>
+            ))
+          )}
         </div>
       )}
 
-      {/* ── Error de stock u otro ── */}
+      {/* ── Error ── */}
       {error && items.length > 0 && (
         <div className={styles.error}>⚠ {error}</div>
       )}
@@ -146,7 +171,7 @@ export function PedidoPanel({ items, onCambiarCantidad, onLimpiar, onFinalizar, 
       <div className={styles.footerAccion}>
         <button
           className={styles.btnFinalizar}
-          disabled={items.length === 0 || cargando}
+          disabled={items.length === 0 || cargando || !metodoPago}
           onClick={handleFinalizar}
         >
           {cargando

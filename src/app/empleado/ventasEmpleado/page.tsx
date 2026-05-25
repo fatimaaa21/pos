@@ -1,81 +1,85 @@
-// src/app/empleado/mis-ventas/page.tsx
-
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VentasEmpleadoClient } from "./ventasEmpleadoClient";
 
 export default async function VentasEmpleadoPage() {
   const supabase = await createClient();
-  const adminClient = createAdminClient(); // bypasea RLS
+  const adminClient = createAdminClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // ── Paso 1: ventas del empleado ───────────────────────────────────────────
+  // ── Perfil del empleado → negocio ─────────────────────────────────────────
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  // ── Métodos de pago activos del negocio ───────────────────────────────────
+  const { data: negocio } = await supabase
+    .from("negocios")
+    .select("metodosPago")
+    .eq("eCodCompany", perfil?.fkeCodCompany)
+    .single();
+
+  const metodosPago: string[] = negocio?.metodosPago ?? ["efectivo", "tarjeta", "transferencia"];
+
+  // ── Ventas del empleado ───────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, eMetodoPago, fhCreateVenta")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, metodos_pago(tNamePay, tIconPay)")
     .eq("fkeCodUser", user.id)
     .order("fhCreateVenta", { ascending: false });
 
-  if (ventasError) {
-    console.error("Error cargando ventas:", ventasError.message);
-  }
+  if (ventasError) console.error("Error cargando ventas:", ventasError.message);
 
-  // ── Paso 2: detalles de esas ventas ──────────────────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);
   let detalles: any[] = [];
 
   if (ids.length > 0) {
-    const { data: det, error: detError } = await adminClient
+    const { data: det } = await adminClient
       .from("detalle_venta")
       .select("eCodDetalle, fkeCodVenta, fkeCodProduct, eCantidad, ePrecioUnitario, eSubtotal")
       .in("fkeCodVenta", ids);
-
-    if (detError) {
-      console.error("Error cargando detalles:", detError.message);
-    } else {
-      detalles = det ?? [];
-    }
+    detalles = det ?? [];
   }
 
-  // ── Paso 3: nombres de productos ─────────────────────────────────────────
   const productIds = [...new Set(detalles.map((d) => d.fkeCodProduct))];
   let productos: any[] = [];
 
   if (productIds.length > 0) {
-    const { data: prods, error: prodsError } = await adminClient
+    const { data: prods } = await adminClient
       .from("productos")
       .select("eCodProduct, tNameProduct, ImgProduct")
       .in("eCodProduct", productIds);
-
-    if (prodsError) {
-      console.error("Error cargando productos:", prodsError.message);
-    } else {
-      productos = prods ?? [];
-    }
+    productos = prods ?? [];
   }
 
-  // ── Paso 4: combinar en memoria ───────────────────────────────────────────
   const productosMap = new Map(productos.map((p) => [p.eCodProduct, p]));
-
   const detallesConProducto = detalles.map((d) => ({
     ...d,
     producto: productosMap.get(d.fkeCodProduct) ?? null,
   }));
 
-  const ventasCompletas = (ventas ?? []).map((v) => ({
+  const ventasCompletas = (ventas ?? []).map((v: any) => ({
     ...v,
+    metodoPagoNombre: v.metodos_pago?.tNamePay ?? v.fkeMetodoPago,
+    metodoPagoIcono:  v.metodos_pago?.tIconPay ?? null,
     detalle_venta: detallesConProducto.filter((d) => d.fkeCodVenta === v.eCodVenta),
   }));
 
-  // ── Total del día ─────────────────────────────────────────────────────────
   const hoy = new Date();
   hoy.setUTCHours(0, 0, 0, 0);
-
   const totalHoy = ventasCompletas
     .filter((v) => new Date(v.fhCreateVenta) >= hoy)
     .reduce((acc, v) => acc + v.eTotal, 0);
 
-  return <VentasEmpleadoClient ventas={ventasCompletas} totalHoy={totalHoy} />;
+  return (
+    <VentasEmpleadoClient
+      ventas={ventasCompletas}
+      totalHoy={totalHoy}
+      metodosPago={metodosPago}
+    />
+  );
 }

@@ -258,13 +258,13 @@
 
 /* ── Métodos de pago — 3 botones en fila ── */
 .metodos {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
 }
  
 .metodoBtn {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -10,26 +10,24 @@ export interface FiltrosUsuario {
   busqueda:    string;
   roles:       ("admin" | "empleado")[];
   estados:     ("activo" | "inactivo")[];
-  categorias?: string[];                                          // eCodCategory o tNameCategory
-  stocks?:     ("disponible" | "bajo" | "agotado")[];            // estado de stock
-  // Filtros de ventas
-  periodo?:   "hoy" | "semana" | "mes" | "todo";
-  metodo?:    "todos" | "efectivo" | "tarjeta" | "transferencia";
-  empleado?:  string;
+  categorias?: string[];
+  stocks?:     ("disponible" | "bajo" | "agotado")[];
+  periodo?:    "hoy" | "semana" | "mes" | "todo";
+  metodo?:     string;
+  empleado?:   string;
 }
 
 interface TablaToolbarProps {
   filtros:   FiltrosUsuario;
   onChange:  (filtros: FiltrosUsuario) => void;
   total:     number;
-  // Ocultar secciones
-  ocultarRol?:    boolean;
-  ocultarEstado?: boolean;
-  // Extras opcionales
+  ocultarRol?:         boolean;
+  ocultarEstado?:      boolean;
   opcionesCategorias?: { value: string; label: string }[];
   mostrarStock?:       boolean;
   mostrarPeriodo?:     boolean;
-  mostrarMetodo?:      boolean;
+  mostrarMetodo?:      boolean;                              // legacy hardcodeado
+  opcionesMetodo?:     { value: string; label: string }[];  // dinámico desde DB
   empleados?:          { id: string; nombre: string }[];
 }
 
@@ -190,7 +188,8 @@ const OPCIONES_PERIODO = [
   { value: "todo",   label: "Todo"        },
 ];
 
-const OPCIONES_METODO = [
+// Método hardcodeado — solo se usa cuando mostrarMetodo=true y no se pasa opcionesMetodo
+const OPCIONES_METODO_LEGACY = [
   { value: "todos",         label: "Todos"         },
   { value: "efectivo",      label: "Efectivo",      icon: <Banknote   size={12} /> },
   { value: "tarjeta",       label: "Tarjeta",       icon: <CreditCard size={12} /> },
@@ -209,6 +208,7 @@ export function TablaToolbar({
   mostrarStock    = false,
   mostrarPeriodo  = false,
   mostrarMetodo   = false,
+  opcionesMetodo,
   empleados,
 }: TablaToolbarProps) {
 
@@ -354,15 +354,28 @@ export function TablaToolbar({
         </>
       )}
 
-      {/* ── Método de pago ── */}
-      {mostrarMetodo && (
+      {/* ── Método dinámico desde DB ── */}
+      {opcionesMetodo && opcionesMetodo.length > 1 && (
         <>
           <div className={styles.divider} />
           <DropdownSingle
             label="Método"
-            opciones={OPCIONES_METODO}
+            opciones={opcionesMetodo}
             valor={filtros.metodo ?? "todos"}
-            onChange={(v) => onChange({ ...filtros, metodo: v as FiltrosUsuario["metodo"] })}
+            onChange={(v) => onChange({ ...filtros, metodo: v })}
+          />
+        </>
+      )}
+
+      {/* ── Método hardcodeado legacy (cuando no hay opcionesMetodo) ── */}
+      {mostrarMetodo && !opcionesMetodo && (
+        <>
+          <div className={styles.divider} />
+          <DropdownSingle
+            label="Método"
+            opciones={OPCIONES_METODO_LEGACY}
+            valor={filtros.metodo ?? "todos"}
+            onChange={(v) => onChange({ ...filtros, metodo: v })}
           />
         </>
       )}

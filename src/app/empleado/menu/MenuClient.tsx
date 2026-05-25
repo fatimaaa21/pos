@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Categoria, ProductoConStock, MetodoPago } from "@/types";
-import { Buscador } from "@/components/ui/Buscador";
-import { CategoriaCarrusel } from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
-import { ProductoGrid } from "@/components/ui/ProductoGrid/ProductoGrid";
-import { PedidoPanel } from "@/components/ui/PedidoPanel/PedidoPanel";
-import { ModalVentaExitosa } from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
-import { crearVenta } from "@/lib/actions/ventas";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import { Buscador }           from "@/components/ui/Buscador";
+import { CategoriaCarrusel }  from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
+import { ProductoGrid }       from "@/components/ui/ProductoGrid/ProductoGrid";
+import { PedidoPanel }        from "@/components/ui/PedidoPanel/PedidoPanel";
+import { ModalVentaExitosa }  from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
+import { crearVenta }         from "@/lib/actions/ventas";
 import styles from "./menu.module.css";
 
 export interface ItemCarritoMenu {
@@ -17,16 +18,17 @@ export interface ItemCarritoMenu {
 }
 
 interface Props {
-  categorias: Categoria[];
-  productos: ProductoConStock[];   // ← solo los que tienen stock
+  categorias:  Categoria[];
+  productos:   ProductoConStock[];
+  metodosPago: MetodoPagoGlobal[];
 }
 
-export function MenuClient({ categorias, productos }: Props) {
+export function MenuClient({ categorias, productos, metodosPago }: Props) {
   const [categoriaActiva, setCategoriaActiva] = useState<string>("todas");
-  const [busqueda, setBusqueda] = useState("");
+  const [busqueda,        setBusqueda]        = useState("");
   const router = useRouter();
-  const [carrito, setCarrito] = useState<ItemCarritoMenu[]>([]);
-  const [errorVenta, setErrorVenta] = useState<string | null>(null);
+  const [carrito,      setCarrito]      = useState<ItemCarritoMenu[]>([]);
+  const [errorVenta,   setErrorVenta]   = useState<string | null>(null);
   const [ventaExitosa, setVentaExitosa] = useState<string | null>(null);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
@@ -54,7 +56,6 @@ export function MenuClient({ categorias, productos }: Props) {
     setErrorVenta(null);
     setCarrito((prev) => {
       const existe = prev.find((i) => i.producto.eCodProduct === producto.eCodProduct);
-      // No agregar más de lo que hay en stock
       if (existe) {
         if (existe.cantidad >= producto.stockDisponible) return prev;
         return prev.map((i) =>
@@ -74,7 +75,6 @@ export function MenuClient({ categorias, productos }: Props) {
         .map((i) => {
           if (i.producto.eCodProduct !== eCodProduct) return i;
           const nuevaCantidad = i.cantidad + delta;
-          // No superar el stock disponible
           if (nuevaCantidad > i.producto.stockDisponible) return i;
           return { ...i, cantidad: nuevaCantidad };
         })
@@ -136,6 +136,7 @@ export function MenuClient({ categorias, productos }: Props) {
       {/* ── Panel de pedido fijo ── */}
       <PedidoPanel
         items={carrito}
+        metodosPago={metodosPago}
         onCambiarCantidad={cambiarCantidad}
         onLimpiar={limpiarCarrito}
         onFinalizar={handleFinalizar}

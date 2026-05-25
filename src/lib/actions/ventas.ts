@@ -1,19 +1,18 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { MetodoPago } from "@/types";
-import { revalidatePath } from "next/cache";
+import { revalidatePath }    from "next/cache";
 
 interface ItemVenta {
-  eCodProduct: string;
-  cantidad: number;
+  eCodProduct:    string;
+  cantidad:       number;
   precioUnitario: number;
 }
 
-export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
+export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
   try {
-    const supabase = await createClient();
+    const supabase    = await createClient();
     const adminClient = createAdminClient();
 
     // 1. Verificar sesión
@@ -66,7 +65,7 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
         fkeCodUser:    user.id,
         fkeCodCompany,
         eTotal,
-        eMetodoPago:   metodoPago,
+        fkeMetodoPago,     // eCodPay del método seleccionado
         fhCreateVenta: new Date().toISOString(),
       })
       .select("eCodVenta")
@@ -76,7 +75,7 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
       return { error: `Error al crear venta: ${ventaError?.message}` };
     }
 
-    // 6. Insertar detalle (una fila por producto)
+    // 6. Insertar detalle
     const detalle = items.map((i) => ({
       fkeCodVenta:     venta.eCodVenta,
       fkeCodProduct:   i.eCodProduct,
@@ -93,7 +92,7 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
       return { error: `Error al guardar detalle: ${detalleError.message}` };
     }
 
-    // 7. Descontar del inventario y marcar agotado si corresponde
+    // 7. Descontar inventario
     for (const item of items) {
       const { data: lote } = await adminClient
         .from("vista_inventario")
@@ -105,12 +104,10 @@ export async function crearVenta(items: ItemVenta[], metodoPago: MetodoPago) {
       if (!lote) continue;
 
       const restanteTrasVenta = lote.eCantRestante - item.cantidad;
-      const agotado = restanteTrasVenta <= 0;
-
       await adminClient
         .from("inventario")
         .update({
-          bStateInventory:   !agotado,
+          bStateInventory:   restanteTrasVenta > 0,
           fhUpdateInventory: new Date().toISOString(),
         })
         .eq("eCodInventory", lote.eCodInventory);

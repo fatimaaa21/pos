@@ -221,24 +221,22 @@ export function InventarioClient({ inventario: inicial }: Props) {
       key: "eCantVendida",
       label: "Vendidas",
       render: (c) => (
-        <span>
-          {c.eCantVendida}
-        </span>
+        <span>{c.eCantVendida ?? 0}</span>
       ),
     },
     {
-      key: "eCantRestante",
-      label: "Restantes",
-      render: (c) => {
-        const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-        const variante = estado === "disponible" ? "disponible" : estado === "bajo" ? "bajo" : "agotado";
-        return (
-          <Badge variante={variante}>
-            {c.eCantRestante}
-          </Badge>
-        );
-      },
-    },
+  key: "eCantRestante",
+  label: "Restantes",
+  render: (c) => {
+    const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+    const variante = estado === "disponible" ? "disponible" : estado === "bajo" ? "bajo" : "agotado";
+    return (
+      <Badge variante={variante} dot={false}>
+        {c.eCantRestante}
+      </Badge>
+    );
+  },
+},
     {
       key: "ePriceProduct",
       label: "Precio",

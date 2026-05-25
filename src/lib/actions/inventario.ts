@@ -16,14 +16,27 @@ export async function agregarStock(formData: FormData) {
       return { error: "Datos inválidos" };
     }
 
+    // ── Obtener fkeCodCompany desde el producto ───────────────────────────
+    const { data: producto, error: productoError } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany")
+      .eq("eCodProduct", fkeCodProduct)
+      .single();
+
+    if (productoError || !producto?.fkeCodCompany) {
+      return { error: "No se pudo obtener el negocio del producto" };
+    }
+
+    const fkeCodCompany = producto.fkeCodCompany;
     const ahora = new Date().toISOString();
 
     const { data, error } = await adminClient
       .from("inventario")
       .insert({
         fkeCodProduct,
+        fkeCodCompany,        // ← esto faltaba
         eCantIngresada,
-        eStockMinimo: eStockMinimo,
+        eStockMinimo,
         bStateInventory: true,
         fhCreateInventory: ahora,
         fhUpdateInventory: ahora,
