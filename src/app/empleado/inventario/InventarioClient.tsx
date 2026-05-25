@@ -8,7 +8,10 @@ import { Badge } from "@/components/ui/Badge";
 import { getEstadoStock } from "@/types";
 import styles from "./Inventario.module.css";
 
-type ProductoConStockExtendido = ProductoConStock & { stockMinimo: number };
+type ProductoConStockExtendido = ProductoConStock & {
+  stockMinimo:    number;
+  stockIngresado: number;   // ← nuevo
+};
 
 interface Props {
   categorias: Categoria[];
@@ -76,9 +79,9 @@ export function InventarioEmpleadoClient({ categorias, productos }: Props) {
                 ? "bajo"
                 : "agotado";
 
-            const pct = producto.stockMinimo > 0
-              ? Math.min((producto.stockDisponible / (producto.stockMinimo * 3)) * 100, 100)
-              : Math.min((producto.stockDisponible / 50) * 100, 100);
+            const pct = producto.stockIngresado > 0
+              ? Math.min((producto.stockDisponible / producto.stockIngresado) * 100, 100)
+              : 100;
 
             const barraColor =
               estado === "disponible"

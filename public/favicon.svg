@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Favicon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 16 16">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: url(#Degradado_sin_nombre_43-2);
+      }
+
+      .cls-2 {
+        fill: url(#Degradado_sin_nombre_43);
+      }
+
+      .cls-3 {
+        fill: #d0d9c0;
+      }
+    </style>
+    <linearGradient id="Degradado_sin_nombre_43" data-name="Degradado sin nombre 43" x1="3.87" y1="6.51" x2="7.97" y2="13.62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#628321"/>
+      <stop offset=".23" stop-color="#5c7e1e" stop-opacity=".99"/>
+      <stop offset=".53" stop-color="#4c7018" stop-opacity=".96"/>
+      <stop offset=".88" stop-color="#31590e" stop-opacity=".92"/>
+      <stop offset="1" stop-color="#27500a" stop-opacity=".9"/>
+    </linearGradient>
+    <linearGradient id="Degradado_sin_nombre_43-2" data-name="Degradado sin nombre 43" x1="12.17" y1="3.68" x2="8.06" y2="7.79" xlink:href="#Degradado_sin_nombre_43"/>
+  </defs>
+  <rect class="cls-3" x="0" y="0" width="16" height="16" rx="4" ry="4"/>
+  <g>
+    <path class="cls-2" d="M5.74,7.9c-.11.72-.41,1.31.05,2,.29.43.78.77,1.31.82.83.1,1.45-.68,2.22-.35,1.02.55.25,2.1-.42,2.65-.49.46-1.03.61-1.7.67-2.38.23-4.25-1.64-4.25-4.02-.02-1.18.33-3.27,1.76-3.55,1.05-.06,1.23.92,1.02,1.73v.05Z"/>
+    <path class="cls-1" d="M10.03,8.23c.2-.7.57-1.25.2-1.99-.23-.47-.68-.87-1.2-.98-.81-.21-1.53.49-2.25.07-.94-.67.02-2.12.75-2.58.55-.39,1.09-.48,1.77-.45,2.39.07,4,2.16,3.7,4.52-.13,1.17-.74,3.2-2.2,3.3-1.05-.08-1.1-1.07-.8-1.85v-.05Z"/>
+  </g>
+</svg>

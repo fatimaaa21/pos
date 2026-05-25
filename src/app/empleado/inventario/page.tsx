@@ -15,8 +15,10 @@ export default async function InventarioEmpleadoPage() {
   // Stock desde la vista (igual que el menú)
   const { data: lotes } = await supabase
     .from("vista_inventario")
-    .select("fkeCodProduct, eCantRestante, eStockMinimo")
+    .select("fkeCodProduct, eCantRestante, eCantIngresada, eStockMinimo")
     .eq("bStateInventory", true);
+
+  const ingresadoPorProducto = new Map<string, number>();
 
   if (!lotes || lotes.length === 0) {
     return (
@@ -42,21 +44,23 @@ export default async function InventarioEmpleadoPage() {
   for (const lote of lotes) {
     const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
     stockPorProducto.set(lote.fkeCodProduct, actual + lote.eCantRestante);
-    // Tomar el mínimo más alto (conservador)
+
+    const ingresado = ingresadoPorProducto.get(lote.fkeCodProduct) ?? 0;
+    ingresadoPorProducto.set(lote.fkeCodProduct, ingresado + lote.eCantIngresada);
+
     const minActual = minimoPorProducto.get(lote.fkeCodProduct) ?? 0;
     minimoPorProducto.set(lote.fkeCodProduct, Math.max(minActual, lote.eStockMinimo));
   }
 
-  const productosConStock: (ProductoConStock & { stockMinimo: number })[] = (
-    productos ?? []
-  ).map((p) => ({
-    eCodProduct: p.eCodProduct,
-    tNameProduct: p.tNameProduct,
-    fkeCodCategory: p.fkeCodCategory,
-    ePriceProduct: p.ePriceProduct,
-    ImgProduct: p.ImgProduct,
+  const productosConStock = (productos ?? []).map((p) => ({
+    eCodProduct:     p.eCodProduct,
+    tNameProduct:    p.tNameProduct,
+    fkeCodCategory:  p.fkeCodCategory,
+    ePriceProduct:   p.ePriceProduct,
+    ImgProduct:      p.ImgProduct,
     stockDisponible: stockPorProducto.get(p.eCodProduct) ?? 0,
-    stockMinimo: minimoPorProducto.get(p.eCodProduct) ?? 0,
+    stockMinimo:     minimoPorProducto.get(p.eCodProduct) ?? 0,
+    stockIngresado:  ingresadoPorProducto.get(p.eCodProduct) ?? 0,  // ← nuevo
   }));
 
   return (

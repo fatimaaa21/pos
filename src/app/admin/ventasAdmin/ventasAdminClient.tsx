@@ -1,19 +1,15 @@
-// src/app/admin/ventas/VentasAdminClient.tsx
 "use client";
 
 import { useState, useMemo } from "react";
-import {
-  Banknote, CreditCard, Smartphone,
-  Eye, ShoppingBag, TrendingUp, Users,
-} from "lucide-react";
+import { Eye } from "lucide-react";
 import { PageHeader }   from "@/components/ui/PageHeader";
 import { StatCards }    from "@/components/ui/Statscards";
 import { Buscador }     from "@/components/ui/Buscador";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
-import { Badge } from "@/components/ui/Badge";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
-import { ModalVerVenta } from "./ModalVerVenta";
+import { ModalVerVenta }   from "./ModalVerVenta";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./ventasAdmin.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
@@ -31,7 +27,7 @@ interface DetalleVenta {
 export interface VentaAdmin {
   eCodVenta:     string;
   eTotal:        number;
-  eMetodoPago:   "efectivo" | "transferencia" | "tarjeta";
+  fkeMetodoPago:   string;   // eCodPay del método
   fhCreateVenta: string;
   fkeCodUser:    string;
   empleado?: { eCodUser: string; tNameUser: string } | null;
@@ -39,28 +35,27 @@ export interface VentaAdmin {
 }
 
 interface Props {
-  ventas:    VentaAdmin[];
-  empleados: { id: string; nombre: string }[];
+  ventas:      VentaAdmin[];
+  empleados:   { id: string; nombre: string }[];
+  metodosPago: MetodoPagoGlobal[];
 }
 
-// ── Badge método ──────────────────────────────────────────────────────────────
- 
-const METODO_BADGE: Record<string, { label: string; clase: string }> = {
-  efectivo:      { label: "Efectivo",      clase: "efectivo"      },
-  tarjeta:       { label: "Tarjeta",       clase: "tarjeta"       },
-  transferencia: { label: "QR / Transfer", clase: "transferencia" },
-};
+// ── Helper: resolver método desde eCodPay ─────────────────────────────────────
+
+function MetodoBadge({
+  eCodPay,
+  metodosPago,
+}: {
+  eCodPay:     string;
+  metodosPago: MetodoPagoGlobal[];
+}) {
+  const metodo = metodosPago.find((m) => m.eCodPay === eCodPay);
+  if (!metodo) return <span style={{ color: "var(--gray)", fontSize: 13 }}>—</span>;
+
+  return <span>{metodo.tNamePay}</span>;
+}
 
 // ── Filtros de periodo ────────────────────────────────────────────────────────
-
-type FiltroPeriodo = "hoy" | "semana" | "mes" | "todo";
-
-const PERIODOS: { value: FiltroPeriodo; label: string }[] = [
-  { value: "hoy",    label: "Hoy"         },
-  { value: "semana", label: "Esta semana" },
-  { value: "mes",    label: "Este mes"    },
-  { value: "todo",   label: "Todo"        },
-];
 
 function estaEnPeriodo(fechaISO: string, periodo: string): boolean {
   const d     = new Date(fechaISO);
@@ -84,14 +79,14 @@ function estaEnPeriodo(fechaISO: string, periodo: string): boolean {
       d.getUTCFullYear() === ahora.getUTCFullYear()
     );
   }
-  return true; // "todo"
+  return true;
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function VentasAdminClient({ ventas, empleados }: Props) {
+export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
   const [busqueda,      setBusqueda]      = useState("");
-  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+  const [filtros,       setFiltros]       = useState<FiltrosUsuario>({
     busqueda:  "",
     roles:     [],
     estados:   [],
@@ -100,18 +95,23 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
     empleado:  "todos",
   });
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [periodo,       setPeriodo]       = useState<FiltroPeriodo>("hoy");
-  const [metodoFiltro,  setMetodoFiltro]  = useState<string>("todos");
-  const [empleadoFiltro,setEmpleadoFiltro]= useState<string>("todos");
   const [ventaVer,      setVentaVer]      = useState<VentaAdmin | null>(null);
+
+  // Opciones de método para el toolbar — dinámicas desde el catálogo
+  const opcionesMetodo = useMemo(() => [
+    { value: "todos", label: "Todos" },
+    ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),
+  ], [metodosPago]);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = useMemo(() => {
     return ventas.filter((v) => {
       const coincidePeriodo  = estaEnPeriodo(v.fhCreateVenta, filtros.periodo ?? "hoy");
-      const coincideMetodo   = !filtros.metodo  || filtros.metodo  === "todos" || v.eMetodoPago === filtros.metodo;
-      const coincideEmpleado = !filtros.empleado || filtros.empleado === "todos" || v.fkeCodUser === filtros.empleado;
- 
+      const coincideMetodo   = !filtros.metodo || filtros.metodo === "todos"
+        || v.fkeMetodoPago === filtros.metodo;
+      const coincideEmpleado = !filtros.empleado || filtros.empleado === "todos"
+        || v.fkeCodUser === filtros.empleado;
+
       const folio = v.eCodVenta.slice(-8).toUpperCase();
       const coincideBusqueda =
         !filtros.busqueda ||
@@ -120,40 +120,29 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
         v.detalle_venta.some(
           (d) => d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase())
         );
- 
+
       return coincidePeriodo && coincideMetodo && coincideEmpleado && coincideBusqueda;
     });
   }, [ventas, filtros]);
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  const totalFiltrado = filtradas.reduce((acc, v) => acc + v.eTotal, 0);
-  const totalPiezas   = filtradas.reduce(
-    (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0),
-    0
+  const totalFiltrado  = filtradas.reduce((acc, v) => acc + v.eTotal, 0);
+  const totalPiezas    = filtradas.reduce(
+    (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0), 0
   );
-  const ticketPromedio = filtradas.length > 0
-    ? totalFiltrado / filtradas.length
-    : 0;
+  const ticketPromedio = filtradas.length > 0 ? totalFiltrado / filtradas.length : 0;
 
   // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<VentaAdmin>[] = [
     {
       key: "eCodVenta",
       label: "Folio",
-      render: (v) => (
-        <span>
-          # {v.eCodVenta.slice(-8).toUpperCase()}
-        </span>
-      ),
+      render: (v) => <span># {v.eCodVenta.slice(-8).toUpperCase()}</span>,
     },
     {
       key: "empleado",
       label: "Empleado",
-      render: (v) => (
-          <span >
-            {v.empleado?.tNameUser ?? "—"}
-          </span>
-      ),
+      render: (v) => <span>{v.empleado?.tNameUser ?? "—"}</span>,
     },
     {
       key: "detalle_venta",
@@ -169,33 +158,21 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
       },
     },
     {
-      key: "eMetodoPago",
-      label: "Método de Pago",
-      render: (v) => {
-        return (
-          <span>
-            {v.eMetodoPago}
-          </span>
-        );
-      },
+      key: "fkeMetodoPago",
+      label: "Método de pago",
+      render: (v) => (
+        <MetodoBadge eCodPay={v.fkeMetodoPago} metodosPago={metodosPago} />
+      ),
     },
     {
       key: "eTotal",
       label: "Total",
-      render: (v) => (
-        <span>
-          ${v.eTotal.toFixed(2)}
-        </span>
-      ),
+      render: (v) => <span>${v.eTotal.toFixed(2)}</span>,
     },
     {
       key: "fhCreateVenta",
-      label: "Fecha de Creación",
-      render: (v) => (
-        <span>
-          {formatFechaHora(v.fhCreateVenta)}
-        </span>
-      ),
+      label: "Fecha",
+      render: (v) => <span>{formatFechaHora(v.fhCreateVenta)}</span>,
     },
     {
       key: "acciones",
@@ -214,8 +191,6 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
 
   return (
     <div className="container">
-
-      {/* Header */}
       <div className="header">
         <Buscador
           valor={busqueda}
@@ -229,12 +204,11 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
         descripcion="Historial de ventas del negocio"
       />
 
-      {/* Stats */}
       <StatCards stats={[
-        { label: "Ventas en periodo",  value: filtradas.length,                                            variante: "primary" },
-        { label: "Total facturado",    value: `$${totalFiltrado.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, variante: "success" },
-        { label: "Piezas vendidas",    value: totalPiezas,                                                 variante: "accent"  },
-        { label: "Ticket promedio",    value: `$${ticketPromedio.toFixed(2)}`,                             variante: "neutral" },
+        { label: "Ventas en periodo", value: filtradas.length,                                                           variante: "primary" },
+        { label: "Total facturado",   value: `$${totalFiltrado.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`, variante: "success" },
+        { label: "Piezas vendidas",   value: totalPiezas,                                                                variante: "accent"  },
+        { label: "Ticket promedio",   value: `$${ticketPromedio.toFixed(2)}`,                                            variante: "neutral" },
       ]} />
 
       <TablaToolbar
@@ -244,11 +218,10 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
         ocultarRol
         ocultarEstado
         mostrarPeriodo
-        mostrarMetodo
+        opcionesMetodo={opcionesMetodo}
         empleados={empleados}
-    />
+      />
 
-      {/* Tabla */}
       <DataTable
         columnas={columnas}
         datos={filtradas}
@@ -259,10 +232,10 @@ export function VentasAdminClient({ ventas, empleados }: Props) {
         vacio="No hay ventas en este periodo"
       />
 
-      {/* Modal detalle */}
       {ventaVer && (
         <ModalVerVenta
           venta={ventaVer}
+          metodosPago={metodosPago}
           onClose={() => setVentaVer(null)}
         />
       )}

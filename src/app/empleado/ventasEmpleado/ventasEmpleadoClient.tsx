@@ -1,4 +1,4 @@
-// src/app/empleado/mis-ventas/MisVentasClient.tsx
+// src/app/empleado/ventasEmpleado/ventasEmpleadoClient.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -12,59 +12,56 @@ import styles from "./ventasEmpleado.module.css";
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface DetalleVenta {
-  eCodDetalle: string;
-  fkeCodVenta: string;
-  fkeCodProduct: string;
-  eCantidad: number;
+  eCodDetalle:     string;
+  fkeCodVenta:     string;
+  fkeCodProduct:   string;
+  eCantidad:       number;
   ePrecioUnitario: number;
-  eSubtotal: number;
+  eSubtotal:       number;
   producto?: {
     tNameProduct: string;
-    ImgProduct?: string;
+    ImgProduct?:  string;
   } | null;
 }
 
 interface Venta {
-  eCodVenta: string;
-  eTotal: number;
-  eMetodoPago: "efectivo" | "transferencia" | "tarjeta";
+  eCodVenta:     string;
+  eTotal:        number;
+  fkeMetodoPago:   string;
+  metodoPagoNombre:  string;   // ← nombre legible
+  metodoPagoIcono?:  string | null;
   fhCreateVenta: string;
   detalle_venta: DetalleVenta[];
 }
 
 interface Props {
-  ventas: Venta[];
-  totalHoy: number;
+  ventas:      Venta[];
+  totalHoy:    number;
+  metodosPago: string[];
 }
 
-// ── Icono por método de pago ───────────────────────────────────────────────────
+// ── Config de métodos ─────────────────────────────────────────────────────────
 
-const METODO_CONFIG = {
-  efectivo: {
-    label: "Efectivo",
-    icon: <Banknote size={13} />,
-    clase: "efectivo",
-  },
-  tarjeta: {
-    label: "Tarjeta",
-    icon: <CreditCard size={13} />,
-    clase: "tarjeta",
-  },
-  transferencia: {
-    label: "QR / Transfer",
-    icon: <Smartphone size={13} />,
-    clase: "transferencia",
-  },
-} as const;
+const METODO_ICONS: Record<string, React.ReactNode> = {
+  efectivo:      <Banknote size={13} />,
+  tarjeta:       <CreditCard size={13} />,
+  transferencia: <Smartphone size={13} />,
+};
+
+const METODO_LABELS: Record<string, string> = {
+  efectivo:      "Efectivo",
+  tarjeta:       "Tarjeta",
+  transferencia: "QR / Transfer",
+};
 
 // ── Helper de periodo ─────────────────────────────────────────────────────────
- 
+
 type FiltroPeriodo = "hoy" | "semana" | "mes" | "todo";
- 
+
 function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
   const d     = new Date(fechaISO);
   const ahora = new Date();
- 
+
   if (periodo === "hoy") {
     return (
       d.getUTCFullYear() === ahora.getUTCFullYear() &&
@@ -84,7 +81,7 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
       d.getUTCFullYear() === ahora.getUTCFullYear()
     );
   }
-  return true; // "todo"
+  return true;
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -92,20 +89,23 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
 export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
-    busqueda:  "",
-    roles:     [],
-    estados:   [],
-    periodo:   "hoy",
-    metodo:    "todos",
-    empleado:  "todos",
+    busqueda: "",
+    roles:    [],
+    estados:  [],
+    periodo:  "hoy",
+    metodo:   "todos",
+    empleado: "todos",
   });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const ventasFiltradas = useMemo(() => {
     return ventas.filter((v) => {
-      const coincidePeriodo = estaEnPeriodo(v.fhCreateVenta, (filtros.periodo ?? "hoy") as FiltroPeriodo);
- 
+      const coincidePeriodo = estaEnPeriodo(
+        v.fhCreateVenta,
+        (filtros.periodo ?? "hoy") as FiltroPeriodo
+      );
+
       const folio = v.eCodVenta.slice(-8).toUpperCase();
       const coincideBusqueda =
         !filtros.busqueda ||
@@ -113,24 +113,24 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
         v.detalle_venta.some((d) =>
           d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase())
         );
- 
+
       return coincidePeriodo && coincideBusqueda;
     });
   }, [ventas, filtros]);
 
   const totalFiltrado = ventasFiltradas.reduce((acc, v) => acc + v.eTotal, 0);
-  const totalPiezas = ventasFiltradas.reduce(
+  const totalPiezas   = ventasFiltradas.reduce(
     (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0),
     0
   );
 
   return (
     <div className={styles.layout}>
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar folio o producto..."
-        />
+      <Buscador
+        valor={busqueda}
+        onChange={setBusqueda}
+        placeholder="Buscar folio o producto..."
+      />
 
       {/* ── Banner total del día ── */}
       <div className={styles.banner}>
@@ -141,8 +141,8 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
           </div>
           <div className={styles.bannerTotal}>
             {totalHoy.toLocaleString("es-MX", {
-              style: "currency",
-              currency: "MXN",
+              style:                 "currency",
+              currency:              "MXN",
               minimumFractionDigits: 2,
             })}
           </div>
@@ -160,8 +160,8 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
           {
             label: "Total periodo",
             value: totalFiltrado.toLocaleString("es-MX", {
-              style: "currency",
-              currency: "MXN",
+              style:                 "currency",
+              currency:              "MXN",
               minimumFractionDigits: 0,
             }),
             variante: "accent",
@@ -188,24 +188,21 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
       ) : (
         <div className={styles.grid}>
           {ventasFiltradas.map((venta) => {
-            const folio = venta.eCodVenta.slice(-8).toUpperCase();
-            const metodo = METODO_CONFIG[venta.eMetodoPago] ?? METODO_CONFIG.efectivo;
-            const expandida = ventaExpandida === venta.eCodVenta;
-
+            const folio       = venta.eCodVenta.slice(-8).toUpperCase();
+            const metodoLabel = venta.metodoPagoNombre;
+            const metodoClase = venta.fkeMetodoPago; // para el CSS si el id coincide con la clase
+            const expandida   = ventaExpandida === venta.eCodVenta;
             return (
               <div
                 key={venta.eCodVenta}
                 className={`${styles.card} ${expandida ? styles.cardExpandida : ""}`}
-                onClick={() =>
-                  setVentaExpandida(expandida ? null : venta.eCodVenta)
-                }
+                onClick={() => setVentaExpandida(expandida ? null : venta.eCodVenta)}
               >
                 {/* Encabezado */}
                 <div className={styles.cardHeader}>
                   <span className={styles.cardFolio}>Venta #{folio}</span>
-                  <span className={`${styles.cardMetodo} ${styles[`metodo_${metodo.clase}`]}`}>
-                    {metodo.icon}
-                    {metodo.label}
+                  <span className={`${styles.cardMetodo} ${styles[`metodo_${metodoClase}`] ?? styles.metodo_efectivo}`}>
+                    {metodoLabel}
                   </span>
                 </div>
 

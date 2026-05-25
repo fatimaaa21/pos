@@ -7,6 +7,12 @@
     padding: 16px;
 }
 
+/* Wrapper que limita el ancho del card */
+.cardWrapper {
+    width: 100%;
+    max-width: 400px;
+}
+
 .subtitulo {
   color: var(--gray);
   font-size: 16px;
@@ -16,6 +22,7 @@
 /* section PIN Inputs */
 .inputs {
   display: flex;
+  padding: 24px;
   justify-content: center;
   gap: 12px;
 }
@@ -70,17 +77,14 @@
 }
 
 /* Logo */
-.logo {
+.logo img{
   width: 64px;
   height: 64px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #d4a574, #a86530);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 30px;
-  margin: 0 auto 16px;
-  box-shadow: 0 8px 24px rgba(193,127,62,0.25);
+  margin: 24px auto 24px;
+  box-shadow: var(--shadow-lg);
 }
 
 /* Error */

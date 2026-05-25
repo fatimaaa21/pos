@@ -1,29 +1,27 @@
-// src/app/admin/ventas/ModalVerVenta.tsx
 "use client";
 
-import { Modal } from "@/components/ui/Modal";
-import { Badge } from "@/components/ui/Badge";
+import * as Icons from "lucide-react";
+import { Modal }  from "@/components/ui/Modal";
 import { formatFechaHora } from "@/lib/utils/fecha";
-import type { VentaAdmin } from "./ventasAdminClient";
+import type { VentaAdmin }       from "./ventasAdminClient";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./ventasAdmin.module.css";
-import { Banknote, CreditCard, Smartphone } from "lucide-react";
 
 interface Props {
-  venta:   VentaAdmin;
-  onClose: () => void;
+  venta:       VentaAdmin;
+  metodosPago: MetodoPagoGlobal[];
+  onClose:     () => void;
 }
 
-const METODO_CONFIG = {
-  efectivo:      { label: "Efectivo",      icon: <Banknote   size={14} /> },
-  tarjeta:       { label: "Tarjeta",       icon: <CreditCard size={14} /> },
-  transferencia: { label: "QR / Transfer", icon: <Smartphone size={14} /> },
-} as const;
-
-export function ModalVerVenta({ venta, onClose }: Props) {
-  const folio  = venta.eCodVenta.slice(-8).toUpperCase();
-  const metodo = METODO_CONFIG[venta.eMetodoPago] ?? METODO_CONFIG.efectivo;
+export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
+  const folio    = venta.eCodVenta.slice(-8).toUpperCase();
   const subtotal = venta.detalle_venta.reduce((acc, d) => acc + d.eSubtotal, 0);
   const iva      = venta.eTotal - subtotal > 0.01 ? venta.eTotal - subtotal : null;
+
+  // Resolver método desde eCodPay
+  const metodo = metodosPago.find((m) => m.eCodPay === venta.fkeMetodoPago);
+  const Icono  = metodo ? ((Icons as any)[metodo.tIconPay] ?? Icons.CreditCard) : Icons.CreditCard;
+  const nombreMetodo = metodo?.tNamePay ?? venta.fkeMetodoPago;
 
   return (
     <Modal
@@ -32,7 +30,7 @@ export function ModalVerVenta({ venta, onClose }: Props) {
       labelCancelar="Cerrar"
       ancho="sm"
     >
-      {/* Encabezado de la venta */}
+      {/* Encabezado */}
       <div className={styles.modalHeader}>
         <div className={styles.modalHeaderInfo}>
           <div className={styles.modalFecha}>{formatFechaHora(venta.fhCreateVenta)}</div>
@@ -43,13 +41,15 @@ export function ModalVerVenta({ venta, onClose }: Props) {
             <span>{venta.empleado?.tNameUser ?? "Empleado desconocido"}</span>
           </div>
         </div>
-        <span className={`${styles.metodoBadge} ${styles[`metodo_${venta.eMetodoPago}`]}`}>
-          {metodo.icon}
-          {metodo.label}
+
+        {/* Badge método dinámico */}
+        <span className={styles.metodoBadge}>
+          <Icono size={13} />
+          {nombreMetodo}
         </span>
       </div>
 
-      {/* Detalle de productos */}
+      {/* Detalle */}
       <div className={styles.modalDetalle}>
         <div className={styles.modalDetalleHeader}>
           <span>Pzas</span>
@@ -61,15 +61,9 @@ export function ModalVerVenta({ venta, onClose }: Props) {
         {venta.detalle_venta.map((d) => (
           <div key={d.eCodDetalle} className={styles.modalDetalleRow}>
             <span className={styles.modalCantidad}>{d.eCantidad}</span>
-            <span className={styles.modalNombre}>
-              {d.producto?.tNameProduct ?? "—"}
-            </span>
-            <span className={styles.modalPrecio}>
-              ${d.ePrecioUnitario.toFixed(2)}
-            </span>
-            <span className={styles.modalSubtotal}>
-              ${d.eSubtotal.toFixed(2)}
-            </span>
+            <span className={styles.modalNombre}>{d.producto?.tNameProduct ?? "—"}</span>
+            <span className={styles.modalPrecio}>${d.ePrecioUnitario.toFixed(2)}</span>
+            <span className={styles.modalSubtotal}>${d.eSubtotal.toFixed(2)}</span>
           </div>
         ))}
       </div>

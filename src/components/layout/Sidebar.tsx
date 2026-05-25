@@ -18,27 +18,28 @@ import {
   Building2,
   Settings,
   ChevronUp,
+  CircleDollarSign,
 } from "lucide-react";
 
 const navAdmin = [
-  { icon: LayoutDashboard,  label: "Dashboard",  href: "/admin/dashboard" },
-  { icon: BookOpenText,     label: "Catálogo",   href: "/admin/catalogo" },
-  { icon: Package,          label: "Productos",  href: "/admin/productos" },
-  { icon: ClipboardPenLine, label: "Inventario", href: "/admin/inventario" },
+  { icon: LayoutDashboard,  label: "Dashboard",  href: "/admin/dashboard"   },
+  { icon: BookOpenText,     label: "Catálogo",   href: "/admin/catalogo"    },
+  { icon: Package,          label: "Productos",  href: "/admin/productos"   },
+  { icon: ClipboardPenLine, label: "Inventario", href: "/admin/inventario"  },
   { icon: BarChart2,        label: "Ventas",     href: "/admin/ventasAdmin" },
-  { icon: Users,            label: "Usuarios",   href: "/admin/usuarios" },
+  { icon: Users,            label: "Usuarios",   href: "/admin/usuarios"    },
 ];
 
 const navEmpleado = [
-  { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu" },
-  { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario" },
-  { icon: Users,            label: "Mis ventas", href: "/empleado/ventasEmpleado" },
+  { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"            },
+  { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"      },
+  { icon: Users,            label: "Mis ventas", href: "/empleado/ventasEmpleado"  },
 ];
 
 const navSistemas = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/sistemas/dashboard" },
-  { icon: Building2,       label: "Negocios",  href: "/sistemas/negocios" },
-  { icon: Building2,       label: "Métodos Pagos",  href: "/sistemas/metodosPago" },
+  { icon: LayoutDashboard,   label: "Dashboard",     href: "/sistemas/dashboard"   },
+  { icon: Building2,         label: "Negocios",      href: "/sistemas/negocios"    },
+  { icon: CircleDollarSign,  label: "Pagos", href: "/sistemas/metodosPago" },
 ];
 
 interface NegocioInfo {
@@ -61,7 +62,8 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
     perfil.tRolUser === "sistemas" ? navSistemas :
     navEmpleado;
 
-  const esAdmin = perfil.tRolUser === "admin";
+  const esAdmin    = perfil.tRolUser === "admin";
+  const esSistemas = perfil.tRolUser === "sistemas";
 
   const iniciales = perfil.tNameUser
     .split(" ")
@@ -89,10 +91,26 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [popupAbierto]);
 
-  return (
-    <aside className={styles.sidebar}>
+  // ── Logo header según rol ─────────────────────────────────────────────────
+  function renderLogo() {
+    // Sistemas: logo de Kivi desde /public
+    if (esSistemas) {
+      return (
+        <div className={styles.logo}>
+          <img
+            src="/kivi-logo.svg"
+            alt="Kivi"
+            className={styles.logoImg}
+          />
+          <div className={styles.logoTextos}>
+            <div className={styles.logoText}>Kivi</div>
+          </div>
+        </div>
+      );
+    }
 
-      {/* ── Logo del negocio ── */}
+    // Admin / Empleado: logo del negocio o fallback de iniciales
+    return (
       <div className={styles.logo}>
         {negocio?.imgCompany ? (
           <img
@@ -107,10 +125,18 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
         )}
         <div className={styles.logoTextos}>
           <div className={styles.logoText}>
-            {negocio?.tNameCompany ?? "Mi negocio"}
+            {negocio?.tNameCompany ?? "Kivi"}
           </div>
         </div>
       </div>
+    );
+  }
+
+  return (
+    <aside className={styles.sidebar}>
+
+      {/* ── Logo ── */}
+      {renderLogo()}
 
       {/* ── Navegación ── */}
       <nav className={styles.nav}>

@@ -94,6 +94,8 @@ export interface Venta {
   empleado?: Perfil;
   eTotal: number;
   fkeMetodoPago: MetodoPago;
+  metodoPagoNombre:  string;   // ← nombre legible
+  metodoPagoIcono?:  string | null;
   fhCreateVenta: string;
 }
 
