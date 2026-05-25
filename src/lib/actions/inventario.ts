@@ -9,14 +9,18 @@ export async function agregarStock(formData: FormData) {
     const adminClient = createAdminClient();
 
     const fkeCodProduct  = formData.get("fkeCodProduct") as string;
-    const eCantIngresada = parseFloat(formData.get("eCantIngresada") as string);
-    const eStockMinimo   = parseFloat(formData.get("eStockMinimo") as string);
+    const bIlimitado      = formData.get("bUnlimitedInventory") === "true";
+    const eCantIngresada = bIlimitado ? null : parseFloat(formData.get("eCantIngresada") as string);
+    const eStockMinimo   = bIlimitado ? null : parseFloat(formData.get("eStockMinimo") as string);
 
-    if (!fkeCodProduct || isNaN(eCantIngresada) || eCantIngresada <= 0) {
-      return { error: "Datos inválidos" };
+    if (!fkeCodProduct) {
+      return { error: "Selecciona un producto" };
     }
 
-    // ── Obtener fkeCodCompany desde el producto ───────────────────────────
+    if (!bIlimitado && (eCantIngresada === null || isNaN(eCantIngresada) || eCantIngresada <= 0)) {
+      return { error: "Ingresa una cantidad válida" };
+    }
+
     const { data: producto, error: productoError } = await adminClient
       .from("productos")
       .select("fkeCodCompany")
@@ -34,23 +38,24 @@ export async function agregarStock(formData: FormData) {
       .from("inventario")
       .insert({
         fkeCodProduct,
-        fkeCodCompany,        // ← esto faltaba
-        eCantIngresada,
-        eStockMinimo,
-        bStateInventory: true,
-        fhCreateInventory: ahora,
-        fhUpdateInventory: ahora,
+        fkeCodCompany,
+        bUnlimitedInventory: bIlimitado,
+        eCantIngresada:      bIlimitado ? null : eCantIngresada,
+        eStockMinimo:        bIlimitado ? null : (isNaN(eStockMinimo!) ? 0 : eStockMinimo),
+        bStateInventory:     true,
+        fhCreateInventory:   ahora,
+        fhUpdateInventory:   ahora,
       })
       .select(`
         *,
         productos!inventario_fkeCodProduct_fkey (
-            eCodProduct,
-            tNameProduct,
-            ImgProduct,
-            ePriceProduct,
-            categorias ( tNameCategory )
+          eCodProduct,
+          tNameProduct,
+          ImgProduct,
+          ePriceProduct,
+          categorias ( tNameCategory )
         )
-        `)
+      `)
       .single();
 
     if (error) return { error: `Error al agregar stock: ${error.message}` };
@@ -72,13 +77,17 @@ export async function editarStock(formData: FormData) {
 
     const { data: actual, error: errorLectura } = await adminClient
       .from("inventario")
-      .select("eCantIngresada")
+      .select("eCantIngresada, bUnlimitedInventory")
       .eq("eCodInventory", eCodInventory)
       .single();
 
     if (errorLectura || !actual) return { error: "No se encontró el registro" };
 
-    const nuevaCantIngresada = actual.eCantIngresada + eCantAgregar;
+    if (actual.bUnlimitedInventory) {
+      return { error: "Este producto tiene stock infinito, no requiere actualización de cantidad" };
+    }
+
+    const nuevaCantIngresada = (actual.eCantIngresada ?? 0) + eCantAgregar;
 
     const { data: inventario, error } = await adminClient
       .from("inventario")
@@ -93,8 +102,6 @@ export async function editarStock(formData: FormData) {
 
     if (error) return { error: `Error al actualizar: ${error.message}` };
 
-    // ── Recalcular si debe estar activo ──────────────────────────────────
-    // Leer el restante real desde la vista después de actualizar
     const { data: vistaActual } = await adminClient
       .from("vista_inventario")
       .select("eCantRestante")
@@ -102,13 +109,12 @@ export async function editarStock(formData: FormData) {
       .single();
 
     if (vistaActual) {
-      const debeEstarActivo = vistaActual.eCantRestante > 0;
+      const debeEstarActivo = (vistaActual.eCantRestante ?? 0) > 0;
       await adminClient
         .from("inventario")
         .update({ bStateInventory: debeEstarActivo })
         .eq("eCodInventory", eCodInventory);
     }
-    // ─────────────────────────────────────────────────────────────────────
 
     revalidatePath("/admin/inventario");
     revalidatePath("/empleado/menu");
@@ -125,7 +131,7 @@ export async function toggleEstadoInventario(eCodInventory: string, nuevoEstado:
     const { error } = await adminClient
       .from("inventario")
       .update({
-        bStateInventory: nuevoEstado,
+        bStateInventory:   nuevoEstado,
         fhUpdateInventory: new Date().toISOString(),
       })
       .eq("eCodInventory", eCodInventory);

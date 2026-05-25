@@ -58,20 +58,27 @@ export interface Inventario {
   fkeCodCompany: string;
   eCodInventory: string;
   fkeCodProduct: string;
-  eCantIngresada: number;
+  eCantIngresada: number | null;
   eCantVendida: number;
-  eCantRestante: number;
-  eStockMinimo: number;
+  eCantRestante: number | null;
+  eStockMinimo: number | null;
+  bUnlimitedInventory: boolean;
   fhCreateInventory?: string;
   fhUpdateInventory?: string;
   bStateInventory?: boolean;
 }
 
-export type EstadoStock = "disponible" | "bajo" | "agotado";
+export type EstadoStock = "disponible" | "bajo" | "agotado" | "ilimitado";
 
-export function getEstadoStock(restante: number, minimo: number): EstadoStock {
+export function getEstadoStock(
+  restante: number | null,
+  minimo: number | null,
+  ilimitado?: boolean
+): EstadoStock {
+  if (ilimitado) return "ilimitado";
+  if (restante === null) return "ilimitado";
   if (restante === 0) return "agotado";
-  if (restante <= minimo) return "bajo";
+  if (minimo !== null && restante <= minimo) return "bajo";
   return "disponible";
 }
 
@@ -82,9 +89,9 @@ export interface ProductoConStock {
   ePriceProduct: number;
   ImgProduct?: string;
   stockDisponible: number;
+  bIlimitado?: boolean;
 }
 
-// MetodoPago ahora es string (eCodPay uuid) en lugar de union type hardcodeado
 export type MetodoPago = string;
 
 export interface Venta {
@@ -94,8 +101,8 @@ export interface Venta {
   empleado?: Perfil;
   eTotal: number;
   fkeMetodoPago: MetodoPago;
-  metodoPagoNombre:  string;   // ← nombre legible
-  metodoPagoIcono?:  string | null;
+  metodoPagoNombre: string;
+  metodoPagoIcono?: string | null;
   fhCreateVenta: string;
 }
 
