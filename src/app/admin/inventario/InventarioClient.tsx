@@ -18,8 +18,6 @@ import { eliminarInventario, toggleEstadoInventario } from "@/lib/actions/invent
 import { getEstadoStock } from "@/types";
 import styles from "./inventario.module.css";
 
-// ── Tipo extendido con join ───────────────────────────────────────────────────
-// Supabase devuelve el producto anidado cuando se hace el select con join
 export interface InventarioConProducto extends Inventario {
   productos?: {
     tNameProduct: string;
@@ -37,25 +35,24 @@ interface Props {
 }
 
 export function InventarioClient({ inventario: inicial }: Props) {
-    const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
-    const [busqueda, setBusqueda] = useState("");
-    const router = useRouter();
-    const [filtros, setFiltros] = useState<FiltrosUsuario>({
-        busqueda:   "",
-        roles:      [],
-        estados:    [],
-        categorias: [],
-        stocks:     [],
-    });
-    const [modalAgregar, setModalAgregar] = useState(false);
-    const [stockVer, setStockVer] = useState<Inventario | null>(null);
-    const [stockEditar, setStockEditar] = useState<Inventario | null>(null);
-    const [seleccionados, setSeleccionados] = useState<string[]>([]);
-    const [eliminando, setEliminando] = useState<string | null>(null);
-    const [toggleando, setToggleando] = useState<string | null>(null);
+  const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
+  const [busqueda, setBusqueda] = useState("");
+  const router = useRouter();
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    busqueda:   "",
+    roles:      [],
+    estados:    [],
+    categorias: [],
+    stocks:     [],
+  });
+  const [modalAgregar, setModalAgregar] = useState(false);
+  const [stockVer,     setStockVer]     = useState<Inventario | null>(null);
+  const [stockEditar,  setStockEditar]  = useState<Inventario | null>(null);
+  const [seleccionados, setSeleccionados] = useState<string[]>([]);
+  const [eliminando,  setEliminando]    = useState<string | null>(null);
+  const [toggleando,  setToggleando]    = useState<string | null>(null);
 
-    // ── Opciones de categoría derivadas del inventario ───────────────────────
-  // Extraemos las categorías únicas que realmente están en el inventario actual
+  // ── Opciones de categoría derivadas del inventario ────────────────────────
   const opcionesCategorias = Array.from(
     new Map(
       inventario
@@ -70,29 +67,24 @@ export function InventarioClient({ inventario: inicial }: Props) {
     ).values()
   ).sort((a, b) => a.label.localeCompare(b.label));
 
-  /// ── Filtrado ──────────────────────────────────────────────────────────────
+  // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = inventario.filter((c) => {
-    // Búsqueda por texto (nombre producto o categoría)
     const texto = filtros.busqueda.toLowerCase();
     const nombreProducto  = c.productos?.tNameProduct?.toLowerCase() ?? "";
     const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
     const coincideTexto   = !texto || nombreProducto.includes(texto) || nombreCategoria.includes(texto);
- 
-    // Estado activo/inactivo
-    const estadoValor   = c.bStateInventory ? "activo" : "inactivo";
-    const coincideEstado =
-      filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
- 
-    // Categoría (por eCodCategory)
-    const codCategoria   = c.productos?.categorias?.eCodCategory ?? "";
-    const coincideCategoria =
-      !filtros.categorias?.length || filtros.categorias.includes(codCategoria);
- 
-    // Stock (disponible / bajo / agotado)
-    const estadoStock = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-    const coincideStock =
-      !filtros.stocks?.length || filtros.stocks.includes(estadoStock);
- 
+
+    const estadoValor    = c.bStateInventory ? "activo" : "inactivo";
+    const coincideEstado = filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
+
+    const codCategoria      = c.productos?.categorias?.eCodCategory ?? "";
+    const coincideCategoria = !filtros.categorias?.length || filtros.categorias.includes(codCategoria);
+
+    const estadoStock   = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+    // "ilimitado" se trata como "disponible" en el filtro de stock
+    const stockNorm     = estadoStock === "ilimitado" ? "disponible" : estadoStock;
+    const coincideStock = !filtros.stocks?.length || filtros.stocks.includes(stockNorm);
+
     return coincideTexto && coincideEstado && coincideCategoria && coincideStock;
   });
 
@@ -104,19 +96,17 @@ export function InventarioClient({ inventario: inicial }: Props) {
   }
 
   function handleStockEditado(actualizado: Inventario) {
-      setInventario((prev) =>
-        prev.map((c) =>
-          c.eCodInventory === actualizado.eCodInventory
-            ? { ...actualizado } // preservar productos del estado local
-            : c
-        )
-      );
-      setStockEditar(null);
-      router.refresh();
-    }
+    setInventario((prev) =>
+      prev.map((c) =>
+        c.eCodInventory === actualizado.eCodInventory ? { ...actualizado } : c
+      )
+    );
+    setStockEditar(null);
+    router.refresh();
+  }
 
   async function handleEliminar(item: InventarioConProducto) {
-    if (!confirm(`¿Eliminar este registro de inventario? Esta acción no se puede deshacer.`)) return;
+    if (!confirm("¿Eliminar este registro de inventario? Esta acción no se puede deshacer.")) return;
     setEliminando(item.eCodInventory);
     const result = await eliminarInventario(item.eCodInventory);
     if (!result?.error) {
@@ -141,26 +131,28 @@ export function InventarioClient({ inventario: inicial }: Props) {
   }
 
   async function recargar() {
-  const supabase = createClient();
-  const { data } = await supabase
-    .from("vista_inventario")
-    .select(`
-      *,
-      productos!inventario_fkeCodProduct_fkey (
-        tNameProduct,
-        ImgProduct,
-        ePriceProduct,
-        categorias ( tNameCategory )
-      )
-    `)
-    .order("fhCreateInventory", { ascending: false });
-
-  if (data) setInventario(data as InventarioConProducto[]);
-}
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("vista_inventario")
+      .select(`
+        *,
+        productos!inventario_fkeCodProduct_fkey (
+          tNameProduct,
+          ImgProduct,
+          ePriceProduct,
+          categorias ( tNameCategory )
+        )
+      `)
+      .order("fhCreateInventory", { ascending: false });
+    if (data) setInventario(data as InventarioConProducto[]);
+  }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const disponibles = inventario.filter(
-    (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "disponible"
+    (p) => {
+      const e = getEstadoStock(p.eCantRestante, p.eStockMinimo);
+      return e === "disponible" || e === "ilimitado";
+    }
   ).length;
   const stockBajo = inventario.filter(
     (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "bajo"
@@ -172,79 +164,66 @@ export function InventarioClient({ inventario: inicial }: Props) {
   // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<InventarioConProducto>[] = [
     {
-  key: "tNameProduct",
-  label: "Producto",
-  render: (c) => {
-    const producto = c.productos;
-
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div className={styles.avatar}>
-          {producto?.ImgProduct ? (
-            <img
-              src={producto.ImgProduct}
-              alt={producto.tNameProduct ?? "Producto"}
-              onError={(e) => { e.currentTarget.style.display = "none"; }}
-            />
-          ) : (
-            <span>📦</span>
-          )}
-        </div>
-        <div>
-          <span>
-            {producto?.tNameProduct ?? "Sin nombre"}
-          </span>
-        </div>
-      </div>
-    );
-  },
-},
+      key: "tNameProduct",
+      label: "Producto",
+      render: (c) => {
+        const producto = c.productos;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className={styles.avatar}>
+              {producto?.ImgProduct ? (
+                <img
+                  src={producto.ImgProduct}
+                  alt={producto.tNameProduct ?? "Producto"}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span>📦</span>
+              )}
+            </div>
+            <span>{producto?.tNameProduct ?? "Sin nombre"}</span>
+          </div>
+        );
+      },
+    },
     {
       key: "tNameCategory",
       label: "Categoría",
       render: (c) => (
-        <span>
-            {c.productos?.categorias?.tNameCategory ?? "Sin categoría"}
-        </span>
+        <span>{c.productos?.categorias?.tNameCategory ?? "Sin categoría"}</span>
       ),
     },
     {
       key: "eCantIngresada",
       label: "Ingresadas",
-      render: (c) => (
-        <span>
-          {c.eCantIngresada}
-        </span>
-      ),
+      render: (c) => <span>{c.eCantIngresada}</span>,
     },
     {
       key: "eCantVendida",
       label: "Vendidas",
-      render: (c) => (
-        <span>{c.eCantVendida ?? 0}</span>
-      ),
+      render: (c) => <span>{c.eCantVendida ?? 0}</span>,
     },
     {
-  key: "eCantRestante",
-  label: "Restantes",
-  render: (c) => {
-    const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-    const variante = estado === "disponible" ? "disponible" : estado === "bajo" ? "bajo" : "agotado";
-    return (
-      <Badge variante={variante} dot={false}>
-        {c.eCantRestante}
-      </Badge>
-    );
-  },
-},
+      key: "eCantRestante",
+      label: "Restantes",
+      render: (c) => {
+        const estado = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+        const variante =
+          estado === "ilimitado" ? "ilimitado"  as const
+          : estado === "bajo"    ? "bajo"        as const
+          : estado === "agotado" ? "agotado"     as const
+          : "disponible"                          as const;
+        return (
+          <Badge variante={variante} dot={false}>
+            {c.eCantRestante}
+          </Badge>
+        );
+      },
+    },
     {
       key: "ePriceProduct",
       label: "Precio",
-      render: (c) => (
-        <span>
-          $ {c.productos?.ePriceProduct?.toFixed(2) ?? "—"}
-        </span>
-      ),
+      render: (c) => <span>$ {c.productos?.ePriceProduct?.toFixed(2) ?? "—"}</span>,
     },
     {
       key: "bStateInventory",
@@ -262,20 +241,22 @@ export function InventarioClient({ inventario: inicial }: Props) {
       label: "Acciones",
       render: (c) => (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <ActionBtn title="Ver detalles" onClick={() => setStockVer(c)}>
-                <Eye size={18} />
+          <ActionBtn title="Ver detalles" onClick={() => setStockVer(c)}>
+            <Eye size={18} />
+          </ActionBtn>
+          {!c.bUnlimitedInventory && (
+            <ActionBtn title="Agregar unidades" onClick={() => setStockEditar(c)}>
+              <Pencil size={18} />
             </ActionBtn>
-            <ActionBtn title="Editar" onClick={() => setStockEditar(c)}>
-                <Pencil size={18} />
-            </ActionBtn>
-            <ActionBtn
-                title="Eliminar"
-                onClick={() => handleEliminar(c)}
-                loading={eliminando === c.eCodInventory}
-                danger
-            >
-                <Trash2 size={18} />
-            </ActionBtn>
+          )}
+          <ActionBtn
+            title="Eliminar"
+            onClick={() => handleEliminar(c)}
+            loading={eliminando === c.eCodInventory}
+            danger
+          >
+            <Trash2 size={18} />
+          </ActionBtn>
         </div>
       ),
     },
@@ -298,10 +279,10 @@ export function InventarioClient({ inventario: inicial }: Props) {
       />
 
       <StatCards stats={[
-        { label: "Productos en inventario", value: inventario.length,  variante: "primary" },
-        { label: "Disponibles",             value: disponibles,         variante: "success" },
-        { label: "Stock bajo",              value: stockBajo,           variante: "warning" },
-        { label: "Agotados",                value: agotados,            variante: "error"   },
+        { label: "Productos en inventario", value: inventario.length, variante: "primary" },
+        { label: "Disponibles",             value: disponibles,        variante: "success" },
+        { label: "Stock bajo",              value: stockBajo,          variante: "warning" },
+        { label: "Agotados",                value: agotados,           variante: "error"   },
       ]} />
 
       <TablaToolbar
@@ -322,26 +303,26 @@ export function InventarioClient({ inventario: inicial }: Props) {
         onSeleccionar={setSeleccionados}
         vacio="No hay productos en inventario"
       />
-        {/* Modales */}
-        {modalAgregar && (
-            <ModalAgregarStock
-            onClose={() => setModalAgregar(false)}
-            onAgregado={handleStockAgregado}
-            />
-        )}
-        {stockVer && (
-            <ModalVerStock
-                inventario={stockVer}
-                onClose={() => setStockVer(null)}
-            />
-        )}
-        {stockEditar && (
-            <ModalEditarStock
-                inventario={stockEditar}
-                onClose={() => setStockEditar(null)}
-                onEditado={handleStockEditado}
-            />
-        )}
+
+      {modalAgregar && (
+        <ModalAgregarStock
+          onClose={() => setModalAgregar(false)}
+          onAgregado={handleStockAgregado}
+        />
+      )}
+      {stockVer && (
+        <ModalVerStock
+          inventario={stockVer}
+          onClose={() => setStockVer(null)}
+        />
+      )}
+      {stockEditar && (
+        <ModalEditarStock
+          inventario={stockEditar}
+          onClose={() => setStockEditar(null)}
+          onEditado={handleStockEditado}
+        />
+      )}
     </div>
   );
 }

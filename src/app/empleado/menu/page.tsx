@@ -8,7 +8,6 @@ export default async function MenuPage() {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
 
-  // ── Usuario y negocio ─────────────────────────────────────────────────────
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: perfil } = await supabase
@@ -19,8 +18,7 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Métodos de pago activos del negocio ───────────────────────────────────
-  // 1. IDs seleccionados por el admin
+  // ── Métodos de pago ───────────────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago")
@@ -28,9 +26,8 @@ export default async function MenuPage() {
     .single();
 
   const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
-
-  // 2. Datos completos de esos métodos (en el orden definido por Sistemas)
   let metodosPago: MetodoPagoGlobal[] = [];
+
   if (idsSeleccionados.length > 0) {
     const { data: metodos } = await adminClient
       .from("metodos_pago")
@@ -38,7 +35,6 @@ export default async function MenuPage() {
       .in("eCodPay", idsSeleccionados)
       .eq("bStatePay", true)
       .order("orden");
-
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
@@ -49,14 +45,14 @@ export default async function MenuPage() {
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Stock ─────────────────────────────────────────────────────────────────
+  // ── Inventario: lotes con stock > 0 ó infinitos, ambos activos ────────────
   const { data: lotes, error } = await supabase
     .from("vista_inventario")
-    .select("fkeCodProduct, eCantRestante")
+    .select("fkeCodProduct, eCantRestante, bUnlimitedInventory")
     .eq("bStateInventory", true)
-    .gt("eCantRestante", 0);
+    .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
 
-  if (error) console.error("Error:", JSON.stringify(error));
+  if (error) console.error("Error menú:", JSON.stringify(error));
 
   if (!lotes || lotes.length === 0) {
     return (
@@ -76,10 +72,17 @@ export default async function MenuPage() {
     .in("eCodProduct", idsConStock)
     .eq("bStateProduct", true);
 
-  const stockPorProducto = new Map<string, number>();
+  // Calcular stock y marcar infinitos
+  const stockPorProducto    = new Map<string, number>();
+  const infinitoPorProducto = new Map<string, boolean>();
+
   for (const lote of lotes) {
-    const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
-    stockPorProducto.set(lote.fkeCodProduct, actual + lote.eCantRestante);
+    if (lote.bUnlimitedInventory) {
+      infinitoPorProducto.set(lote.fkeCodProduct, true);
+    } else {
+      const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
+      stockPorProducto.set(lote.fkeCodProduct, actual + (lote.eCantRestante ?? 0));
+    }
   }
 
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => ({
@@ -88,7 +91,11 @@ export default async function MenuPage() {
     fkeCodCategory:  p.fkeCodCategory,
     ePriceProduct:   p.ePriceProduct,
     ImgProduct:      p.ImgProduct,
-    stockDisponible: stockPorProducto.get(p.eCodProduct) ?? 0,
+    bInfinito:       infinitoPorProducto.get(p.eCodProduct) ?? false,
+    // Centinela: Number.MAX_SAFE_INTEGER nunca bloquea el botón + en el carrito
+    stockDisponible: infinitoPorProducto.get(p.eCodProduct)
+      ? Number.MAX_SAFE_INTEGER
+      : (stockPorProducto.get(p.eCodProduct) ?? 0),
   }));
 
   return (

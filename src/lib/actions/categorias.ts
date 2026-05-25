@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import type { Categoria } from "@/types";
 import { revalidatePath } from "next/cache";
 
@@ -8,26 +9,36 @@ import { revalidatePath } from "next/cache";
 export async function crearCategoria(formData: FormData) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    // Obtener el negocio del admin actual
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
 
     const tNameCategory = formData.get("tNameCategory") as string;
-    const ImgCategory = formData.get("ImgCategory") as string;
-
-    console.log("[crearCategoria] tNameCategory:", tNameCategory);
-    console.log("[crearCategoria] ImgCategory:", ImgCategory);
+    const ImgCategory   = formData.get("ImgCategory") as string;
 
     const { data: categoria, error: categoriaError } = await adminClient
       .from("categorias")
       .insert({
+        fkeCodCompany:    perfil.fkeCodCompany,
         tNameCategory,
-        ImgCategory: ImgCategory || null,   // null si viene vacío, nunca "EMPTY"
-        bStateCategory: true,
+        ImgCategory:      ImgCategory || null,
+        bStateCategory:   true,
         fhCreateCategory: new Date().toISOString(),
       })
       .select()
       .single();
 
     if (categoriaError) {
-      console.error("[crearCategoria] error:", categoriaError);
       return { error: `Error al crear categoría: ${categoriaError.message}` };
     }
 

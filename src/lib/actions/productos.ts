@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import type { Producto } from "@/types";
 import { revalidatePath } from "next/cache";
 
@@ -8,22 +9,36 @@ import { revalidatePath } from "next/cache";
 export async function crearProducto(formData: FormData) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
 
-    const tNameProduct = formData.get("tNameProduct") as string;
-    const ImgProduct = formData.get("ImgProduct") as string;
-    const ePriceProduct = parseFloat(formData.get("ePriceProduct") as string);
-    const eCostProduct = parseFloat(formData.get("eCostProduct") as string);
+    // Obtener el negocio del admin actual
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const tNameProduct   = formData.get("tNameProduct") as string;
+    const ImgProduct     = formData.get("ImgProduct") as string;
+    const ePriceProduct  = parseFloat(formData.get("ePriceProduct") as string);
+    const eCostProduct   = parseFloat(formData.get("eCostProduct") as string);
     const fkeCodCategory = formData.get("fkeCodCategory") as string;
 
     const { data: producto, error: productoError } = await adminClient
       .from("productos")
       .insert({
+        fkeCodCompany:   perfil.fkeCodCompany,
         tNameProduct,
-        ImgProduct: ImgProduct || null,   // null si viene vacío
+        ImgProduct:      ImgProduct || null,
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
-        bStateProduct: true,
+        bStateProduct:   true,
         fhCreateProduct: new Date().toISOString(),
       })
       .select()

@@ -1,58 +1,32 @@
-// src/app/empleado/ventasEmpleado/ventasEmpleadoClient.tsx
 "use client";
 
 import { useState, useMemo } from "react";
-import { Banknote, CreditCard, Smartphone, ShoppingBag, TrendingUp } from "lucide-react";
-import { Buscador } from "@/components/ui/Buscador";
-import { StatCards } from "@/components/ui/Statscards";
+import { ShoppingBag, TrendingUp } from "lucide-react";
+import { Buscador }     from "@/components/ui/Buscador";
+import { StatCards }    from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
+import type { DetalleVentaConProducto } from "@/types";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./ventasEmpleado.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-interface DetalleVenta {
-  eCodDetalle:     string;
-  fkeCodVenta:     string;
-  fkeCodProduct:   string;
-  eCantidad:       number;
-  ePrecioUnitario: number;
-  eSubtotal:       number;
-  producto?: {
-    tNameProduct: string;
-    ImgProduct?:  string;
-  } | null;
-}
-
 interface Venta {
-  eCodVenta:     string;
-  eTotal:        number;
-  fkeMetodoPago:   string;
-  metodoPagoNombre:  string;   // ← nombre legible
-  metodoPagoIcono?:  string | null;
-  fhCreateVenta: string;
-  detalle_venta: DetalleVenta[];
+  eCodVenta:        string;
+  eTotal:           number;
+  fkeMetodoPago:    string;
+  metodoPagoNombre: string;
+  metodoPagoIcono?: string | null;
+  fhCreateVenta:    string;
+  detalle_venta:    DetalleVentaConProducto[];
 }
 
 interface Props {
   ventas:      Venta[];
   totalHoy:    number;
-  metodosPago: string[];
+  metodosPago: MetodoPagoGlobal[];
 }
-
-// ── Config de métodos ─────────────────────────────────────────────────────────
-
-const METODO_ICONS: Record<string, React.ReactNode> = {
-  efectivo:      <Banknote size={13} />,
-  tarjeta:       <CreditCard size={13} />,
-  transferencia: <Smartphone size={13} />,
-};
-
-const METODO_LABELS: Record<string, string> = {
-  efectivo:      "Efectivo",
-  tarjeta:       "Tarjeta",
-  transferencia: "QR / Transfer",
-};
 
 // ── Helper de periodo ─────────────────────────────────────────────────────────
 
@@ -61,24 +35,23 @@ type FiltroPeriodo = "hoy" | "semana" | "mes" | "todo";
 function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
   const d     = new Date(fechaISO);
   const ahora = new Date();
-
   if (periodo === "hoy") {
     return (
-      d.getUTCFullYear() === ahora.getUTCFullYear() &&
-      d.getUTCMonth()    === ahora.getUTCMonth()    &&
-      d.getUTCDate()     === ahora.getUTCDate()
+      d.getFullYear() === ahora.getFullYear() &&
+      d.getMonth()    === ahora.getMonth()    &&
+      d.getDate()     === ahora.getDate()
     );
   }
   if (periodo === "semana") {
-    const hace7 = new Date(ahora);
-    hace7.setUTCDate(ahora.getUTCDate() - 7);
-    hace7.setUTCHours(0, 0, 0, 0);
-    return d >= hace7;
+    const inicioDia = new Date(ahora);
+    inicioDia.setHours(0, 0, 0, 0);
+    inicioDia.setDate(inicioDia.getDate() - 7);
+    return d >= inicioDia;
   }
   if (periodo === "mes") {
     return (
-      d.getUTCMonth()    === ahora.getUTCMonth() &&
-      d.getUTCFullYear() === ahora.getUTCFullYear()
+      d.getMonth()    === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear()
     );
   }
   return true;
@@ -86,7 +59,7 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
+export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
@@ -98,6 +71,12 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
   });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
 
+  // Opciones de método construidas desde los métodos del negocio
+  const opcionesMetodo = useMemo(() => [
+    { value: "todos", label: "Todos" },
+    ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),
+  ], [metodosPago]);
+
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const ventasFiltradas = useMemo(() => {
     return ventas.filter((v) => {
@@ -105,6 +84,9 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
         v.fhCreateVenta,
         (filtros.periodo ?? "hoy") as FiltroPeriodo
       );
+      const coincideMetodo =
+        !filtros.metodo || filtros.metodo === "todos" ||
+        v.fkeMetodoPago === filtros.metodo;
 
       const folio = v.eCodVenta.slice(-8).toUpperCase();
       const coincideBusqueda =
@@ -114,7 +96,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
           d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase())
         );
 
-      return coincidePeriodo && coincideBusqueda;
+      return coincidePeriodo && coincideMetodo && coincideBusqueda;
     });
   }, [ventas, filtros]);
 
@@ -177,6 +159,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
         ocultarRol
         ocultarEstado
         mostrarPeriodo
+        opcionesMetodo={opcionesMetodo}
       />
 
       {/* ── Grid de ventas ── */}
@@ -188,30 +171,25 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
       ) : (
         <div className={styles.grid}>
           {ventasFiltradas.map((venta) => {
-            const folio       = venta.eCodVenta.slice(-8).toUpperCase();
-            const metodoLabel = venta.metodoPagoNombre;
-            const metodoClase = venta.fkeMetodoPago; // para el CSS si el id coincide con la clase
-            const expandida   = ventaExpandida === venta.eCodVenta;
+            const folio    = venta.eCodVenta.slice(-8).toUpperCase();
+            const expandida = ventaExpandida === venta.eCodVenta;
             return (
               <div
                 key={venta.eCodVenta}
                 className={`${styles.card} ${expandida ? styles.cardExpandida : ""}`}
                 onClick={() => setVentaExpandida(expandida ? null : venta.eCodVenta)}
               >
-                {/* Encabezado */}
                 <div className={styles.cardHeader}>
                   <span className={styles.cardFolio}>Venta #{folio}</span>
-                  <span className={`${styles.cardMetodo} ${styles[`metodo_${metodoClase}`] ?? styles.metodo_efectivo}`}>
-                    {metodoLabel}
+                  <span className={`${styles.cardMetodo} ${styles[`metodo_${venta.fkeMetodoPago}`] ?? styles.metodo_efectivo}`}>
+                    {venta.metodoPagoNombre}
                   </span>
                 </div>
 
-                {/* Hora */}
                 <div className={styles.cardFecha}>
                   {formatFechaHora(venta.fhCreateVenta)}
                 </div>
 
-                {/* Tabla de productos */}
                 <div className={styles.cardDetalle}>
                   <div className={styles.cardDetalleHeader}>
                     <span>Pzas</span>
@@ -241,7 +219,6 @@ export function VentasEmpleadoClient({ ventas, totalHoy }: Props) {
                   )}
                 </div>
 
-                {/* Total */}
                 <div className={styles.cardTotal}>
                   <span className={styles.cardTotalLabel}>Monto Total</span>
                   <span className={styles.cardTotalValor}>

@@ -19,11 +19,28 @@ export default async function VentasAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
-  // ── Métodos de pago del catálogo global ───────────────────────────────────
-  const { data: metodosPago } = await adminClient
-    .from("metodos_pago")
-    .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
-    .order("orden");
+  // ── Métodos de pago activos del negocio ───────────────────────────────────
+  // 1. IDs que el admin seleccionó para su negocio
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("metodosPago")
+    .eq("eCodCompany", fkeCodCompany)
+    .single();
+
+  const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
+
+  // 2. Solo esos métodos, en el orden definido por Sistemas
+  let metodosPago: MetodoPagoGlobal[] = [];
+  if (idsSeleccionados.length > 0) {
+    const { data: metodos } = await adminClient
+      .from("metodos_pago")
+      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
+      .in("eCodPay", idsSeleccionados)
+      .eq("bStatePay", true)
+      .order("orden");
+
+    metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
+  }
 
   // ── Ventas ────────────────────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
@@ -100,7 +117,7 @@ export default async function VentasAdminPage() {
     <VentasAdminClient
       ventas={ventasCompletas}
       empleados={empleadosFiltro}
-      metodosPago={(metodosPago as MetodoPagoGlobal[]) ?? []}
+      metodosPago={metodosPago}
     />
   );
 }

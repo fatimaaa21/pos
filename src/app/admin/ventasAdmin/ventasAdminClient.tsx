@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Eye } from "lucide-react";
+import * as Icons from "lucide-react";
 import { PageHeader }   from "@/components/ui/PageHeader";
 import { StatCards }    from "@/components/ui/Statscards";
 import { Buscador }     from "@/components/ui/Buscador";
@@ -9,29 +10,20 @@ import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import { ModalVerVenta }   from "./ModalVerVenta";
+import type { DetalleVentaConProducto } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./ventasAdmin.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
-interface DetalleVenta {
-  eCodDetalle:     string;
-  fkeCodVenta:     string;
-  fkeCodProduct:   string;
-  eCantidad:       number;
-  ePrecioUnitario: number;
-  eSubtotal:       number;
-  producto?: { tNameProduct: string; ImgProduct?: string } | null;
-}
-
 export interface VentaAdmin {
   eCodVenta:     string;
   eTotal:        number;
-  fkeMetodoPago:   string;   // eCodPay del método
+  fkeMetodoPago: string;
   fhCreateVenta: string;
   fkeCodUser:    string;
   empleado?: { eCodUser: string; tNameUser: string } | null;
-  detalle_venta: DetalleVenta[];
+  detalle_venta: DetalleVentaConProducto[];
 }
 
 interface Props {
@@ -40,7 +32,7 @@ interface Props {
   metodosPago: MetodoPagoGlobal[];
 }
 
-// ── Helper: resolver método desde eCodPay ─────────────────────────────────────
+// ── Helper: badge de método dinámico ─────────────────────────────────────────
 
 function MetodoBadge({
   eCodPay,
@@ -51,32 +43,31 @@ function MetodoBadge({
 }) {
   const metodo = metodosPago.find((m) => m.eCodPay === eCodPay);
   if (!metodo) return <span style={{ color: "var(--gray)", fontSize: 13 }}>—</span>;
-
   return <span>{metodo.tNamePay}</span>;
 }
 
-// ── Filtros de periodo ────────────────────────────────────────────────────────
+// ── Filtro de periodo ─────────────────────────────────────────────────────────
 
 function estaEnPeriodo(fechaISO: string, periodo: string): boolean {
   const d     = new Date(fechaISO);
   const ahora = new Date();
   if (periodo === "hoy") {
     return (
-      d.getUTCFullYear() === ahora.getUTCFullYear() &&
-      d.getUTCMonth()    === ahora.getUTCMonth()    &&
-      d.getUTCDate()     === ahora.getUTCDate()
+      d.getFullYear() === ahora.getFullYear() &&
+      d.getMonth()    === ahora.getMonth()    &&
+      d.getDate()     === ahora.getDate()
     );
   }
   if (periodo === "semana") {
-    const hace7 = new Date(ahora);
-    hace7.setUTCDate(ahora.getUTCDate() - 7);
-    hace7.setUTCHours(0, 0, 0, 0);
-    return d >= hace7;
+    const inicioDia = new Date(ahora);
+    inicioDia.setHours(0, 0, 0, 0);
+    inicioDia.setDate(inicioDia.getDate() - 7);
+    return d >= inicioDia;
   }
   if (periodo === "mes") {
     return (
-      d.getUTCMonth()    === ahora.getUTCMonth() &&
-      d.getUTCFullYear() === ahora.getUTCFullYear()
+      d.getMonth()    === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear()
     );
   }
   return true;
@@ -97,7 +88,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [ventaVer,      setVentaVer]      = useState<VentaAdmin | null>(null);
 
-  // Opciones de método para el toolbar — dinámicas desde el catálogo
+  // Opciones de método dinámicas desde el catálogo
   const opcionesMetodo = useMemo(() => [
     { value: "todos", label: "Todos" },
     ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),

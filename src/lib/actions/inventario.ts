@@ -30,30 +30,42 @@ export async function agregarStock(formData: FormData) {
     const fkeCodCompany = producto.fkeCodCompany;
     const ahora = new Date().toISOString();
 
-    const { data, error } = await adminClient
+    const { data: insertado, error } = await adminClient
       .from("inventario")
       .insert({
         fkeCodProduct,
-        fkeCodCompany,        // ← esto faltaba
+        fkeCodCompany,
         eCantIngresada,
         eStockMinimo,
         bStateInventory: true,
         fhCreateInventory: ahora,
         fhUpdateInventory: ahora,
       })
-      .select(`
-        *,
-        productos!inventario_fkeCodProduct_fkey (
-            eCodProduct,
-            tNameProduct,
-            ImgProduct,
-            ePriceProduct,
-            categorias ( tNameCategory )
-        )
-        `)
+      .select("eCodInventory")
       .single();
 
     if (error) return { error: `Error al agregar stock: ${error.message}` };
+
+    // ── Leer desde vista_inventario para obtener eCantRestante calculado ──
+    // La tabla base no tiene eCantRestante; es un campo calculado en la vista.
+    // Si devolviéramos el insert directo, eCantRestante llegaría como 0.
+    const { data, error: vistaError } = await adminClient
+      .from("vista_inventario")
+      .select(`
+        *,
+        productos!inventario_fkeCodProduct_fkey (
+          tNameProduct,
+          ImgProduct,
+          ePriceProduct,
+          categorias ( eCodCategory, tNameCategory )
+        )
+      `)
+      .eq("eCodInventory", insertado.eCodInventory)
+      .single();
+
+    if (vistaError || !data) {
+      return { error: `Error al leer el stock creado: ${vistaError?.message}` };
+    }
 
     revalidatePath("/admin/inventario");
     return { inventario: data as Inventario };
@@ -94,7 +106,6 @@ export async function editarStock(formData: FormData) {
     if (error) return { error: `Error al actualizar: ${error.message}` };
 
     // ── Recalcular si debe estar activo ──────────────────────────────────
-    // Leer el restante real desde la vista después de actualizar
     const { data: vistaActual } = await adminClient
       .from("vista_inventario")
       .select("eCantRestante")
@@ -108,7 +119,6 @@ export async function editarStock(formData: FormData) {
         .update({ bStateInventory: debeEstarActivo })
         .eq("eCodInventory", eCodInventory);
     }
-    // ─────────────────────────────────────────────────────────────────────
 
     revalidatePath("/admin/inventario");
     revalidatePath("/empleado/menu");

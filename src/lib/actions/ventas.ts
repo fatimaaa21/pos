@@ -15,11 +15,9 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
 
-    // 1. Verificar sesión
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    // 2. Obtener fkeCodCompany del perfil del empleado
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles")
       .select("fkeCodCompany")
@@ -32,11 +30,11 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
 
     const fkeCodCompany = perfil.fkeCodCompany;
 
-    // 3. Validar stock antes de proceder
+    // 3. Validar stock — los ilimitados se saltan esta validación
     for (const item of items) {
       const { data: lote, error: loteError } = await adminClient
         .from("vista_inventario")
-        .select("eCodInventory, eCantRestante")
+        .select("eCodInventory, eCantRestante, bUnlimitedInventory")
         .eq("fkeCodProduct", item.eCodProduct)
         .eq("bStateInventory", true)
         .single();
@@ -45,7 +43,7 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
         return { error: "Producto sin inventario activo" };
       }
 
-      if (lote.eCantRestante < item.cantidad) {
+      if (!lote.bUnlimitedInventory && (lote.eCantRestante ?? 0) < item.cantidad) {
         return {
           error: `Stock insuficiente. Solo quedan ${lote.eCantRestante} unidades disponibles`,
         };
@@ -65,7 +63,7 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
         fkeCodUser:    user.id,
         fkeCodCompany,
         eTotal,
-        fkeMetodoPago,     // eCodPay del método seleccionado
+        fkeMetodoPago,
         fhCreateVenta: new Date().toISOString(),
       })
       .select("eCodVenta")
@@ -92,18 +90,26 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
       return { error: `Error al guardar detalle: ${detalleError.message}` };
     }
 
-    // 7. Descontar inventario
+    // 7. Descontar inventario — los ilimitados NO se descuentan
     for (const item of items) {
       const { data: lote } = await adminClient
         .from("vista_inventario")
-        .select("eCodInventory, eCantRestante")
+        .select("eCodInventory, eCantRestante, bUnlimitedInventory")
         .eq("fkeCodProduct", item.eCodProduct)
         .eq("bStateInventory", true)
         .single();
 
       if (!lote) continue;
 
-      const restanteTrasVenta = lote.eCantRestante - item.cantidad;
+      if (lote.bUnlimitedInventory) {
+        await adminClient
+          .from("inventario")
+          .update({ fhUpdateInventory: new Date().toISOString() })
+          .eq("eCodInventory", lote.eCodInventory);
+        continue;
+      }
+
+      const restanteTrasVenta = (lote.eCantRestante ?? 0) - item.cantidad;
       await adminClient
         .from("inventario")
         .update({

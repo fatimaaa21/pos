@@ -14,10 +14,10 @@ interface Props {
 
 export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    eCantAgregar:  "",
-    eStockMinimo:  inventario.eStockMinimo.toString(),
+  const [error, setError]     = useState<string | null>(null);
+  const [form, setForm]       = useState({
+    eCantAgregar: "",
+    eStockMinimo: (inventario.eStockMinimo ?? 0).toString(),
   });
 
   async function handleConfirmar() {
@@ -25,9 +25,9 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
     setError(null);
 
     const formData = new FormData();
-    formData.append("eCodInventory",  inventario.eCodInventory);
-    formData.append("eCantAgregar",   form.eCantAgregar);
-    formData.append("eStockMinimo",   form.eStockMinimo);
+    formData.append("eCodInventory", inventario.eCodInventory);
+    formData.append("eCantAgregar",  form.eCantAgregar);
+    formData.append("eStockMinimo",  form.eStockMinimo);
 
     const result = await editarStock(formData);
 
@@ -39,11 +39,10 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
     }
   }
 
-  const cantAgregar = parseFloat(form.eCantAgregar) || 0;
-  const nuevasCantidad = inventario.eCantIngresada + cantAgregar;
-  const nuevosRestantes = inventario.eCantRestante + cantAgregar;
-
-  const deshabilitado = cantAgregar <= 0;
+  const cantAgregar    = parseFloat(form.eCantAgregar) || 0;
+  const nuevasCantidad = (inventario.eCantIngresada ?? 0) + cantAgregar;
+  const nuevosRestantes = (inventario.eCantRestante ?? 0) + cantAgregar;
+  const deshabilitado  = cantAgregar <= 0;
 
   return (
     <Modal
@@ -92,15 +91,11 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
       </div>
 
       {/* Stock actual */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "var(--space-2)",
-      }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-2)" }}>
         {[
-          { label: "Ingresadas", valor: inventario.eCantIngresada, color: "var(--dark)" },
-          { label: "Vendidas",   valor: inventario.eCantVendida,   color: "var(--gray)" },
-          { label: "Restantes",  valor: inventario.eCantRestante,  color: "var(--color-primary)" },
+          { label: "Ingresadas", valor: inventario.eCantIngresada ?? 0, color: "var(--dark)" },
+          { label: "Vendidas",   valor: inventario.eCantVendida ?? 0,   color: "var(--gray)" },
+          { label: "Restantes",  valor: inventario.eCantRestante ?? 0,  color: "var(--color-primary)" },
         ].map(({ label, valor, color }) => (
           <div key={label} style={{
             background: "var(--background)",
@@ -116,7 +111,6 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
         ))}
       </div>
 
-      {/* Campos */}
       <ModalField label="Unidades a agregar" required>
         <ModalInput
           type="number"
@@ -138,7 +132,6 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
         />
       </ModalField>
 
-      {/* Preview del resultado */}
       {cantAgregar > 0 && (
         <ModalInfo>
           <Package size={18} />
