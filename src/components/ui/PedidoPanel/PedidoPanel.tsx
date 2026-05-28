@@ -16,6 +16,7 @@ interface Props {
   onLimpiar:    () => void;
   onFinalizar:  (metodoPago: MetodoPago) => Promise<void>;
   error?:       string | null;
+  bloqueado?: boolean;
 }
 
 const IVA = 0.16;
@@ -40,6 +41,7 @@ export function PedidoPanel({
   onLimpiar,
   onFinalizar,
   error,
+  bloqueado = false,
 }: Props) {
   const [metodoPago, setMetodoPago] = useState<string>(
     metodosPago[0]?.eCodPay ?? ""
@@ -195,7 +197,7 @@ export function PedidoPanel({
         <div className={styles.footerAccion}>
           <button
             className={styles.btnFinalizar}
-            disabled={items.length === 0 || cargando || !metodoPago}
+            disabled={items.length === 0 || cargando || !metodoPago || bloqueado}
             onClick={handleClickCobrar}
           >
             {cargando

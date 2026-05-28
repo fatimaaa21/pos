@@ -120,8 +120,34 @@ export interface DetalleVentaConProducto extends DetalleVenta {
   producto?: { tNameProduct: string; ImgProduct?: string } | null;
 }
 
-export interface ItemCarrito {
-  producto: Producto & { cantidad_disponible: number };
-  cantidad: number;
-  subtotal: number;
+export interface VentasDelTurno {
+  eTotalEfectivo:      number;
+  eTotalTarjeta:       number;
+  eTotalTransferencia: number;
+  eTotalVentas:        number;
+  eNumVentas:          number;
+}
+
+export type EstadoCorte = "abierto" | "pendiente" | "aprobado" | "diferencia";
+
+export interface CorteCaja {
+  eCodCorte:             string;
+  fkeCodUser:            string;
+  fkeCodCompany:         string;
+  tNombreTurno?:         string | null;
+  eFondoInicial:         number;
+  eEfectivoContado?:     number | null;
+  eTotalEfectivo?:       number | null;
+  eTotalTarjeta?:        number | null;
+  eTotalTransferencia?:  number | null;
+  eTotalVentas?:         number | null;
+  eEfectivoEsperado?:    number | null;
+  eDiferencia?:          number | null;
+  bStateCorte:           EstadoCorte;
+  tNotaAdmin?:           string | null;
+  fkeCodAdmin?:          string | null;
+  fhInicioTurno:         string;
+  fhCierreTurno?:        string | null;
+  fhCreateCorte:         string;
+  fhUpdateCorte:         string;
 }

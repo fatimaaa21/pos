@@ -1,8 +1,8 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MenuClient }        from "./MenuClient";
-import type { Categoria, ProductoConStock } from "@/types";
-import type { MetodoPagoGlobal }            from "@/lib/actions/metodos-pago";
+import type { Categoria, ProductoConStock, CorteCaja, VentasDelTurno } from "@/types";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
 export default async function MenuPage() {
   const supabase    = await createClient();
@@ -10,33 +10,58 @@ export default async function MenuPage() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: perfil } = await supabase
-    .from("perfiles")
-    .select("fkeCodCompany")
-    .eq("eCodUser", user!.id)
-    .single();
+  // ── Turno abierto ─────────────────────────────────────────────────────────
+  const { data: turnoAbierto } = user
+    ? await adminClient
+        .from("cortes_caja")
+        .select("*")
+        .eq("fkeCodUser", user.id)
+        .eq("bStateCorte", "abierto")
+        .maybeSingle()
+    : { data: null };
 
-  const fkeCodCompany = perfil?.fkeCodCompany;
+  const tieneTurno = !!turnoAbierto;
 
-  // ── Métodos de pago ───────────────────────────────────────────────────────
-  const { data: negocio } = await adminClient
-    .from("negocios")
-    .select("metodosPago")
-    .eq("eCodCompany", fkeCodCompany)
-    .single();
+  // ── Ventas del turno actual ───────────────────────────────────────────────
+  let ventasDelTurno: VentasDelTurno = {
+    eTotalEfectivo:      0,
+    eTotalTarjeta:       0,
+    eTotalTransferencia: 0,
+    eTotalVentas:        0,
+    eNumVentas:          0,
+  };
 
-  const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
-  let metodosPago: MetodoPagoGlobal[] = [];
+  if (turnoAbierto && user) {
+    const { data: ventas } = await adminClient
+      .from("ventas")
+      .select("eTotal, fkeMetodoPago")   // ← fkeMetodoPago, no eMetodoPago
+      .eq("fkeCodUser", user.id)
+      .gte("fhCreateVenta", turnoAbierto.fhInicioTurno);
 
-  if (idsSeleccionados.length > 0) {
-    const { data: metodos } = await adminClient
-      .from("metodos_pago")
-      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
-      .in("eCodPay", idsSeleccionados)
-      .eq("bStatePay", true)
-      .order("orden");
-    metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
+    if (ventas) {
+      ventasDelTurno.eTotalEfectivo      = ventas.filter(v => v.fkeMetodoPago === "efectivo").reduce((a, v) => a + v.eTotal, 0);
+      ventasDelTurno.eTotalTarjeta       = ventas.filter(v => v.fkeMetodoPago === "tarjeta").reduce((a, v) => a + v.eTotal, 0);
+      ventasDelTurno.eTotalTransferencia = ventas.filter(v => v.fkeMetodoPago === "transferencia").reduce((a, v) => a + v.eTotal, 0);
+      ventasDelTurno.eTotalVentas        = ventas.reduce((a, v) => a + v.eTotal, 0);
+      ventasDelTurno.eNumVentas          = ventas.length;
+    }
   }
+
+  // ── Perfil del empleado ───────────────────────────────────────────────────
+  const { data: perfil } = user
+    ? await supabase
+        .from("perfiles")
+        .select("fkeCodCompany")
+        .eq("eCodUser", user.id)
+        .single()
+    : { data: null };
+
+  // ── Métodos de pago activos ───────────────────────────────────────────────
+  const { data: metodosPago } = await adminClient
+    .from("metodos_pago")
+    .select("eCodPay, tNamePay, tIconPay")
+    .eq("bStatePay", true)
+    .order("orden", { ascending: true });
 
   // ── Categorías ────────────────────────────────────────────────────────────
   const { data: categorias } = await supabase
@@ -45,21 +70,26 @@ export default async function MenuPage() {
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Inventario: lotes con stock > 0 ó infinitos, ambos activos ────────────
+  // ── Inventario ────────────────────────────────────────────────────────────
   const { data: lotes, error } = await supabase
     .from("vista_inventario")
-    .select("fkeCodProduct, eCantRestante, bUnlimitedInventory")
+    .select("fkeCodProduct, eCantRestante")
     .eq("bStateInventory", true)
-    .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+    .gt("eCantRestante", 0);
 
-  if (error) console.error("Error menú:", JSON.stringify(error));
+  if (error) console.error("Error:", JSON.stringify(error));
+
+  const metodosSeguros = (metodosPago ?? []) as MetodoPagoGlobal[];
 
   if (!lotes || lotes.length === 0) {
     return (
       <MenuClient
         categorias={(categorias as Categoria[]) ?? []}
         productos={[]}
-        metodosPago={metodosPago}
+        tieneTurno={tieneTurno}
+        corte={(turnoAbierto ?? null) as CorteCaja | null}
+        ventasDelTurno={ventasDelTurno}
+        metodosPago={metodosSeguros}
       />
     );
   }
@@ -72,17 +102,10 @@ export default async function MenuPage() {
     .in("eCodProduct", idsConStock)
     .eq("bStateProduct", true);
 
-  // Calcular stock y marcar infinitos
-  const stockPorProducto    = new Map<string, number>();
-  const infinitoPorProducto = new Map<string, boolean>();
-
+  const stockPorProducto = new Map<string, number>();
   for (const lote of lotes) {
-    if (lote.bUnlimitedInventory) {
-      infinitoPorProducto.set(lote.fkeCodProduct, true);
-    } else {
-      const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
-      stockPorProducto.set(lote.fkeCodProduct, actual + (lote.eCantRestante ?? 0));
-    }
+    const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
+    stockPorProducto.set(lote.fkeCodProduct, actual + lote.eCantRestante);
   }
 
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => ({
@@ -91,18 +114,17 @@ export default async function MenuPage() {
     fkeCodCategory:  p.fkeCodCategory,
     ePriceProduct:   p.ePriceProduct,
     ImgProduct:      p.ImgProduct,
-    bInfinito:       infinitoPorProducto.get(p.eCodProduct) ?? false,
-    // Centinela: Number.MAX_SAFE_INTEGER nunca bloquea el botón + en el carrito
-    stockDisponible: infinitoPorProducto.get(p.eCodProduct)
-      ? Number.MAX_SAFE_INTEGER
-      : (stockPorProducto.get(p.eCodProduct) ?? 0),
+    stockDisponible: stockPorProducto.get(p.eCodProduct) ?? 0,
   }));
 
   return (
     <MenuClient
       categorias={(categorias as Categoria[]) ?? []}
       productos={productosConStock}
-      metodosPago={metodosPago}
+      tieneTurno={tieneTurno}
+      corte={(turnoAbierto ?? null) as CorteCaja | null}
+      ventasDelTurno={ventasDelTurno}
+      metodosPago={metodosSeguros}
     />
   );
 }

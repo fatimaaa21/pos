@@ -19,6 +19,7 @@ import {
   Settings,
   ChevronUp,
   CircleDollarSign,
+  Calculator,
 } from "lucide-react";
 
 const navAdmin = [
@@ -27,6 +28,7 @@ const navAdmin = [
   { icon: Package,          label: "Productos",  href: "/admin/productos"   },
   { icon: ClipboardPenLine, label: "Inventario", href: "/admin/inventario"  },
   { icon: BarChart2,        label: "Ventas",     href: "/admin/ventasAdmin" },
+  { icon: Calculator,       label: "Cortes de caja",     href: "/admin/cortes"       },
   { icon: Users,            label: "Usuarios",   href: "/admin/usuarios"    },
 ];
 
