@@ -1,15 +1,20 @@
 import styles from "./Badge.module.css";
 
+// Variantes en uso real en el proyecto.
+// Cualquier variante aquí DEBE tener su clase CSS correspondiente.
 type Variante =
-  | "activo" | "inactivo" | "sistemas" | "admin" | "empleado"
-  | "pendiente" | "publicado" | "bloqueado" | "bajo" | "agotado" | "ilimitado"
-  | "abierto" | "disponible" | "categoria"
-  | "warning"    // ← nuevo
-  | "error"      // ← nuevo
-  | "primary"    // ← nuevo
-  | "success"    // ← nuevo
-  | "neutral";   // ← nuevo
-
+  | "activo"    // activo/inactivo — toggle de estado
+  | "inactivo"
+  | "sistemas"  // rol: sistemas
+  | "admin"     // rol: admin
+  | "empleado"  // rol: empleado / "En turno"
+  | "pendiente" // estado amarillo: pendiente de revisión
+  | "bajo"      // stock bajo
+  | "agotado"   // stock agotado / neutral
+  | "disponible"// stock disponible
+  | "ilimitado" // stock ilimitado
+  | "categoria" // badge de categoría (acento)
+  | "error";    // diferencia / error (rojo)
 
 interface BadgeProps {
   variante?: Variante;
@@ -21,28 +26,31 @@ interface BadgeProps {
 }
 
 const CONFIG: Record<Variante, { label: string; clase: string }> = {
-  activo:      { label: "Activo",      clase: styles.activo     },
-  inactivo:    { label: "Inactivo",    clase: styles.inactivo   },
-  sistemas:    { label: "Sistemas",    clase: styles.sistemas   },
-  admin:       { label: "Admin",       clase: styles.admin      },
-  empleado:    { label: "Empleado",    clase: styles.empleado   },
-  pendiente:   { label: "Pendiente",   clase: styles.pendiente  },
-  publicado:   { label: "Publicado",   clase: styles.publicado  },
-  bloqueado:   { label: "Bloqueado",   clase: styles.bloqueado  },
-  bajo:        { label: "Stock bajo",  clase: styles.bajo       },
-  agotado:     { label: "Agotado",     clase: styles.agotado    },
-  disponible:  { label: "Disponible",  clase: styles.disponible },
-  ilimitado:   { label: "Ilimitado",   clase: styles.ilimitado  },
-  categoria:   { label: "",            clase: styles.categoria  },
-  warning: { label: "Advertencia", clase: styles.warning },
-  error:   { label: "Error",       clase: styles.error   },
-  primary: { label: "",            clase: styles.primary  },
-  success: { label: "Aprobado",    clase: styles.success  },
-  neutral: { label: "",            clase: styles.neutral  },
+  activo:     { label: "Activo",     clase: styles.activo    },
+  inactivo:   { label: "Inactivo",   clase: styles.inactivo  },
+  sistemas:   { label: "Sistemas",   clase: styles.sistemas  },
+  admin:      { label: "Admin",      clase: styles.admin     },
+  empleado:   { label: "Empleado",   clase: styles.empleado  },
+  pendiente:  { label: "Pendiente",  clase: styles.pendiente },
+  bajo:       { label: "Stock bajo", clase: styles.bajo      },
+  agotado:    { label: "Agotado",    clase: styles.agotado   },
+  disponible: { label: "Disponible", clase: styles.disponible},
+  ilimitado:  { label: "Ilimitado",  clase: styles.ilimitado },
+  categoria:  { label: "",           clase: styles.categoria },
+  error:      { label: "Error",      clase: styles.error     },
 };
 
-export function Badge({ variante, activo, children, dot = true, onToggle, toggling }: BadgeProps) {
-  const v: Variante = variante ?? (activo === true ? "activo" : activo === false ? "inactivo" : "activo");
+export function Badge({
+  variante,
+  activo,
+  children,
+  dot = true,
+  onToggle,
+  toggling,
+}: BadgeProps) {
+  const v: Variante =
+    variante ?? (activo === true ? "activo" : activo === false ? "inactivo" : "activo");
+
   const config = CONFIG[v];
 
   const content = (

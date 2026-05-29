@@ -13,11 +13,9 @@ export async function iniciarTurno(formData: FormData) {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
 
-    // 1. Verificar sesión
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    // 2. Obtener negocio del empleado
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles")
       .select("fkeCodCompany")
@@ -28,7 +26,6 @@ export async function iniciarTurno(formData: FormData) {
       return { error: "No se encontró el negocio del empleado" };
     }
 
-    // 3. Verificar que no haya un turno ya abierto
     const { data: turnoAbierto } = await adminClient
       .from("cortes_caja")
       .select("eCodCorte")
@@ -40,7 +37,6 @@ export async function iniciarTurno(formData: FormData) {
       return { error: "Ya tienes un turno abierto" };
     }
 
-    // 4. Parsear datos del form
     const eFondoInicial = parseFloat(formData.get("eFondoInicial") as string);
     const tNombreTurno  = (formData.get("tNombreTurno") as string) || null;
 
@@ -48,7 +44,6 @@ export async function iniciarTurno(formData: FormData) {
       return { error: "Fondo inicial inválido" };
     }
 
-    // 5. Crear el corte en estado 'abierto'
     const ahora = new Date().toISOString();
     const { data: corte, error: corteError } = await adminClient
       .from("cortes_caja")
@@ -57,7 +52,7 @@ export async function iniciarTurno(formData: FormData) {
         fkeCodCompany: perfil.fkeCodCompany,
         tNombreTurno,
         eFondoInicial,
-        bStateCorte:  "abierto",
+        bStateCorte:   "abierto",
         fhInicioTurno: ahora,
         fhCreateCorte: ahora,
         fhUpdateCorte: ahora,
@@ -85,11 +80,9 @@ export async function cerrarTurno(formData: FormData) {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
 
-    // 1. Verificar sesión
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    // 2. Buscar el turno abierto del empleado
     const { data: corte, error: corteError } = await adminClient
       .from("cortes_caja")
       .select("eCodCorte, eFondoInicial, fhInicioTurno")
@@ -101,7 +94,7 @@ export async function cerrarTurno(formData: FormData) {
       return { error: "No se encontró un turno abierto" };
     }
 
-    // 3. Calcular totales desde ventas del turno
+    // ── Ventas del turno ──────────────────────────────────────────────────
     const { data: ventas, error: ventasError } = await adminClient
       .from("ventas")
       .select("eTotal, fkeMetodoPago")
@@ -112,25 +105,47 @@ export async function cerrarTurno(formData: FormData) {
       return { error: `Error al calcular ventas: ${ventasError.message}` };
     }
 
-    const eTotalEfectivo      = (ventas ?? [])
-    .filter(v => v.fkeMetodoPago === "efectivo")
-    .reduce((acc, v) => acc + v.eTotal, 0);
+    // ── Total real de ventas (independiente de método) ────────────────────
+    const eTotalVentas = (ventas ?? []).reduce((acc, v) => acc + v.eTotal, 0);
 
-    const eTotalTarjeta       = (ventas ?? [])
-    .filter(v => v.fkeMetodoPago === "tarjeta")
-    .reduce((acc, v) => acc + v.eTotal, 0);
+    // ── Clasificar por método usando nombres dinámicos (no strings hardcoded)
+    // fkeMetodoPago es un UUID; los strings "efectivo", "tarjeta" son legacy.
+    let eTotalEfectivo      = 0;
+    let eTotalTarjeta       = 0;
+    let eTotalTransferencia = 0;
 
-    const eTotalTransferencia = (ventas ?? [])
-    .filter(v => v.fkeMetodoPago === "transferencia")
-    .reduce((acc, v) => acc + v.eTotal, 0);
+    if (ventas && ventas.length > 0) {
+      const metodosIds = [...new Set(ventas.map((v) => v.fkeMetodoPago))];
 
-    console.log("ventas sample:", JSON.stringify(ventas?.[0]));
+      const { data: metodosInfo } = await adminClient
+        .from("metodos_pago")
+        .select("eCodPay, tNamePay")
+        .in("eCodPay", metodosIds);
 
+      const metodosMap = new Map(
+        (metodosInfo ?? []).map((m) => [m.eCodPay, m.tNamePay.toLowerCase()])
+      );
 
-    const eTotalVentas        = eTotalEfectivo + eTotalTarjeta + eTotalTransferencia;
-    const eEfectivoEsperado   = corte.eFondoInicial + eTotalEfectivo;
+      const esEfectivo = (id: string) => (metodosMap.get(id) ?? "").includes("efectivo");
+      const esTarjeta  = (id: string) => (metodosMap.get(id) ?? "").includes("tarjeta");
 
-    // 4. Efectivo físico contado por el empleado
+      eTotalEfectivo = ventas
+        .filter((v) => esEfectivo(v.fkeMetodoPago))
+        .reduce((acc, v) => acc + v.eTotal, 0);
+
+      eTotalTarjeta = ventas
+        .filter((v) => esTarjeta(v.fkeMetodoPago))
+        .reduce((acc, v) => acc + v.eTotal, 0);
+
+      // Cualquier método que no sea efectivo ni tarjeta va a transferencia/QR
+      eTotalTransferencia = ventas
+        .filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago))
+        .reduce((acc, v) => acc + v.eTotal, 0);
+    }
+
+    // ── Solo el efectivo entra al cajón físico ────────────────────────────
+    const eEfectivoEsperado = corte.eFondoInicial + eTotalEfectivo;
+
     const eEfectivoContado = parseFloat(formData.get("eEfectivoContado") as string);
     if (isNaN(eEfectivoContado) || eEfectivoContado < 0) {
       return { error: "Monto de efectivo contado inválido" };
@@ -139,7 +154,6 @@ export async function cerrarTurno(formData: FormData) {
     const eDiferencia = eEfectivoContado - eEfectivoEsperado;
     const ahora       = new Date().toISOString();
 
-    // 5. Actualizar el corte a estado 'pendiente'
     const { data: corteActualizado, error: updateError } = await adminClient
       .from("cortes_caja")
       .update({
@@ -150,7 +164,7 @@ export async function cerrarTurno(formData: FormData) {
         eTotalVentas,
         eEfectivoEsperado,
         eDiferencia,
-        bStateCorte:  "pendiente",
+        bStateCorte:   "pendiente",
         fhCierreTurno: ahora,
         fhUpdateCorte: ahora,
       })
@@ -179,7 +193,6 @@ export async function revisarCorte(formData: FormData) {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
 
-    // 1. Verificar sesión y rol admin
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
@@ -193,7 +206,6 @@ export async function revisarCorte(formData: FormData) {
       return { error: "Acceso no autorizado" };
     }
 
-    // 2. Parsear datos
     const eCodCorte    = formData.get("eCodCorte")    as string;
     const bStateCorte = formData.get("bStateCorte") as "aprobado" | "diferencia";
     const tNotaAdmin   = (formData.get("tNotaAdmin")  as string) || null;
@@ -202,7 +214,6 @@ export async function revisarCorte(formData: FormData) {
       return { error: "Estado inválido" };
     }
 
-    // 3. Verificar que el corte pertenece al negocio del admin
     const { data: corte } = await adminClient
       .from("cortes_caja")
       .select("eCodCorte, bStateCorte, fkeCodCompany")
@@ -218,7 +229,6 @@ export async function revisarCorte(formData: FormData) {
       return { error: "Solo se pueden revisar cortes en estado pendiente" };
     }
 
-    // 4. Actualizar
     const { data: corteActualizado, error: updateError } = await adminClient
       .from("cortes_caja")
       .update({

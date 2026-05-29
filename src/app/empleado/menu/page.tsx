@@ -1,8 +1,8 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MenuClient }        from "./MenuClient";
-import type { Categoria, ProductoConStock } from "@/types";
-import type { MetodoPagoGlobal }            from "@/lib/actions/metodos-pago";
+import type { Categoria, ProductoConStock, CorteCaja, VentasDelTurno } from "@/types";
+import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
 export default async function MenuPage() {
   const supabase    = await createClient();
@@ -18,7 +18,7 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Métodos de pago ───────────────────────────────────────────────────────
+  // ── Métodos de pago activos para el negocio ───────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago")
@@ -38,6 +38,66 @@ export default async function MenuPage() {
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
+  // ── Turno activo del empleado ─────────────────────────────────────────────
+  const { data: corteAbierto } = await adminClient
+    .from("cortes_caja")
+    .select("*")
+    .eq("fkeCodUser", user!.id)
+    .eq("bStateCorte", "abierto")
+    .maybeSingle();
+
+  const tieneTurno = corteAbierto !== null;
+
+  // ── Ventas acumuladas en el turno actual ──────────────────────────────────
+  // Se calcula aquí (server) para que ModalCerrarCaja tenga datos frescos
+  // sin necesitar otro fetch desde el cliente.
+  let ventasDelTurno: VentasDelTurno = {
+    eTotalEfectivo:      0,
+    eTotalTarjeta:       0,
+    eTotalTransferencia: 0,
+    eTotalVentas:        0,
+    eNumVentas:          0,
+  };
+
+  if (corteAbierto) {
+    const { data: ventasTurno } = await adminClient
+      .from("ventas")
+      .select("eTotal, fkeMetodoPago")
+      .eq("fkeCodUser", user!.id)
+      .gte("fhCreateVenta", corteAbierto.fhInicioTurno);
+
+    if (ventasTurno && ventasTurno.length > 0) {
+      // Resolver nombres de métodos para clasificar (efectivo vs tarjeta vs resto)
+      // fkeMetodoPago es un UUID dinámico, no el string "efectivo"
+      const metodosIds = [...new Set(ventasTurno.map((v) => v.fkeMetodoPago))];
+      const { data: metodosInfo } = await adminClient
+        .from("metodos_pago")
+        .select("eCodPay, tNamePay")
+        .in("eCodPay", metodosIds);
+
+      const metodosMap = new Map(
+        (metodosInfo ?? []).map((m) => [m.eCodPay, m.tNamePay.toLowerCase()])
+      );
+
+      const esEfectivo = (id: string) => (metodosMap.get(id) ?? "").includes("efectivo");
+      const esTarjeta  = (id: string) => (metodosMap.get(id) ?? "").includes("tarjeta");
+
+      ventasDelTurno = {
+        eTotalEfectivo: ventasTurno
+          .filter((v) => esEfectivo(v.fkeMetodoPago))
+          .reduce((a, v) => a + v.eTotal, 0),
+        eTotalTarjeta: ventasTurno
+          .filter((v) => esTarjeta(v.fkeMetodoPago))
+          .reduce((a, v) => a + v.eTotal, 0),
+        eTotalTransferencia: ventasTurno
+          .filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago))
+          .reduce((a, v) => a + v.eTotal, 0),
+        eTotalVentas: ventasTurno.reduce((a, v) => a + v.eTotal, 0),
+        eNumVentas:   ventasTurno.length,
+      };
+    }
+  }
+
   // ── Categorías ────────────────────────────────────────────────────────────
   const { data: categorias } = await supabase
     .from("categorias")
@@ -54,12 +114,16 @@ export default async function MenuPage() {
 
   if (error) console.error("Error menú:", JSON.stringify(error));
 
+  // Retorno temprano si no hay productos — turno/métodos siguen pasando
   if (!lotes || lotes.length === 0) {
     return (
       <MenuClient
         categorias={(categorias as Categoria[]) ?? []}
         productos={[]}
         metodosPago={metodosPago}
+        tieneTurno={tieneTurno}
+        corte={(corteAbierto as CorteCaja | null) ?? null}
+        ventasDelTurno={ventasDelTurno}
       />
     );
   }
@@ -102,6 +166,9 @@ export default async function MenuPage() {
       categorias={(categorias as Categoria[]) ?? []}
       productos={productosConStock}
       metodosPago={metodosPago}
+      tieneTurno={tieneTurno}
+      corte={(corteAbierto as CorteCaja | null) ?? null}
+      ventasDelTurno={ventasDelTurno}
     />
   );
 }

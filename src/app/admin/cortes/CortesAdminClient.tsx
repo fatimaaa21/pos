@@ -3,6 +3,7 @@
 import { useState }          from "react";
 import { Eye }               from "lucide-react";
 import { PageHeader }        from "@/components/ui/PageHeader";
+import { Buscador } from "@/components/ui/Buscador";
 import { StatCards }         from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge }             from "@/components/ui/Badge";
@@ -20,11 +21,13 @@ interface Props {
   cortes: CorteConEmpleado[];
 }
 
+// Mapeo de estado → variante de Badge válida + etiqueta legible.
+// Cada variante tiene su clase CSS definida en Badge.module.css.
 const ESTADO_CONFIG = {
-  abierto:    { label: "En turno",  variante: "primary"  },
-  pendiente:  { label: "Pendiente", variante: "warning"  },
-  aprobado:   { label: "Aprobado",  variante: "success"  },
-  diferencia: { label: "Diferencia", variante: "error"   },
+  abierto:    { label: "En turno",   variante: "empleado"  },  // verde primario
+  pendiente:  { label: "Pendiente",  variante: "pendiente" },  // amarillo
+  aprobado:   { label: "Aprobado",   variante: "activo"    },  // verde éxito
+  diferencia: { label: "Diferencia", variante: "error"     },  // rojo
 } as const;
 
 export function CortesAdminClient({ cortes: inicial }: Props) {
@@ -121,9 +124,9 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
           ? "var(--color-error)"
           : c.eDiferencia > 0
           ? "var(--color-accent)"
-          : "var(--color-success)";
+          : "var(--dark)";
         return (
-          <span style={{ fontWeight: 700, color }}>
+          <span style={{ color }}>
             {c.eDiferencia.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
           </span>
         );
@@ -134,7 +137,9 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
       label: "Estado",
       render: (c) => {
         const cfg = ESTADO_CONFIG[c.bStateCorte as keyof typeof ESTADO_CONFIG];
-        return <Badge variante={cfg?.variante ?? "neutral"}>{cfg?.label ?? c.bStateCorte}</Badge>;
+        // Fallback a inactivo si el estado no está mapeado (no debería ocurrir)
+        if (!cfg) return <Badge variante="inactivo">{c.bStateCorte}</Badge>;
+        return <Badge variante={cfg.variante}>{cfg.label}</Badge>;
       },
     },
     {
@@ -154,7 +159,13 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
 
   return (
     <div className="container">
-      <div className="header" />
+        <div className="header">
+            <Buscador
+                valor={filtros.busqueda}
+                onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
+                placeholder="Buscar usuario..."
+                />
+        </div>
 
       <PageHeader
         titulo="Cortes de caja"
@@ -167,7 +178,11 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
         { label: "Con diferencia",   value: diferencias,   variante: "error"    },
         {
           label: "Total recaudado",
-          value: totalRecaudado.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }),
+          value: totalRecaudado.toLocaleString("es-MX", {
+            style: "currency",
+            currency: "MXN",
+            minimumFractionDigits: 0,
+          }),
           variante: "primary",
         },
       ]} />
