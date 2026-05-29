@@ -28,7 +28,7 @@ interface Props {
 
 export function MetodosPagoClient({ metodos: inicial }: Props) {
   const [metodos,    setMetodos]    = useState<MetodoPagoGlobal[]>(inicial);
-    const [busqueda, setBusqueda] = useState("");
+  const [busqueda,   setBusqueda]   = useState("");
   const [modalCrear, setModalCrear] = useState(false);
   const [editando,   setEditando]   = useState<MetodoPagoGlobal | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
@@ -54,15 +54,12 @@ export function MetodosPagoClient({ metodos: inicial }: Props) {
   }
 
   function handleCreado(metodo: MetodoPagoGlobal) {
-    setMetodos((p) => [...p, metodo].sort((a, b) => a.orden - b.orden));
+    setMetodos((p) => [...p, metodo]);
     setModalCrear(false);
   }
 
   function handleEditado(metodo: MetodoPagoGlobal) {
-    setMetodos((p) =>
-      p.map((x) => x.eCodPay === metodo.eCodPay ? metodo : x)
-       .sort((a, b) => a.orden - b.orden)
-    );
+    setMetodos((p) => p.map((x) => x.eCodPay === metodo.eCodPay ? metodo : x));
     setEditando(null);
   }
 
@@ -85,11 +82,6 @@ export function MetodosPagoClient({ metodos: inicial }: Props) {
       key: "descripcion",
       label: "Descripción",
       render: (m) => <span>{m.descripcion ?? "—"}</span>,
-    },
-    {
-      key: "orden",
-      label: "Orden",
-      render: (m) => <span>{m.orden}</span>,
     },
     {
       key: "bStatePay",
@@ -127,13 +119,13 @@ export function MetodosPagoClient({ metodos: inicial }: Props) {
 
   return (
     <div className="container">
-        <div className="header">
-            <Buscador
-                valor={busqueda}
-                onChange={setBusqueda}
-                placeholder="Buscar negocio..."
-            />
-        </div>
+      <div className="header">
+        <Buscador
+          valor={busqueda}
+          onChange={setBusqueda}
+          placeholder="Buscar método..."
+        />
+      </div>
 
       <PageHeader
         titulo="Métodos de pago"
@@ -142,9 +134,9 @@ export function MetodosPagoClient({ metodos: inicial }: Props) {
       />
 
       <StatCards stats={[
-        { label: "Total métodos", value: metodos.length,              variante: "primary" },
-        { label: "Activos",       value: activos,                     variante: "success" },
-        { label: "Inactivos",     value: metodos.length - activos,    variante: "accent"  },
+        { label: "Total métodos", value: metodos.length,           variante: "primary" },
+        { label: "Activos",       value: activos,                  variante: "success" },
+        { label: "Inactivos",     value: metodos.length - activos, variante: "accent"  },
       ]} />
 
       <DataTable

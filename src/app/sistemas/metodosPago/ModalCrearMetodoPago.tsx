@@ -26,14 +26,12 @@ interface FormState {
   tNamePay:    string;
   tIconPay:    string;
   descripcion: string;
-  orden:       string;
 }
 
 const FORM_VACIO: FormState = {
   tNamePay:    "",
   tIconPay:    "CreditCard",
   descripcion: "",
-  orden:       "0",
 };
 
 interface Props {
@@ -54,7 +52,6 @@ export function ModalCrearMetodoPago({ onClose, onCreado }: Props) {
     fd.append("tNamePay",    form.tNamePay);
     fd.append("tIconPay",    form.tIconPay);
     fd.append("descripcion", form.descripcion);
-    fd.append("orden",       form.orden);
 
     const result = await crearMetodoPago(fd);
     setLoading(false);
@@ -113,16 +110,6 @@ export function ModalCrearMetodoPago({ onClose, onCreado }: Props) {
           placeholder="Ej. Pago en efectivo en caja"
           value={form.descripcion}
           onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))}
-        />
-      </ModalField>
-
-      <ModalField label="Orden de aparición">
-        <ModalInput
-          type="number"
-          min={0}
-          placeholder="0"
-          value={form.orden}
-          onChange={(e) => setForm((p) => ({ ...p, orden: e.target.value }))}
         />
       </ModalField>
     </Modal>

@@ -1,5 +1,5 @@
 export type Rol = "admin" | "empleado" | "sistemas";
-
+ 
 export interface Perfil {
   fkeCodCompany: string | null;
   eCodUser: string;
@@ -11,7 +11,7 @@ export interface Perfil {
   fhCreateUser: string;
   fhUpdateUser?: string;
 }
-
+ 
 export interface Negocio {
   eCodCompany: string;
   tNameCompany: string;
@@ -22,7 +22,7 @@ export interface Negocio {
   bstateCompany: boolean;
   fhCreateCompany: string;
 }
-
+ 
 export interface Categoria {
   fkeCodCompany: string;
   eCodCategory: string;
@@ -33,14 +33,14 @@ export interface Categoria {
   bStateCategory?: boolean;
   productos?: ProductoResumen[];
 }
-
+ 
 export interface ProductoResumen {
   eCodProduct: string;
   tNameProduct: string;
   bStateProduct?: boolean;
   ePriceProduct: number;
 }
-
+ 
 export interface Producto {
   fkeCodCompany: string;
   eCodProduct: string;
@@ -53,7 +53,7 @@ export interface Producto {
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
 }
-
+ 
 export interface Inventario {
   fkeCodCompany: string;
   eCodInventory: string;
@@ -67,9 +67,9 @@ export interface Inventario {
   fhUpdateInventory?: string;
   bStateInventory?: boolean;
 }
-
+ 
 export type EstadoStock = "disponible" | "bajo" | "agotado" | "ilimitado";
-
+ 
 export function getEstadoStock(
   restante: number | null,
   minimo: number | null,
@@ -80,7 +80,7 @@ export function getEstadoStock(
   if (restante <= minimo) return "bajo";
   return "disponible";
 }
-
+ 
 export interface ProductoConStock {
   eCodProduct: string;
   tNameProduct: string;
@@ -88,11 +88,16 @@ export interface ProductoConStock {
   ePriceProduct: number;
   ImgProduct?: string;
   stockDisponible: number;
-  bIlimitado?: boolean;
+  bInfinito?: boolean;
 }
-
-export type MetodoPago = string;
-
+ 
+// Branded type: sigue siendo string en runtime pero TypeScript
+// lo distingue de un string genérico en tiempo de compilación.
+// El único punto de entrada válido es el cast explícito "as MetodoPago"
+// que ocurre en PedidoPanel justo después de seleccionar el eCodPay.
+declare const __metodoPagoBrand: unique symbol;
+export type MetodoPago = string & { readonly [__metodoPagoBrand]: never };
+ 
 export interface Venta {
   fkeCodCompany: string;
   eCodVenta: string;
@@ -104,7 +109,7 @@ export interface Venta {
   metodoPagoIcono?: string | null;
   fhCreateVenta: string;
 }
-
+ 
 // Fila pura de la tabla detalle_venta — sin joins
 export interface DetalleVenta {
   eCodDetalle: string;

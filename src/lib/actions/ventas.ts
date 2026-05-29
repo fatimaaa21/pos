@@ -3,6 +3,7 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
+import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
   eCodProduct:    string;
@@ -10,7 +11,7 @@ interface ItemVenta {
   precioUnitario: number;
 }
 
-export async function crearVenta(items: ItemVenta[], fkeMetodoPago: string) {
+export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) {
   try {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
