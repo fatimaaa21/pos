@@ -26,7 +26,6 @@ interface FormState {
   tNamePay:    string;
   tIconPay:    string;
   descripcion: string;
-  orden:       string;
 }
 
 interface Props {
@@ -40,7 +39,6 @@ export function ModalEditarMetodoPago({ metodo, onClose, onEditado }: Props) {
     tNamePay:    metodo.tNamePay,
     tIconPay:    metodo.tIconPay,
     descripcion: metodo.descripcion ?? "",
-    orden:       String(metodo.orden),
   });
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -54,7 +52,6 @@ export function ModalEditarMetodoPago({ metodo, onClose, onEditado }: Props) {
     fd.append("tNamePay",    form.tNamePay);
     fd.append("tIconPay",    form.tIconPay);
     fd.append("descripcion", form.descripcion);
-    fd.append("orden",       form.orden);
 
     const result = await editarMetodoPago(fd);
     setLoading(false);
@@ -112,15 +109,6 @@ export function ModalEditarMetodoPago({ metodo, onClose, onEditado }: Props) {
           placeholder="Ej. Pago en efectivo en caja"
           value={form.descripcion}
           onChange={(e) => setForm((p) => ({ ...p, descripcion: e.target.value }))}
-        />
-      </ModalField>
-
-      <ModalField label="Orden de aparición">
-        <ModalInput
-          type="number"
-          min={0}
-          value={form.orden}
-          onChange={(e) => setForm((p) => ({ ...p, orden: e.target.value }))}
         />
       </ModalField>
     </Modal>

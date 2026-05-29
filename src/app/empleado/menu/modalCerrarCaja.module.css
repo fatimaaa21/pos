@@ -1,0 +1,67 @@
+.fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: var(--space-1) 0;
+}
+
+.filaLabel { color: var(--gray); }
+.filaValor { font-weight: 600; color: var(--dark); }
+
+/* ── Desglose ── */
+.desglose {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.desgloseTitle {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dark);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-light);
+  margin: 0;
+}
+
+.desgloseFila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  color: var(--dark);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.desgloseFila:last-child { border-bottom: none; }
+
+.desgloseIcono { color: var(--gray); flex-shrink: 0; }
+.desgloseLabel { flex: 1; }
+.desgloseValor { font-weight: 600; }
+
+.desgloseTotal {
+  background: var(--background);
+  font-weight: 700;
+}
+
+.desgloseTotal .desgloseValor { color: var(--color-success); }
+
+/* ── Diferencia ── */
+.diferencia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ok       { background: var(--color-success-bg); color: var(--color-success); }
+.faltante { background: var(--color-error-bg);   color: var(--color-error);   }
+.sobrante { background: var(--color-accent-bg);  color: var(--color-accent);  }

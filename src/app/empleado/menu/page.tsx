@@ -31,10 +31,10 @@ export default async function MenuPage() {
   if (idsSeleccionados.length > 0) {
     const { data: metodos } = await adminClient
       .from("metodos_pago")
-      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
+      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay")
       .in("eCodPay", idsSeleccionados)
-      .eq("bStatePay", true)
-      .order("orden");
+      .eq("bStatePay", true);
+
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
@@ -92,7 +92,6 @@ export default async function MenuPage() {
     ePriceProduct:   p.ePriceProduct,
     ImgProduct:      p.ImgProduct,
     bInfinito:       infinitoPorProducto.get(p.eCodProduct) ?? false,
-    // Centinela: Number.MAX_SAFE_INTEGER nunca bloquea el botón + en el carrito
     stockDisponible: infinitoPorProducto.get(p.eCodProduct)
       ? Number.MAX_SAFE_INTEGER
       : (stockPorProducto.get(p.eCodProduct) ?? 0),

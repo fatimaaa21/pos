@@ -1,19 +1,15 @@
 import styles from "./Badge.module.css";
 
 type Variante =
-  | "activo"
-  | "inactivo"
-  | "sistemas"
-  | "admin"
-  | "empleado"
-  | "pendiente"
-  | "publicado"
-  | "bloqueado"
-  | "bajo"
-  | "agotado"
-  | "disponible"
-  | "ilimitado"
-  | "categoria";
+  | "activo" | "inactivo" | "sistemas" | "admin" | "empleado"
+  | "pendiente" | "publicado" | "bloqueado" | "bajo" | "agotado" | "ilimitado"
+  | "abierto" | "disponible" | "categoria"
+  | "warning"    // ← nuevo
+  | "error"      // ← nuevo
+  | "primary"    // ← nuevo
+  | "success"    // ← nuevo
+  | "neutral";   // ← nuevo
+
 
 interface BadgeProps {
   variante?: Variante;
@@ -38,6 +34,11 @@ const CONFIG: Record<Variante, { label: string; clase: string }> = {
   disponible:  { label: "Disponible",  clase: styles.disponible },
   ilimitado:   { label: "Ilimitado",   clase: styles.ilimitado  },
   categoria:   { label: "",            clase: styles.categoria  },
+  warning: { label: "Advertencia", clase: styles.warning },
+  error:   { label: "Error",       clase: styles.error   },
+  primary: { label: "",            clase: styles.primary  },
+  success: { label: "Aprobado",    clase: styles.success  },
+  neutral: { label: "",            clase: styles.neutral  },
 };
 
 export function Badge({ variante, activo, children, dot = true, onToggle, toggling }: BadgeProps) {

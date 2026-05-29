@@ -13,19 +13,39 @@ import styles from "./ventasEmpleado.module.css";
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface Venta {
-  eCodVenta:        string;
-  eTotal:           number;
-  fkeMetodoPago:    string;
-  metodoPagoNombre: string;
-  metodoPagoIcono?: string | null;
-  fhCreateVenta:    string;
-  detalle_venta:    DetalleVentaConProducto[];
+  eCodVenta:     string;
+  eTotal:        number;
+  fkeMetodoPago: string;
+  fhCreateVenta: string;
+  detalle_venta: DetalleVentaConProducto[];
 }
 
 interface Props {
   ventas:      Venta[];
   totalHoy:    number;
   metodosPago: MetodoPagoGlobal[];
+}
+
+// ── Paleta de colores para badges dinámicos ───────────────────────────────────
+// Cada método recibe un color según su índice en el array.
+// Usa las CSS variables del sistema para mantener consistencia visual.
+
+const PALETA_METODO = [
+  { bg: "var(--color-primary-50)",  color: "var(--color-primary-dark)", border: "var(--color-primary-light)"  },
+  { bg: "var(--color-accent-bg)",   color: "var(--color-accent)",       border: "#f5d5b0"                     },
+  { bg: "#E6F1FB",                  color: "#185FA5",                   border: "#B5D4F4"                     },
+  { bg: "var(--color-warning-bg)",  color: "var(--color-warning)",      border: "var(--color-warning-border)" },
+  { bg: "var(--color-success-bg)",  color: "var(--color-success)",      border: "var(--color-success-border)" },
+];
+
+function resolverMetodo(fkeMetodoPago: string, metodosPago: MetodoPagoGlobal[]) {
+  const idx    = metodosPago.findIndex((m) => m.eCodPay === fkeMetodoPago);
+  const metodo = idx >= 0 ? metodosPago[idx] : null;
+  const estilo = PALETA_METODO[idx >= 0 ? idx % PALETA_METODO.length : 0];
+  return {
+    nombre: metodo?.tNamePay ?? "Método eliminado",
+    estilo,
+  };
 }
 
 // ── Helper de periodo ─────────────────────────────────────────────────────────
@@ -71,7 +91,6 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
   });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
 
-  // Opciones de método construidas desde los métodos del negocio
   const opcionesMetodo = useMemo(() => [
     { value: "todos", label: "Todos" },
     ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),
@@ -171,8 +190,10 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
       ) : (
         <div className={styles.grid}>
           {ventasFiltradas.map((venta) => {
-            const folio    = venta.eCodVenta.slice(-8).toUpperCase();
-            const expandida = ventaExpandida === venta.eCodVenta;
+            const folio              = venta.eCodVenta.slice(-8).toUpperCase();
+            const expandida          = ventaExpandida === venta.eCodVenta;
+            const { nombre, estilo } = resolverMetodo(venta.fkeMetodoPago, metodosPago);
+
             return (
               <div
                 key={venta.eCodVenta}
@@ -181,8 +202,15 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
               >
                 <div className={styles.cardHeader}>
                   <span className={styles.cardFolio}>Venta #{folio}</span>
-                  <span className={`${styles.cardMetodo} ${styles[`metodo_${venta.fkeMetodoPago}`] ?? styles.metodo_efectivo}`}>
-                    {venta.metodoPagoNombre}
+                  <span
+                    className={styles.cardMetodo}
+                    style={{
+                      background: estilo.bg,
+                      color:      estilo.color,
+                      border:     `1px solid ${estilo.border}`,
+                    }}
+                  >
+                    {nombre}
                   </span>
                 </div>
 

@@ -18,10 +18,12 @@ export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
   const subtotal = venta.detalle_venta.reduce((acc, d) => acc + d.eSubtotal, 0);
   const iva      = venta.eTotal - subtotal > 0.01 ? venta.eTotal - subtotal : null;
 
-  // Resolver método desde eCodPay
   const metodo = metodosPago.find((m) => m.eCodPay === venta.fkeMetodoPago);
-  const Icono  = metodo ? ((Icons as any)[metodo.tIconPay] ?? Icons.CreditCard) : Icons.CreditCard;
-  const nombreMetodo = metodo?.tNamePay ?? venta.fkeMetodoPago;
+
+  // Si el método fue eliminado de la DB mostramos un fallback legible,
+  // nunca el UUID crudo.
+  const Icono        = metodo ? ((Icons as any)[metodo.tIconPay] ?? Icons.CreditCard) : Icons.CreditCard;
+  const nombreMetodo = metodo?.tNamePay ?? "Método eliminado";
 
   return (
     <Modal
@@ -42,7 +44,6 @@ export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
           </div>
         </div>
 
-        {/* Badge método dinámico */}
         <span className={styles.metodoBadge}>
           <Icono size={13} />
           {nombreMetodo}

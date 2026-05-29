@@ -19,29 +19,6 @@ export default async function VentasAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
-  // ── Métodos de pago activos del negocio ───────────────────────────────────
-  // 1. IDs que el admin seleccionó para su negocio
-  const { data: negocio } = await adminClient
-    .from("negocios")
-    .select("metodosPago")
-    .eq("eCodCompany", fkeCodCompany)
-    .single();
-
-  const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
-
-  // 2. Solo esos métodos, en el orden definido por Sistemas
-  let metodosPago: MetodoPagoGlobal[] = [];
-  if (idsSeleccionados.length > 0) {
-    const { data: metodos } = await adminClient
-      .from("metodos_pago")
-      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay, orden")
-      .in("eCodPay", idsSeleccionados)
-      .eq("bStatePay", true)
-      .order("orden");
-
-    metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
-  }
-
   // ── Ventas ────────────────────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
@@ -50,6 +27,24 @@ export default async function VentasAdminPage() {
     .order("fhCreateVenta", { ascending: false });
 
   if (ventasError) console.error("Error ventas:", ventasError.message);
+
+  // ── Métodos de pago ───────────────────────────────────────────────────────
+  // Se cargan a partir de los IDs que realmente aparecen en las ventas,
+  // sin filtrar por bStatePay ni por la selección actual del negocio.
+  // Esto garantiza que ventas históricas muestren siempre nombre e ícono
+  // correctos aunque el método haya sido desactivado o eliminado después.
+  const idsEnVentas = [...new Set((ventas ?? []).map((v) => v.fkeMetodoPago))];
+  let metodosPago: MetodoPagoGlobal[] = [];
+
+  if (idsEnVentas.length > 0) {
+    const { data: metodos, error: metodosError } = await adminClient
+      .from("metodos_pago")
+      .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay")
+      .in("eCodPay", idsEnVentas);
+
+    if (metodosError) console.error("Error métodos:", metodosError.message);
+    metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
+  }
 
   // ── Detalles ──────────────────────────────────────────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);

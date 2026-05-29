@@ -7,6 +7,7 @@ import styles from "./ProductoGrid.module.css";
 interface Props {
   productos: ProductoConStock[];
   onAgregar: (producto: ProductoConStock) => void;
+  bloqueado?: boolean;
 }
 
 function IconoPlaceholder() {

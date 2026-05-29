@@ -8,3 +8,210 @@
   min-height: 100%;
   overflow: hidden;
 }
+
+/* ── Banner de turno no iniciado ── */
+.bannerTurno {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  background: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-5);
+  margin-right: calc(300px + var(--space-4));
+  margin-bottom: var(--space-6);
+}
+
+.bannerTexto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.bannerIcono {
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.bannerTitulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-warning);
+  margin: 0;
+}
+
+.bannerSub {
+  font-size: 12px;
+  color: var(--color-warning);
+  opacity: 0.8;
+  margin: 2px 0 0 0;
+}
+
+.bannerBtn {
+  background: var(--color-warning);
+  color: white;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.bannerBtn:hover {
+  opacity: 0.88;
+}
+
+/* Catálogo con overlay cuando no hay turno */
+.layoutBloqueado {
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Buscador + botón cerrar caja ── */
+.buscadorRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.buscadorFlex {
+  flex: 1;
+  min-width: 0;
+}
+
+.btnCerrarCaja {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px var(--space-4);
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.btnCerrarCaja:hover {
+  background: var(--color-error);
+  color: white;
+}
+
+/* ── Desglose dentro del modal ── */
+.modalSeccionTitulo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.modalSeparador {
+  border: none;
+  border-top: 1px solid var(--border-light);
+}
+
+.modalDesgloseFila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--dark);
+  padding: var(--space-1) 0;
+}
+
+.modalDesgloseIcono {
+  color: var(--gray);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.modalDesgloseLabel {
+  flex: 1;
+  color: var(--gray);
+}
+
+.modalDesgloseValor {
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.modalDesgloseTotal .modalDesgloseLabel,
+.modalDesgloseTotal .modalDesgloseValor {
+  font-weight: 700;
+  color: var(--dark);
+}
+
+/* Input con prefijo dentro del modal */
+.modalInputWrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: white;
+  transition: border-color 0.15s;
+}
+
+.modalInputWrap:focus-within {
+  border-color: var(--color-primary);
+}
+
+.modalInputPrefix,
+.modalInputSuffix {
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray);
+  background: var(--background);
+  height: 40px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Override para que el ModalInput no tenga borde propio dentro del wrap */
+.modalInputWrap :global(.input),
+.modalInputWrap input {
+  border: none !important;
+  border-radius: 0 !important;
+  flex: 1;
+}
+
+/* ── Diferencia badge en modal ── */
+.modalDiferencia {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.modalDiferenciaOk {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.modalDiferenciaFaltante {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+}
+
+.modalDiferenciaSobrante {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
