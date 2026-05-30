@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { formatFechaHora, formatRelativo } from "@/lib/utils/fecha";
 import { getEstadoStock } from "@/types";
+import { createClient } from "@/lib/supabase/client";
 import type { InventarioConProducto } from "./InventarioClient";
 import styles from "./ModalVerStock.module.css";
 
@@ -13,11 +14,40 @@ interface Props {
   onClose: () => void;
 }
 
+interface PresentacionInfo {
+  tNombre:            string;
+  ePricePresentacion: number;
+  eCostPresentacion:  number;
+}
+
 export function ModalVerStock({ inventario, onClose }: Props) {
   const [ts] = useState(() => Date.now());
+  const [presentacion, setPresentacion] = useState<PresentacionInfo | null>(null);
+
+  // Cargar datos de la presentación si este lote corresponde a una
+  useEffect(() => {
+    const pid = (inventario as any).fkeCodPresentacion as string | null | undefined;
+    if (!pid) return;
+
+    async function cargar() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("presentaciones")
+        .select("tNombre, ePricePresentacion, eCostPresentacion")
+        .eq("eCodPresentacion", pid)
+        .single();
+      if (data) setPresentacion(data as PresentacionInfo);
+    }
+    cargar();
+  }, [(inventario as any).fkeCodPresentacion]);
 
   const esIlimitado = inventario.bUnlimitedInventory;
-  const estado     = getEstadoStock(inventario.eCantRestante, inventario.eStockMinimo, esIlimitado);
+  const estado      = getEstadoStock(inventario.eCantRestante, inventario.eStockMinimo, esIlimitado);
+
+  // Precio: usar el de la presentación si existe, si no el del producto
+  const precioUnitario = presentacion?.ePricePresentacion
+    ?? inventario.productos?.ePriceProduct
+    ?? 0;
 
   const pctVendido =
     !esIlimitado && inventario.eCantIngresada && inventario.eCantIngresada > 0
@@ -26,7 +56,12 @@ export function ModalVerStock({ inventario, onClose }: Props) {
 
   const barraColor = esIlimitado
     ? "var(--color-primary)"
-    : { disponible: "var(--color-success)", bajo: "var(--color-warning)", agotado: "var(--color-error)", ilimitado: "var(--color-primary)" }[estado];
+    : {
+        disponible: "var(--color-success)",
+        bajo:       "var(--color-warning)",
+        agotado:    "var(--color-error)",
+        ilimitado:  "var(--color-primary)",
+      }[estado];
 
   const imgSrc = inventario.productos?.ImgProduct
     ? `${inventario.productos.ImgProduct.split("?")[0]}?t=${ts}`
@@ -34,11 +69,17 @@ export function ModalVerStock({ inventario, onClose }: Props) {
 
   const campos = [
     { label: "Categoría",            valor: inventario.productos?.categorias?.tNameCategory ?? "—" },
-    { label: "Precio unitario",      valor: `$${inventario.productos?.ePriceProduct?.toFixed(2) ?? "—"}` },
+    {
+      label: "Precio unitario",
+      valor: `$${precioUnitario.toFixed(2)}${presentacion ? ` (${presentacion.tNombre})` : ""}`,
+    },
     { label: "Stock mínimo",         valor: esIlimitado ? "—" : `${inventario.eStockMinimo} unidades` },
     { label: "Fecha de ingreso",     valor: formatFechaHora(inventario.fhCreateInventory) },
     { label: "Última actualización", valor: formatRelativo(inventario.fhUpdateInventory) },
-    { label: "Ingresos estimados",   valor: `$${((inventario.eCantVendida ?? 0) * (inventario.productos?.ePriceProduct ?? 0)).toFixed(2)}` },
+    {
+      label: "Ingresos estimados",
+      valor: `$${((inventario.eCantVendida ?? 0) * precioUnitario).toFixed(2)}`,
+    },
   ];
 
   return (
@@ -53,6 +94,22 @@ export function ModalVerStock({ inventario, onClose }: Props) {
           )}
         </div>
         <div className={styles.avatarNombre}>{inventario.productos?.tNameProduct ?? "—"}</div>
+
+        {/* Presentación — se muestra debajo del nombre si aplica */}
+        {presentacion && (
+          <div style={{
+            display: "inline-flex", alignItems: "center",
+            background: "var(--color-primary-50)",
+            border: "1px solid var(--color-primary-light)",
+            borderRadius: "var(--radius-sm)",
+            padding: "2px 10px",
+            fontSize: 12, fontWeight: 700, color: "var(--color-primary-dark)",
+            marginTop: 4,
+          }}>
+            {presentacion.tNombre}
+          </div>
+        )}
+
         <div className={styles.badges}>
           <Badge activo={inventario.bStateInventory} />
           {esIlimitado ? (
@@ -63,7 +120,6 @@ export function ModalVerStock({ inventario, onClose }: Props) {
         </div>
       </div>
 
-      {/* Para ilimitados: solo mostrar vendidas */}
       {esIlimitado ? (
         <div style={{
           background: "var(--color-primary-50)",

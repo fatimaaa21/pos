@@ -1,20 +1,23 @@
 "use client";
 
-import { useState }    from "react";
-import { useRouter }   from "next/navigation";
-import type { Categoria, ProductoConStock, MetodoPago } from "@/types";
-import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import { useState }   from "react";
+import { useRouter }  from "next/navigation";
+import type {
+  Categoria, ProductoConStock, PresentacionConStock,
+  ItemCarritoMenu, MetodoPago,
+} from "@/types";
+import type { MetodoPagoGlobal }  from "@/lib/actions/metodos-pago";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
-import { iniciarTurno, cerrarTurno, getTurnoAbierto } from "@/lib/actions/cortes";
-import { Banknote, CreditCard, Smartphone, TrendingUp, AlertTriangle, CheckCircle, Calculator } from "lucide-react";
-import { Buscador }           from "@/components/ui/Buscador";
-import { CategoriaCarrusel }  from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
-import { ProductoGrid }       from "@/components/ui/ProductoGrid/ProductoGrid";
-import { PedidoPanel }        from "@/components/ui/PedidoPanel/PedidoPanel";
-import { ModalVentaExitosa }  from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
-import { ModalCerrarCaja } from "./ModalCerrarCaja";
+import { iniciarTurno }           from "@/lib/actions/cortes";
+import { Calculator }             from "lucide-react";
+import { Buscador }               from "@/components/ui/Buscador";
+import { CategoriaCarrusel }      from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
+import { ProductoGrid }           from "@/components/ui/ProductoGrid/ProductoGrid";
+import { PedidoPanel }            from "@/components/ui/PedidoPanel/PedidoPanel";
+import { ModalVentaExitosa }      from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
+import { ModalCerrarCaja }        from "./ModalCerrarCaja";
 import type { CorteCaja, VentasDelTurno } from "@/types";
-import { crearVenta }         from "@/lib/actions/ventas";
+import { crearVenta }             from "@/lib/actions/ventas";
 import styles from "./menu.module.css";
 
 const VENTAS_VACIO: VentasDelTurno = {
@@ -22,9 +25,9 @@ const VENTAS_VACIO: VentasDelTurno = {
   eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
 };
 
-export interface ItemCarritoMenu {
-  producto: ProductoConStock;
-  cantidad: number;
+/** Clave única por ítem en el carrito (producto + presentación opcional) */
+function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): string {
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
 }
 
 interface Props {
@@ -32,26 +35,27 @@ interface Props {
   productos:      ProductoConStock[];
   tieneTurno:     boolean;
   metodosPago:    MetodoPagoGlobal[];
-  corte:          CorteCaja | null;       // ← nuevo
-  ventasDelTurno: VentasDelTurno; 
+  corte:          CorteCaja | null;
+  ventasDelTurno: VentasDelTurno;
 }
 
-export function MenuClient({ categorias, productos, tieneTurno, metodosPago, corte, ventasDelTurno = VENTAS_VACIO }: Props) {
+export function MenuClient({
+  categorias, productos, tieneTurno, metodosPago,
+  corte, ventasDelTurno = VENTAS_VACIO,
+}: Props) {
   const [categoriaActiva, setCategoriaActiva] = useState<string>("todas");
-  const [busqueda, setBusqueda]   = useState("");
-  const router                    = useRouter();
-  const [carrito, setCarrito]     = useState<ItemCarritoMenu[]>([]);
-  const [errorVenta, setErrorVenta]     = useState<string | null>(null);
-  const [ventaExitosa, setVentaExitosa] = useState<string | null>(null);
+  const [busqueda, setBusqueda]               = useState("");
+  const router                                = useRouter();
+  const [carrito, setCarrito]                 = useState<ItemCarritoMenu[]>([]);
+  const [errorVenta, setErrorVenta]           = useState<string | null>(null);
+  const [ventaExitosa, setVentaExitosa]       = useState<string | null>(null);
   const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const productosFiltrados = productos.filter((p) => {
     const coincideCategoria =
       categoriaActiva === "todas" || p.fkeCodCategory === categoriaActiva;
-    const coincideBusqueda = p.tNameProduct
-      .toLowerCase()
-      .includes(busqueda.toLowerCase());
+    const coincideBusqueda  = p.tNameProduct.toLowerCase().includes(busqueda.toLowerCase());
     return coincideCategoria && coincideBusqueda;
   });
 
@@ -65,60 +69,39 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
     ),
   };
 
-  // ── Carrito — bloqueado si no hay turno ───────────────────────────────────
-  function agregarProducto(producto: ProductoConStock) {
+  // ── Agregar al carrito ────────────────────────────────────────────────────
+  function agregarProducto(producto: ProductoConStock, presentacion?: PresentacionConStock) {
     if (!tieneTurno) return;
     setErrorVenta(null);
+
+    const key    = carritoKey({ producto, presentacion });
+    const stock  = presentacion?.stockDisponible ?? producto.stockDisponible;
+    const bInf   = presentacion?.bInfinito       ?? producto.bInfinito;
+
     setCarrito((prev) => {
-      const existe = prev.find((i) => i.producto.eCodProduct === producto.eCodProduct);
+      const existe = prev.find((i) => carritoKey(i) === key);
       if (existe) {
-        if (existe.cantidad >= producto.stockDisponible) return prev;
+        if (!bInf && existe.cantidad >= stock) return prev;
         return prev.map((i) =>
-          i.producto.eCodProduct === producto.eCodProduct
-            ? { ...i, cantidad: i.cantidad + 1 }
-            : i
+          carritoKey(i) === key ? { ...i, cantidad: i.cantidad + 1 } : i
         );
       }
-      return [...prev, { producto, cantidad: 1 }];
+      return [...prev, { producto, cantidad: 1, presentacion }];
     });
   }
 
-  // ── Modal iniciar turno ───────────────────────────────────────────────────
-  const [modalTurno, setModalTurno]       = useState(false);
-  const [fondoInicial, setFondoInicial]   = useState("");
-  const [nombreTurno, setNombreTurno]     = useState("");
-  const [errorTurno, setErrorTurno]       = useState<string | null>(null);
-  const [loadingTurno, setLoadingTurno]   = useState(false);
-
-  async function handleIniciarTurno() {
-    setErrorTurno(null);
-    setLoadingTurno(true);
-
-    const fd = new FormData();
-    fd.append("eFondoInicial", fondoInicial);
-    fd.append("tNombreTurno",  nombreTurno);
-
-    const result = await iniciarTurno(fd);
-
-    setLoadingTurno(false);
-
-    if (result.error) {
-      setErrorTurno(result.error);
-    } else {
-      setModalTurno(false);
-      router.refresh();
-    }
-  }
-
-  function cambiarCantidad(eCodProduct: string, delta: number) {
+  // ── Cambiar cantidad ──────────────────────────────────────────────────────
+  function cambiarCantidad(key: string, delta: number) {
     setErrorVenta(null);
     setCarrito((prev) =>
       prev
         .map((i) => {
-          if (i.producto.eCodProduct !== eCodProduct) return i;
-          const nuevaCantidad = i.cantidad + delta;
-          if (nuevaCantidad > i.producto.stockDisponible) return i;
-          return { ...i, cantidad: nuevaCantidad };
+          if (carritoKey(i) !== key) return i;
+          const stock = i.presentacion?.stockDisponible ?? i.producto.stockDisponible;
+          const bInf  = i.presentacion?.bInfinito       ?? i.producto.bInfinito;
+          const nueva = i.cantidad + delta;
+          if (!bInf && nueva > stock) return i;
+          return { ...i, cantidad: nueva };
         })
         .filter((i) => i.cantidad > 0)
     );
@@ -129,24 +112,22 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
     setErrorVenta(null);
   }
 
+  // ── Finalizar venta ───────────────────────────────────────────────────────
   async function handleFinalizar(metodoPago: MetodoPago) {
     if (!tieneTurno) return;
     setErrorVenta(null);
 
     const result = await crearVenta(
       carrito.map((i) => ({
-        eCodProduct:    i.producto.eCodProduct,
-        cantidad:       i.cantidad,
-        precioUnitario: i.producto.ePriceProduct,
+        eCodProduct:       i.producto.eCodProduct,
+        eCodPresentacion:  i.presentacion?.eCodPresentacion,
+        cantidad:          i.cantidad,
+        precioUnitario:    i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct,
       })),
       metodoPago
     );
 
-    if (result.error) {
-      setErrorVenta(result.error);
-      return;
-    }
-
+    if (result.error) { setErrorVenta(result.error); return; }
     setVentaExitosa(result.eCodVenta!);
   }
 
@@ -156,9 +137,28 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
     router.refresh();
   }
 
+  // ── Modal turno ───────────────────────────────────────────────────────────
+  const [modalTurno,   setModalTurno]   = useState(false);
+  const [fondoInicial, setFondoInicial] = useState("");
+  const [nombreTurno,  setNombreTurno]  = useState("");
+  const [errorTurno,   setErrorTurno]   = useState<string | null>(null);
+  const [loadingTurno, setLoadingTurno] = useState(false);
+
+  async function handleIniciarTurno() {
+    setErrorTurno(null);
+    setLoadingTurno(true);
+    const fd = new FormData();
+    fd.append("eFondoInicial", fondoInicial);
+    fd.append("tNombreTurno",  nombreTurno);
+    const result = await iniciarTurno(fd);
+    setLoadingTurno(false);
+    if (result.error) setErrorTurno(result.error);
+    else { setModalTurno(false); router.refresh(); }
+  }
+
   return (
     <>
-      {/* ── Banner de turno no iniciado ───────────────────────────────────── */}
+      {/* Banner turno no iniciado */}
       {!tieneTurno && (
         <div className={styles.bannerTurno}>
           <div className={styles.bannerTexto}>
@@ -168,27 +168,20 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
               <p className={styles.bannerSub}>Inicia tu turno para poder registrar pedidos</p>
             </div>
           </div>
-          <button
-            className={styles.bannerBtn}
-            onClick={() => setModalTurno(true)}
-          >
+          <button className={styles.bannerBtn} onClick={() => setModalTurno(true)}>
             Iniciar turno
           </button>
         </div>
       )}
 
-      {/* ── Catálogo ── */}
+      {/* Catálogo */}
       <div className={`${styles.layout} ${!tieneTurno ? styles.layoutBloqueado : ""}`}>
-        {/* ── Buscador + botón cerrar caja ── */}
         <div className={styles.buscadorRow}>
           <div className={styles.buscadorFlex}>
             <Buscador valor={busqueda} onChange={setBusqueda} />
           </div>
           {tieneTurno && (
-            <button
-              className={styles.btnCerrarCaja}
-              onClick={() => setModalCerrarCaja(true)}
-            >
+            <button className={styles.btnCerrarCaja} onClick={() => setModalCerrarCaja(true)}>
               Cerrar caja
             </button>
           )}
@@ -207,7 +200,7 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
         />
       </div>
 
-      {/* ── Panel de pedido fijo ── */}
+      {/* Panel de pedido */}
       <PedidoPanel
         items={carrito}
         metodosPago={metodosPago}
@@ -225,6 +218,7 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
         />
       )}
 
+      {/* Modal iniciar turno */}
       {modalTurno && (
         <Modal
           titulo="Iniciar turno"
@@ -238,20 +232,15 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
         >
           <ModalField label="Fondo inicial en efectivo" required>
             <ModalInput
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
+              type="number" min="0" step="0.01" placeholder="0.00"
               value={fondoInicial}
               onChange={(e) => setFondoInicial(e.target.value)}
               autoFocus
             />
           </ModalField>
-
           <ModalField label="Nombre del turno (opcional)">
             <ModalInput
-              type="text"
-              placeholder="Ej. Turno matutino"
+              type="text" placeholder="Ej. Turno matutino"
               value={nombreTurno}
               onChange={(e) => setNombreTurno(e.target.value)}
             />
@@ -261,13 +250,10 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
 
       {tieneTurno && corte && modalCerrarCaja && (
         <ModalCerrarCaja
-          corte={corte}                    // ← ahora TypeScript sabe que no es null
+          corte={corte}
           ventasDelTurno={ventasDelTurno}
           onClose={() => setModalCerrarCaja(false)}
-          onCerrado={() => {
-            setModalCerrarCaja(false);
-            router.refresh();
-          }}
+          onCerrado={() => { setModalCerrarCaja(false); router.refresh(); }}
         />
       )}
     </>

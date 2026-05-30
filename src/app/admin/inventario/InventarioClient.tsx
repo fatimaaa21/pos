@@ -20,14 +20,19 @@ import styles from "./inventario.module.css";
 
 export interface InventarioConProducto extends Inventario {
   productos?: {
-    tNameProduct: string;
-    ImgProduct?: string;
+    tNameProduct:  string;
+    ImgProduct?:   string;
     ePriceProduct: number;
     categorias?: {
-      eCodCategory: string;
+      eCodCategory:  string;
       tNameCategory: string;
     };
   };
+  // Presentación vinculada a este lote (null si el producto no usa presentaciones)
+  presentaciones?: {
+    tNombre:            string;
+    ePricePresentacion: number;
+  } | null;
 }
 
 interface Props {
@@ -36,23 +41,19 @@ interface Props {
 
 export function InventarioClient({ inventario: inicial }: Props) {
   const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
-  const [busqueda, setBusqueda] = useState("");
-  const router = useRouter();
-  const [filtros, setFiltros] = useState<FiltrosUsuario>({
-    busqueda:   "",
-    roles:      [],
-    estados:    [],
-    categorias: [],
-    stocks:     [],
+  const [busqueda, setBusqueda]     = useState("");
+  const router                      = useRouter();
+  const [filtros, setFiltros]       = useState<FiltrosUsuario>({
+    busqueda: "", roles: [], estados: [], categorias: [], stocks: [],
   });
   const [modalAgregar, setModalAgregar] = useState(false);
-  const [stockVer,     setStockVer]     = useState<Inventario | null>(null);
-  const [stockEditar,  setStockEditar]  = useState<Inventario | null>(null);
+  const [stockVer,     setStockVer]     = useState<InventarioConProducto | null>(null);
+  const [stockEditar,  setStockEditar]  = useState<InventarioConProducto | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [eliminando,  setEliminando]    = useState<string | null>(null);
   const [toggleando,  setToggleando]    = useState<string | null>(null);
 
-  // ── Opciones de categoría derivadas del inventario ────────────────────────
+  // ── Opciones de categoría ─────────────────────────────────────────────────
   const opcionesCategorias = Array.from(
     new Map(
       inventario
@@ -69,10 +70,15 @@ export function InventarioClient({ inventario: inicial }: Props) {
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = inventario.filter((c) => {
-    const texto = filtros.busqueda.toLowerCase();
+    const texto           = filtros.busqueda.toLowerCase();
     const nombreProducto  = c.productos?.tNameProduct?.toLowerCase() ?? "";
     const nombreCategoria = c.productos?.categorias?.tNameCategory?.toLowerCase() ?? "";
-    const coincideTexto   = !texto || nombreProducto.includes(texto) || nombreCategoria.includes(texto);
+    const nombrePres      = c.presentaciones?.tNombre?.toLowerCase() ?? "";
+    const coincideTexto   =
+      !texto ||
+      nombreProducto.includes(texto) ||
+      nombreCategoria.includes(texto) ||
+      nombrePres.includes(texto);
 
     const estadoValor    = c.bStateInventory ? "activo" : "inactivo";
     const coincideEstado = filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
@@ -80,9 +86,8 @@ export function InventarioClient({ inventario: inicial }: Props) {
     const codCategoria      = c.productos?.categorias?.eCodCategory ?? "";
     const coincideCategoria = !filtros.categorias?.length || filtros.categorias.includes(codCategoria);
 
-    const estadoStock   = getEstadoStock(c.eCantRestante, c.eStockMinimo);
-    // "ilimitado" se trata como "disponible" en el filtro de stock
-    const stockNorm     = estadoStock === "ilimitado" ? "disponible" : estadoStock;
+    const estadoStock = getEstadoStock(c.eCantRestante, c.eStockMinimo);
+    const stockNorm   = estadoStock === "ilimitado" ? "disponible" : estadoStock;
     const coincideStock = !filtros.stocks?.length || filtros.stocks.includes(stockNorm);
 
     return coincideTexto && coincideEstado && coincideCategoria && coincideStock;
@@ -95,11 +100,9 @@ export function InventarioClient({ inventario: inicial }: Props) {
     router.refresh();
   }
 
-  function handleStockEditado(actualizado: Inventario) {
+  function handleStockEditado(actualizado: InventarioConProducto) {
     setInventario((prev) =>
-      prev.map((c) =>
-        c.eCodInventory === actualizado.eCodInventory ? { ...actualizado } : c
-      )
+      prev.map((c) => c.eCodInventory === actualizado.eCodInventory ? actualizado : c)
     );
     setStockEditar(null);
     router.refresh();
@@ -137,23 +140,20 @@ export function InventarioClient({ inventario: inicial }: Props) {
       .select(`
         *,
         productos!inventario_fkeCodProduct_fkey (
-          tNameProduct,
-          ImgProduct,
-          ePriceProduct,
-          categorias ( tNameCategory )
-        )
+          tNameProduct, ImgProduct, ePriceProduct,
+          categorias ( eCodCategory, tNameCategory )
+        ),
+        presentaciones ( tNombre, ePricePresentacion )
       `)
       .order("fhCreateInventory", { ascending: false });
     if (data) setInventario(data as InventarioConProducto[]);
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  const disponibles = inventario.filter(
-    (p) => {
-      const e = getEstadoStock(p.eCantRestante, p.eStockMinimo);
-      return e === "disponible" || e === "ilimitado";
-    }
-  ).length;
+  const disponibles = inventario.filter((p) => {
+    const e = getEstadoStock(p.eCantRestante, p.eStockMinimo);
+    return e === "disponible" || e === "ilimitado";
+  }).length;
   const stockBajo = inventario.filter(
     (p) => getEstadoStock(p.eCantRestante, p.eStockMinimo) === "bajo"
   ).length;
@@ -168,6 +168,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
       label: "Producto",
       render: (c) => {
         const producto = c.productos;
+        const pres     = c.presentaciones;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div className={styles.avatar}>
@@ -181,7 +182,21 @@ export function InventarioClient({ inventario: inicial }: Props) {
                 <span>📦</span>
               )}
             </div>
-            <span>{producto?.tNameProduct ?? "Sin nombre"}</span>
+            <div>
+              <span style={{ fontWeight: 600 }}>
+                {producto?.tNameProduct ?? "Sin nombre"}
+              </span>
+              {pres?.tNombre && (
+                <span style={{
+                  marginLeft: 5,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--gray)",
+                }}>
+                  ({pres.tNombre})
+                </span>
+              )}
+            </div>
           </div>
         );
       },
@@ -223,7 +238,11 @@ export function InventarioClient({ inventario: inicial }: Props) {
     {
       key: "ePriceProduct",
       label: "Precio",
-      render: (c) => <span>$ {c.productos?.ePriceProduct?.toFixed(2) ?? "—"}</span>,
+      render: (c) => {
+        // Si tiene presentación, mostrar el precio de la presentación
+        const precio = c.presentaciones?.ePricePresentacion ?? c.productos?.ePriceProduct;
+        return <span>$ {precio?.toFixed(2) ?? "—"}</span>;
+      },
     },
     {
       key: "bStateInventory",
@@ -331,9 +350,9 @@ function ActionBtn({
   children, title, onClick, danger, loading,
 }: {
   children: React.ReactNode;
-  title: string;
-  onClick: () => void;
-  danger?: boolean;
+  title:    string;
+  onClick:  () => void;
+  danger?:  boolean;
   loading?: boolean;
 }) {
   return (

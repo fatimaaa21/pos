@@ -3,32 +3,33 @@
 import { useState } from "react";
 import { Trash2, Minus, Plus, NotebookPen } from "lucide-react";
 import * as Icons from "lucide-react";
-import type { ItemCarritoMenu } from "@/app/empleado/menu/MenuClient";
+import type { ItemCarritoMenu, MetodoPago } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
-import type { MetodoPago }       from "@/types";
 import styles from "./PedidoPanel.module.css";
 import { ModalEfectivo } from "@/components/ui/ModalEfectivo/ModalEfectivo";
 
 interface Props {
-  items:        ItemCarritoMenu[];
-  metodosPago:  MetodoPagoGlobal[];
-  onCambiarCantidad: (eCodProduct: string, delta: number) => void;
-  onLimpiar:    () => void;
-  onFinalizar:  (metodoPago: MetodoPago) => Promise<void>;
-  error?:       string | null;
-  bloqueado?: boolean;
+  items:             ItemCarritoMenu[];
+  metodosPago:       MetodoPagoGlobal[];
+  onCambiarCantidad: (key: string, delta: number) => void;  // key = carritoKey
+  onLimpiar:         () => void;
+  onFinalizar:       (metodoPago: MetodoPago) => Promise<void>;
+  error?:            string | null;
+  bloqueado?:        boolean;
 }
 
 const IVA = 0.16;
+
+/** Clave única por ítem — debe coincidir con la de MenuClient */
+function carritoKey(item: ItemCarritoMenu): string {
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
+}
 
 function IconoMetodo({ nombre, size = 18 }: { nombre: string; size?: number }) {
   const Icono = (Icons as any)[nombre];
   return Icono ? <Icono size={size} /> : <Icons.CreditCard size={size} />;
 }
 
-// Detecta si un MetodoPagoGlobal corresponde a efectivo.
-// Estrategia 1: campo tTipoPay === "efectivo" (si el backend lo expone).
-// Estrategia 2: el nombre contiene "efectivo" (case-insensitive, fallback robusto).
 function esMetodoEfectivo(metodo: MetodoPagoGlobal): boolean {
   if ("tTipoPay" in metodo && (metodo as any).tTipoPay === "efectivo") return true;
   return metodo.tNamePay.toLowerCase().includes("efectivo");
@@ -43,36 +44,29 @@ export function PedidoPanel({
   error,
   bloqueado = false,
 }: Props) {
-  const [metodoPago, setMetodoPago] = useState<string>(
-    metodosPago[0]?.eCodPay ?? ""
-  );
-  const [cargando, setCargando] = useState(false);
-  const [modalEfectivoAbierto, setModalEfectivoAbierto] = useState(false);
+  const [metodoPago, setMetodoPago]             = useState<string>(metodosPago[0]?.eCodPay ?? "");
+  const [cargando, setCargando]                 = useState(false);
+  const [modalEfectivoAbierto, setModalEfectivo] = useState(false);
 
-  const subtotal = items.reduce(
-    (acc, i) => acc + i.producto.ePriceProduct * i.cantidad,
-    0
-  );
-  const iva   = subtotal * IVA;
-  const total = subtotal + iva;
+  // Precio por ítem: presentación si existe, si no el base del producto
+  const precioItem = (item: ItemCarritoMenu) =>
+    item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct;
 
-  // Resuelve si el método activo es efectivo
+  const subtotal = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
+  const iva      = subtotal * IVA;
+  const total    = subtotal + iva;
+
   const metodoSeleccionado = metodosPago.find((m) => m.eCodPay === metodoPago);
   const metodoEsEfectivo   = metodoSeleccionado ? esMetodoEfectivo(metodoSeleccionado) : false;
 
   function handleClickCobrar() {
     if (items.length === 0 || cargando || !metodoPago) return;
-    // Si es efectivo → abrir modal de ingreso y vuelto
-    if (metodoEsEfectivo) {
-      setModalEfectivoAbierto(true);
-      return;
-    }
-    // Tarjeta, QR, etc. → procesar directo (sin modal)
+    if (metodoEsEfectivo) { setModalEfectivo(true); return; }
     procesarVenta();
   }
 
   async function handleConfirmarEfectivo(_montoPagado: number) {
-    setModalEfectivoAbierto(false);
+    setModalEfectivo(false);
     await procesarVenta();
   }
 
@@ -86,7 +80,7 @@ export function PedidoPanel({
     <>
       <aside className={styles.panel}>
 
-        {/* ── Header ── */}
+        {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerTitulo}>
             <NotebookPen size={18} className={styles.headerIcono} />
@@ -99,7 +93,7 @@ export function PedidoPanel({
           )}
         </div>
 
-        {/* ── Lista de ítems ── */}
+        {/* Lista de ítems */}
         <div className={styles.lista}>
           {items.length === 0 ? (
             <div className={styles.vacio}>
@@ -107,44 +101,65 @@ export function PedidoPanel({
               <p>Agrega productos al pedido</p>
             </div>
           ) : (
-            items.map((item) => (
-              <div key={item.producto.eCodProduct} className={styles.item}>
-                <div className={styles.itemImg}>
-                  {item.producto.ImgProduct ? (
-                    <img src={item.producto.ImgProduct} alt={item.producto.tNameProduct} />
-                  ) : (
-                    <div className={styles.itemImgPlaceholder} />
-                  )}
+            items.map((item) => {
+              const key    = carritoKey(item);
+              const precio = precioItem(item);
+              const stock  = item.presentacion?.stockDisponible ?? item.producto.stockDisponible;
+              const bInf   = item.presentacion?.bInfinito       ?? item.producto.bInfinito;
+              const maxAlcanzado = !bInf && item.cantidad >= stock;
+
+              return (
+                <div key={key} className={styles.item}>
+                  {/* Imagen */}
+                  <div className={styles.itemImg}>
+                    {item.producto.ImgProduct ? (
+                      <img src={item.producto.ImgProduct} alt={item.producto.tNameProduct} />
+                    ) : (
+                      <div className={styles.itemImgPlaceholder} />
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className={styles.itemInfo}>
+                    <p className={styles.itemNombre}>
+                      {item.producto.tNameProduct}
+                      {item.presentacion && (
+                        <span className={styles.itemPresentacion}>
+                          {" "}({item.presentacion.tNombre})
+                        </span>
+                      )}
+                    </p>
+                    <span className={styles.itemPrecioUnit}>
+                      ${precio.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {/* Controles */}
+                  <div className={styles.itemControles}>
+                    <button
+                      className={styles.btnCantidad}
+                      onClick={() => onCambiarCantidad(key, -1)}
+                      aria-label="Quitar uno"
+                    >
+                      <Minus size={11} strokeWidth={2.5} />
+                    </button>
+                    <span className={styles.cantidad}>{item.cantidad}</span>
+                    <button
+                      className={`${styles.btnCantidad} ${maxAlcanzado ? styles.btnCantidadMax : ""}`}
+                      onClick={() => !maxAlcanzado && onCambiarCantidad(key, 1)}
+                      disabled={maxAlcanzado}
+                      aria-label="Agregar uno"
+                    >
+                      <Plus size={11} strokeWidth={2.5} />
+                    </button>
+                  </div>
                 </div>
-                <div className={styles.itemInfo}>
-                  <p className={styles.itemNombre}>{item.producto.tNameProduct}</p>
-                  <span className={styles.itemPrecioUnit}>
-                    ${item.producto.ePriceProduct.toFixed(2)}
-                  </span>
-                </div>
-                <div className={styles.itemControles}>
-                  <button
-                    className={styles.btnCantidad}
-                    onClick={() => onCambiarCantidad(item.producto.eCodProduct, -1)}
-                    aria-label="Quitar uno"
-                  >
-                    <Minus size={11} strokeWidth={2.5} />
-                  </button>
-                  <span className={styles.cantidad}>{item.cantidad}</span>
-                  <button
-                    className={styles.btnCantidad}
-                    onClick={() => onCambiarCantidad(item.producto.eCodProduct, 1)}
-                    aria-label="Agregar uno"
-                  >
-                    <Plus size={11} strokeWidth={2.5} />
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
-        {/* ── Totales ── */}
+        {/* Totales */}
         {items.length > 0 && (
           <div className={styles.totales}>
             <div className={styles.lineaTotal}>
@@ -163,7 +178,7 @@ export function PedidoPanel({
           </div>
         )}
 
-        {/* ── Métodos de pago dinámicos (los que el Admin activó) ── */}
+        {/* Métodos de pago */}
         {items.length > 0 && (
           <div className={styles.metodos}>
             {metodosPago.length === 0 ? (
@@ -178,9 +193,7 @@ export function PedidoPanel({
                   onClick={() => setMetodoPago(m.eCodPay)}
                   title={m.tNamePay}
                 >
-                  <span className={styles.metodoIcono}>
-                    <IconoMetodo nombre={m.tIconPay} />
-                  </span>
+                  <span className={styles.metodoIcono}><IconoMetodo nombre={m.tIconPay} /></span>
                   <span className={styles.metodoLabel}>{m.tNamePay}</span>
                 </button>
               ))
@@ -188,12 +201,12 @@ export function PedidoPanel({
           </div>
         )}
 
-        {/* ── Error ── */}
+        {/* Error */}
         {error && items.length > 0 && (
           <div className={styles.error}>⚠ {error}</div>
         )}
 
-        {/* ── Botón finalizar ── */}
+        {/* Botón finalizar */}
         <div className={styles.footerAccion}>
           <button
             className={styles.btnFinalizar}
@@ -210,12 +223,11 @@ export function PedidoPanel({
 
       </aside>
 
-      {/* ── Modal efectivo — solo aparece cuando el método activo es efectivo ── */}
       {modalEfectivoAbierto && (
         <ModalEfectivo
           total={total}
           onConfirmar={handleConfirmarEfectivo}
-          onCancelar={() => setModalEfectivoAbierto(false)}
+          onCancelar={() => setModalEfectivo(false)}
         />
       )}
     </>

@@ -29,10 +29,6 @@ export default async function VentasAdminPage() {
   if (ventasError) console.error("Error ventas:", ventasError.message);
 
   // ── Métodos de pago ───────────────────────────────────────────────────────
-  // Se cargan a partir de los IDs que realmente aparecen en las ventas,
-  // sin filtrar por bStatePay ni por la selección actual del negocio.
-  // Esto garantiza que ventas históricas muestren siempre nombre e ícono
-  // correctos aunque el método haya sido desactivado o eliminado después.
   const idsEnVentas = [...new Set((ventas ?? []).map((v) => v.fkeMetodoPago))];
   let metodosPago: MetodoPagoGlobal[] = [];
 
@@ -46,14 +42,14 @@ export default async function VentasAdminPage() {
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
-  // ── Detalles ──────────────────────────────────────────────────────────────
+  // ── Detalles (ahora incluye fkeCodPresentacion) ───────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);
   let detalles: any[] = [];
 
   if (ids.length > 0) {
     const { data: det, error: detError } = await adminClient
       .from("detalle_venta")
-      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, eCantidad, ePrecioUnitario, eSubtotal")
+      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal")
       .in("fkeCodVenta", ids);
 
     if (detError) console.error("Error detalles:", detError.message);
@@ -72,6 +68,28 @@ export default async function VentasAdminPage() {
 
     if (prodsError) console.error("Error productos:", prodsError.message);
     else productos = prods ?? [];
+  }
+
+  // ── Presentaciones ────────────────────────────────────────────────────────
+  const presIds = [
+    ...new Set(
+      detalles
+        .map((d) => d.fkeCodPresentacion as string | null)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const presentacionesMap = new Map<string, { tNombre: string }>();
+
+  if (presIds.length > 0) {
+    const { data: pres, error: presError } = await adminClient
+      .from("presentaciones")
+      .select("eCodPresentacion, tNombre")
+      .in("eCodPresentacion", presIds);
+
+    if (presError) console.error("Error presentaciones:", presError.message);
+    for (const p of pres ?? []) {
+      presentacionesMap.set(p.eCodPresentacion, { tNombre: p.tNombre });
+    }
   }
 
   // ── Perfiles de empleados ─────────────────────────────────────────────────
@@ -94,7 +112,10 @@ export default async function VentasAdminPage() {
 
   const detallesConProducto = detalles.map((d) => ({
     ...d,
-    producto: productosMap.get(d.fkeCodProduct) ?? null,
+    producto:     productosMap.get(d.fkeCodProduct) ?? null,
+    presentacion: d.fkeCodPresentacion
+      ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null)
+      : null,
   }));
 
   const ventasCompletas = (ventas ?? []).map((v) => ({

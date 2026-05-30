@@ -8,15 +8,38 @@ export async function agregarStock(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
-    const fkeCodProduct  = formData.get("fkeCodProduct") as string;
-    const eCantIngresada = parseFloat(formData.get("eCantIngresada") as string);
-    const eStockMinimo   = parseFloat(formData.get("eStockMinimo") as string);
+    const fkeCodProduct      = formData.get("fkeCodProduct") as string;
+    const fkeCodPresentacion = (formData.get("fkeCodPresentacion") as string) || null;
+    const bIlimitado         = formData.get("bUnlimitedInventory") === "true";
+    const eCantIngresada     = bIlimitado ? 0 : parseFloat(formData.get("eCantIngresada") as string);
+    const eStockMinimo       = bIlimitado ? 0 : (parseFloat(formData.get("eStockMinimo") as string) || 0);
 
-    if (!fkeCodProduct || isNaN(eCantIngresada) || eCantIngresada <= 0) {
-      return { error: "Datos inválidos" };
+    if (!fkeCodProduct) return { error: "Producto requerido" };
+    if (!bIlimitado && (isNaN(eCantIngresada) || eCantIngresada <= 0)) {
+      return { error: "Cantidad inválida" };
     }
 
-    // ── Obtener fkeCodCompany desde el producto ───────────────────────────
+    // ── Regla de negocio: si el producto tiene presentaciones, SIEMPRE se
+    //    requiere fkeCodPresentacion. No puede haber inventario "genérico"
+    //    para un producto que ya maneja presentaciones. ──────────────────────
+    if (!fkeCodPresentacion) {
+      const { data: presActivas } = await adminClient
+        .from("presentaciones")
+        .select("eCodPresentacion")
+        .eq("fkeCodProduct", fkeCodProduct)
+        .eq("bStatePresentacion", true)
+        .limit(1);
+
+      if (presActivas && presActivas.length > 0) {
+        return {
+          error:
+            "Este producto maneja presentaciones. " +
+            "Selecciona una presentación para registrar el stock.",
+        };
+      }
+    }
+
+    // Obtener fkeCodCompany
     const { data: producto, error: productoError } = await adminClient
       .from("productos")
       .select("fkeCodCompany")
@@ -34,9 +57,11 @@ export async function agregarStock(formData: FormData) {
       .from("inventario")
       .insert({
         fkeCodProduct,
+        fkeCodPresentacion,
         fkeCodCompany,
         eCantIngresada,
         eStockMinimo,
+        bUnlimitedInventory: bIlimitado,
         bStateInventory: true,
         fhCreateInventory: ahora,
         fhUpdateInventory: ahora,
@@ -46,9 +71,6 @@ export async function agregarStock(formData: FormData) {
 
     if (error) return { error: `Error al agregar stock: ${error.message}` };
 
-    // ── Leer desde vista_inventario para obtener eCantRestante calculado ──
-    // La tabla base no tiene eCantRestante; es un campo calculado en la vista.
-    // Si devolviéramos el insert directo, eCantRestante llegaría como 0.
     const { data, error: vistaError } = await adminClient
       .from("vista_inventario")
       .select(`
@@ -105,7 +127,6 @@ export async function editarStock(formData: FormData) {
 
     if (error) return { error: `Error al actualizar: ${error.message}` };
 
-    // ── Recalcular si debe estar activo ──────────────────────────────────
     const { data: vistaActual } = await adminClient
       .from("vista_inventario")
       .select("eCantRestante")
@@ -113,10 +134,9 @@ export async function editarStock(formData: FormData) {
       .single();
 
     if (vistaActual) {
-      const debeEstarActivo = vistaActual.eCantRestante > 0;
       await adminClient
         .from("inventario")
-        .update({ bStateInventory: debeEstarActivo })
+        .update({ bStateInventory: vistaActual.eCantRestante > 0 })
         .eq("eCodInventory", eCodInventory);
     }
 
@@ -131,13 +151,9 @@ export async function editarStock(formData: FormData) {
 export async function toggleEstadoInventario(eCodInventory: string, nuevoEstado: boolean) {
   try {
     const adminClient = createAdminClient();
-
     const { error } = await adminClient
       .from("inventario")
-      .update({
-        bStateInventory: nuevoEstado,
-        fhUpdateInventory: new Date().toISOString(),
-      })
+      .update({ bStateInventory: nuevoEstado, fhUpdateInventory: new Date().toISOString() })
       .eq("eCodInventory", eCodInventory);
 
     if (error) return { error: `Error al actualizar estado: ${error.message}` };
@@ -152,7 +168,6 @@ export async function toggleEstadoInventario(eCodInventory: string, nuevoEstado:
 export async function eliminarInventario(eCodInventory: string) {
   try {
     const adminClient = createAdminClient();
-
     const { error } = await adminClient
       .from("inventario")
       .delete()

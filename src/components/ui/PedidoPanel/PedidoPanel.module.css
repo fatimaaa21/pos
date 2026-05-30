@@ -204,6 +204,17 @@
   text-align: center;
 }
 
+.itemPresentacion {
+  font-weight: 500;
+  color: var(--gray);
+  font-size: 11px;
+}
+
+.btnCantidadMax {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ── Totales ── */
 .totales {
     margin: 0px var(--space-4);

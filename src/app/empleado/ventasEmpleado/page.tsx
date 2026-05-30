@@ -20,10 +20,6 @@ export default async function VentasEmpleadoPage() {
   if (ventasError) console.error("Error cargando ventas:", ventasError.message);
 
   // ── Métodos de pago ───────────────────────────────────────────────────────
-  // Se cargan desde los IDs reales de las ventas, sin filtrar por estado
-  // ni por la configuración actual del negocio. Así las ventas históricas
-  // siempre muestran el nombre e ícono correctos aunque el método haya
-  // sido desactivado o eliminado después.
   const idsEnVentas = [...new Set((ventas ?? []).map((v) => v.fkeMetodoPago))];
   let metodosPago: MetodoPagoGlobal[] = [];
 
@@ -37,14 +33,14 @@ export default async function VentasEmpleadoPage() {
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
-  // ── Detalles ──────────────────────────────────────────────────────────────
+  // ── Detalles (ahora incluye fkeCodPresentacion) ───────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);
   let detalles: any[] = [];
 
   if (ids.length > 0) {
     const { data: det } = await adminClient
       .from("detalle_venta")
-      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, eCantidad, ePrecioUnitario, eSubtotal")
+      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal")
       .in("fkeCodVenta", ids);
     detalles = det ?? [];
   }
@@ -61,11 +57,36 @@ export default async function VentasEmpleadoPage() {
     productos = prods ?? [];
   }
 
+  // ── Presentaciones ────────────────────────────────────────────────────────
+  const presIds = [
+    ...new Set(
+      detalles
+        .map((d) => d.fkeCodPresentacion as string | null)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const presentacionesMap = new Map<string, { tNombre: string }>();
+
+  if (presIds.length > 0) {
+    const { data: pres } = await adminClient
+      .from("presentaciones")
+      .select("eCodPresentacion, tNombre")
+      .in("eCodPresentacion", presIds);
+
+    for (const p of pres ?? []) {
+      presentacionesMap.set(p.eCodPresentacion, { tNombre: p.tNombre });
+    }
+  }
+
   // ── Combinar ──────────────────────────────────────────────────────────────
   const productosMap = new Map(productos.map((p) => [p.eCodProduct, p]));
+
   const detallesConProducto = detalles.map((d) => ({
     ...d,
-    producto: productosMap.get(d.fkeCodProduct) ?? null,
+    producto:     productosMap.get(d.fkeCodProduct) ?? null,
+    presentacion: d.fkeCodPresentacion
+      ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null)
+      : null,
   }));
 
   const ventasCompletas = (ventas ?? []).map((v) => ({
@@ -73,14 +94,10 @@ export default async function VentasEmpleadoPage() {
     detalle_venta: detallesConProducto.filter((d) => d.fkeCodVenta === v.eCodVenta),
   }));
 
-  // ── Total del día (hora local) ────────────────────────────────────────────
-  const ahora = new Date();
-  const inicioDiaLocal = new Date(
-    ahora.getFullYear(),
-    ahora.getMonth(),
-    ahora.getDate()
-  );
-  const totalHoy = ventasCompletas
+  // ── Total del día ─────────────────────────────────────────────────────────
+  const ahora          = new Date();
+  const inicioDiaLocal = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const totalHoy       = ventasCompletas
     .filter((v) => new Date(v.fhCreateVenta) >= inicioDiaLocal)
     .reduce((acc, v) => acc + v.eTotal, 0);
 

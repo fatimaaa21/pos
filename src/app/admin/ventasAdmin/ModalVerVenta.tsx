@@ -18,10 +18,7 @@ export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
   const subtotal = venta.detalle_venta.reduce((acc, d) => acc + d.eSubtotal, 0);
   const iva      = venta.eTotal - subtotal > 0.01 ? venta.eTotal - subtotal : null;
 
-  const metodo = metodosPago.find((m) => m.eCodPay === venta.fkeMetodoPago);
-
-  // Si el método fue eliminado de la DB mostramos un fallback legible,
-  // nunca el UUID crudo.
+  const metodo       = metodosPago.find((m) => m.eCodPay === venta.fkeMetodoPago);
   const Icono        = metodo ? ((Icons as any)[metodo.tIconPay] ?? Icons.CreditCard) : Icons.CreditCard;
   const nombreMetodo = metodo?.tNamePay ?? "Método eliminado";
 
@@ -43,7 +40,6 @@ export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
             <span>{venta.empleado?.tNameUser ?? "Empleado desconocido"}</span>
           </div>
         </div>
-
         <span className={styles.metodoBadge}>
           <Icono size={13} />
           {nombreMetodo}
@@ -62,7 +58,16 @@ export function ModalVerVenta({ venta, metodosPago, onClose }: Props) {
         {venta.detalle_venta.map((d) => (
           <div key={d.eCodDetalle} className={styles.modalDetalleRow}>
             <span className={styles.modalCantidad}>{d.eCantidad}</span>
-            <span className={styles.modalNombre}>{d.producto?.tNameProduct ?? "—"}</span>
+
+            <span className={styles.modalNombre}>
+              {d.producto?.tNameProduct ?? "—"}
+              {d.presentacion?.tNombre && (
+                <span>
+                  {" " + d.presentacion.tNombre}
+                </span>
+              )}
+            </span>
+
             <span className={styles.modalPrecio}>${d.ePrecioUnitario.toFixed(2)}</span>
             <span className={styles.modalSubtotal}>${d.eSubtotal.toFixed(2)}</span>
           </div>

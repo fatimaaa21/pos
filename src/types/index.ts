@@ -1,5 +1,5 @@
 export type Rol = "admin" | "empleado" | "sistemas";
- 
+
 export interface Perfil {
   fkeCodCompany: string | null;
   eCodUser: string;
@@ -11,7 +11,7 @@ export interface Perfil {
   fhCreateUser: string;
   fhUpdateUser?: string;
 }
- 
+
 export interface Negocio {
   eCodCompany: string;
   tNameCompany: string;
@@ -22,7 +22,7 @@ export interface Negocio {
   bstateCompany: boolean;
   fhCreateCompany: string;
 }
- 
+
 export interface Categoria {
   fkeCodCompany: string;
   eCodCategory: string;
@@ -33,14 +33,14 @@ export interface Categoria {
   bStateCategory?: boolean;
   productos?: ProductoResumen[];
 }
- 
+
 export interface ProductoResumen {
   eCodProduct: string;
   tNameProduct: string;
   bStateProduct?: boolean;
   ePriceProduct: number;
 }
- 
+
 export interface Producto {
   fkeCodCompany: string;
   eCodProduct: string;
@@ -53,11 +53,34 @@ export interface Producto {
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
 }
- 
+
+// Presentaciones
+
+export interface Presentacion {
+  eCodPresentacion:    string;
+  fkeCodProduct:       string;
+  tNombre:             string;
+  ePricePresentacion:  number;
+  eCostPresentacion:   number;
+  bStatePresentacion:  boolean;
+  fhCreate?:           string;
+  fhUpdate?:           string;
+}
+
+export interface PresentacionConStock {
+  eCodPresentacion:   string;
+  tNombre:            string;
+  ePricePresentacion: number;
+  eCostPresentacion:  number;
+  stockDisponible:    number;
+  bInfinito:          boolean;
+}
+
 export interface Inventario {
   fkeCodCompany: string;
   eCodInventory: string;
   fkeCodProduct: string;
+  fkeCodPresentacion?: string | null;
   eCantIngresada: number | null;
   eCantVendida: number;
   eCantRestante: number | null;
@@ -67,9 +90,9 @@ export interface Inventario {
   fhUpdateInventory?: string;
   bStateInventory?: boolean;
 }
- 
+
 export type EstadoStock = "disponible" | "bajo" | "agotado" | "ilimitado";
- 
+
 export function getEstadoStock(
   restante: number | null,
   minimo: number | null,
@@ -80,24 +103,33 @@ export function getEstadoStock(
   if (restante <= minimo) return "bajo";
   return "disponible";
 }
- 
+
 export interface ProductoConStock {
-  eCodProduct: string;
-  tNameProduct: string;
-  fkeCodCategory?: string;
-  ePriceProduct: number;
-  ImgProduct?: string;
-  stockDisponible: number;
-  bInfinito?: boolean;
+  eCodProduct:      string;
+  tNameProduct:     string;
+  fkeCodCategory?:  string;
+  ePriceProduct:    number;
+  ImgProduct?:      string;
+  stockDisponible:  number;
+  bInfinito?:       boolean;
+  presentaciones?:  PresentacionConStock[];
 }
- 
-// Branded type: sigue siendo string en runtime pero TypeScript
-// lo distingue de un string genérico en tiempo de compilación.
-// El único punto de entrada válido es el cast explícito "as MetodoPago"
-// que ocurre en PedidoPanel justo después de seleccionar el eCodPay.
+
+// Carrito empleado
+
+/**
+ * Item en el carrito. Exportado desde types para que PedidoPanel
+ * pueda importarlo sin depender de MenuClient.
+ */
+export interface ItemCarritoMenu {
+  producto:      ProductoConStock;
+  cantidad:      number;
+  presentacion?: PresentacionConStock;
+}
+
 declare const __metodoPagoBrand: unique symbol;
 export type MetodoPago = string & { readonly [__metodoPagoBrand]: never };
- 
+
 export interface Venta {
   fkeCodCompany: string;
   eCodVenta: string;
@@ -109,20 +141,20 @@ export interface Venta {
   metodoPagoIcono?: string | null;
   fhCreateVenta: string;
 }
- 
-// Fila pura de la tabla detalle_venta — sin joins
+
 export interface DetalleVenta {
   eCodDetalle: string;
   fkeCodVenta: string;
   fkeCodProduct: string;
+  fkeCodPresentacion?: string | null;
   eCantidad: number;
   ePrecioUnitario: number;
   eSubtotal: number;
 }
- 
-// DetalleVenta con el producto anidado (resultado de join)
+
 export interface DetalleVentaConProducto extends DetalleVenta {
-  producto?: { tNameProduct: string; ImgProduct?: string } | null;
+  producto?:     { tNameProduct: string; ImgProduct?: string } | null;
+  presentacion?: { tNombre: string } | null;   // ← agregar esta línea
 }
 
 export interface VentasDelTurno {

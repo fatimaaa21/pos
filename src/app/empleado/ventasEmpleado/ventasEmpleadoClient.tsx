@@ -26,9 +26,7 @@ interface Props {
   metodosPago: MetodoPagoGlobal[];
 }
 
-// ── Paleta de colores para badges dinámicos ───────────────────────────────────
-// Cada método recibe un color según su índice en el array.
-// Usa las CSS variables del sistema para mantener consistencia visual.
+// ── Paleta de colores para badges ─────────────────────────────────────────────
 
 const PALETA_METODO = [
   { bg: "var(--color-primary-50)",  color: "var(--color-primary-dark)", border: "var(--color-primary-light)"  },
@@ -42,10 +40,7 @@ function resolverMetodo(fkeMetodoPago: string, metodosPago: MetodoPagoGlobal[]) 
   const idx    = metodosPago.findIndex((m) => m.eCodPay === fkeMetodoPago);
   const metodo = idx >= 0 ? metodosPago[idx] : null;
   const estilo = PALETA_METODO[idx >= 0 ? idx % PALETA_METODO.length : 0];
-  return {
-    nombre: metodo?.tNamePay ?? "Método eliminado",
-    estilo,
-  };
+  return { nombre: metodo?.tNamePay ?? "Método eliminado", estilo };
 }
 
 // ── Helper de periodo ─────────────────────────────────────────────────────────
@@ -63,31 +58,23 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
     );
   }
   if (periodo === "semana") {
-    const inicioDia = new Date(ahora);
-    inicioDia.setHours(0, 0, 0, 0);
-    inicioDia.setDate(inicioDia.getDate() - 7);
-    return d >= inicioDia;
+    const inicio = new Date(ahora);
+    inicio.setHours(0, 0, 0, 0);
+    inicio.setDate(inicio.getDate() - 7);
+    return d >= inicio;
   }
   if (periodo === "mes") {
-    return (
-      d.getMonth()    === ahora.getMonth() &&
-      d.getFullYear() === ahora.getFullYear()
-    );
+    return d.getMonth() === ahora.getMonth() && d.getFullYear() === ahora.getFullYear();
   }
   return true;
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+// ── Componente ────────────────────────────────────────────────────────────────
 
 export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
   const [busqueda, setBusqueda] = useState("");
-  const [filtros, setFiltros] = useState<FiltrosUsuario>({
-    busqueda: "",
-    roles:    [],
-    estados:  [],
-    periodo:  "hoy",
-    metodo:   "todos",
-    empleado: "todos",
+  const [filtros, setFiltros]   = useState<FiltrosUsuario>({
+    busqueda: "", roles: [], estados: [], periodo: "hoy", metodo: "todos", empleado: "todos",
   });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
 
@@ -97,32 +84,23 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
   ], [metodosPago]);
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
-  const ventasFiltradas = useMemo(() => {
-    return ventas.filter((v) => {
-      const coincidePeriodo = estaEnPeriodo(
-        v.fhCreateVenta,
-        (filtros.periodo ?? "hoy") as FiltroPeriodo
+  const ventasFiltradas = useMemo(() => ventas.filter((v) => {
+    const coincidePeriodo  = estaEnPeriodo(v.fhCreateVenta, (filtros.periodo ?? "hoy") as FiltroPeriodo);
+    const coincideMetodo   = !filtros.metodo || filtros.metodo === "todos" || v.fkeMetodoPago === filtros.metodo;
+    const folio            = v.eCodVenta.slice(-8).toUpperCase();
+    const coincideBusqueda =
+      !filtros.busqueda ||
+      folio.includes(filtros.busqueda.toUpperCase()) ||
+      v.detalle_venta.some((d) =>
+        d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase()) ||
+        d.presentacion?.tNombre.toLowerCase().includes(filtros.busqueda.toLowerCase())
       );
-      const coincideMetodo =
-        !filtros.metodo || filtros.metodo === "todos" ||
-        v.fkeMetodoPago === filtros.metodo;
-
-      const folio = v.eCodVenta.slice(-8).toUpperCase();
-      const coincideBusqueda =
-        !filtros.busqueda ||
-        folio.includes(filtros.busqueda.toUpperCase()) ||
-        v.detalle_venta.some((d) =>
-          d.producto?.tNameProduct.toLowerCase().includes(filtros.busqueda.toLowerCase())
-        );
-
-      return coincidePeriodo && coincideMetodo && coincideBusqueda;
-    });
-  }, [ventas, filtros]);
+    return coincidePeriodo && coincideMetodo && coincideBusqueda;
+  }), [ventas, filtros]);
 
   const totalFiltrado = ventasFiltradas.reduce((acc, v) => acc + v.eTotal, 0);
   const totalPiezas   = ventasFiltradas.reduce(
-    (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0),
-    0
+    (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0), 0
   );
 
   return (
@@ -133,7 +111,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
         placeholder="Buscar folio o producto..."
       />
 
-      {/* ── Banner total del día ── */}
+      {/* Banner total del día */}
       <div className={styles.banner}>
         <div className={styles.bannerLeft}>
           <div className={styles.bannerLabel}>
@@ -141,11 +119,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
             Mi total de ventas (Hoy)
           </div>
           <div className={styles.bannerTotal}>
-            {totalHoy.toLocaleString("es-MX", {
-              style:                 "currency",
-              currency:              "MXN",
-              minimumFractionDigits: 2,
-            })}
+            {totalHoy.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 2 })}
           </div>
         </div>
         <div className={styles.bannerRight}>
@@ -153,24 +127,18 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
         </div>
       </div>
 
-      {/* ── Stats del periodo ── */}
-      <StatCards
-        stats={[
-          { label: "Ventas en periodo", value: ventasFiltradas.length, variante: "primary" },
-          { label: "Piezas vendidas",   value: totalPiezas,            variante: "success" },
-          {
-            label: "Total periodo",
-            value: totalFiltrado.toLocaleString("es-MX", {
-              style:                 "currency",
-              currency:              "MXN",
-              minimumFractionDigits: 0,
-            }),
-            variante: "accent",
-          },
-        ]}
-      />
+      {/* Stats */}
+      <StatCards stats={[
+        { label: "Ventas en periodo", value: ventasFiltradas.length, variante: "primary" },
+        { label: "Piezas vendidas",   value: totalPiezas,            variante: "success" },
+        {
+          label: "Total periodo",
+          value: totalFiltrado.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }),
+          variante: "accent",
+        },
+      ]} />
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <TablaToolbar
         filtros={filtros}
         onChange={setFiltros}
@@ -181,7 +149,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
         opcionesMetodo={opcionesMetodo}
       />
 
-      {/* ── Grid de ventas ── */}
+      {/* Grid de ventas */}
       {ventasFiltradas.length === 0 ? (
         <div className={styles.vacio}>
           <ShoppingBag size={48} strokeWidth={1} />
@@ -204,19 +172,13 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
                   <span className={styles.cardFolio}>Venta #{folio}</span>
                   <span
                     className={styles.cardMetodo}
-                    style={{
-                      background: estilo.bg,
-                      color:      estilo.color,
-                      border:     `1px solid ${estilo.border}`,
-                    }}
+                    style={{ background: estilo.bg, color: estilo.color, border: `1px solid ${estilo.border}` }}
                   >
                     {nombre}
                   </span>
                 </div>
 
-                <div className={styles.cardFecha}>
-                  {formatFechaHora(venta.fhCreateVenta)}
-                </div>
+                <div className={styles.cardFecha}>{formatFechaHora(venta.fhCreateVenta)}</div>
 
                 <div className={styles.cardDetalle}>
                   <div className={styles.cardDetalleHeader}>
@@ -225,18 +187,18 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
                     <span>Precio</span>
                   </div>
 
-                  {(expandida
-                    ? venta.detalle_venta
-                    : venta.detalle_venta.slice(0, 4)
-                  ).map((d) => (
+                  {(expandida ? venta.detalle_venta : venta.detalle_venta.slice(0, 4)).map((d) => (
                     <div key={d.eCodDetalle} className={styles.cardDetalleRow}>
                       <span className={styles.cantidad}>{d.eCantidad}</span>
                       <span className={styles.nombre}>
                         {d.producto?.tNameProduct ?? "—"}
+                        {d.presentacion?.tNombre && (
+                          <span>
+                            {" " + d.presentacion.tNombre}
+                          </span>
+                        )}
                       </span>
-                      <span className={styles.precio}>
-                        ${d.ePrecioUnitario.toFixed(2)}
-                      </span>
+                      <span className={styles.precio}>${d.ePrecioUnitario.toFixed(2)}</span>
                     </div>
                   ))}
 
@@ -249,9 +211,7 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
 
                 <div className={styles.cardTotal}>
                   <span className={styles.cardTotalLabel}>Monto Total</span>
-                  <span className={styles.cardTotalValor}>
-                    ${venta.eTotal.toFixed(2)}
-                  </span>
+                  <span className={styles.cardTotalValor}>${venta.eTotal.toFixed(2)}</span>
                 </div>
               </div>
             );
