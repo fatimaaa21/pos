@@ -28,35 +28,31 @@
   flex-shrink: 0;
 }
 
-/* ── Verde — activo / publicado / disponible ── */
+/* ── Verde — activo / disponible ── */
 .activo,
-.publicado,
 .disponible {
   background: var(--color-success-bg);
   color: var(--color-success);
   border-color: var(--color-success-border);
 }
 .activo .dot,
-.publicado .dot,
 .disponible .dot {
   background: var(--color-success);
 }
 
-/* ── Neutro — inactivo / bloqueado / agotado ── */
+/* ── Neutro — inactivo / agotado ── */
 .inactivo,
-.bloqueado,
 .agotado {
   background: #F1EFE8;
   color: #444441;
   border-color: var(--border-light);
 }
 .inactivo .dot,
-.bloqueado .dot,
 .agotado .dot {
   background: #444441;
 }
 
-/* ── Amarillo — pendiente / bajo stock ── */
+/* ── Amarillo — pendiente / stock bajo ── */
 .pendiente,
 .bajo {
   background: var(--color-warning-bg);
@@ -68,17 +64,29 @@
   background: var(--color-warning);
 }
 
-/* ── Acento — admin ── */
-.admin, .categoria {
+/* ── Rojo — error / diferencia ── */
+.error {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border-color: var(--color-error-border);
+}
+.error .dot {
+  background: var(--color-error);
+}
+
+/* ── Acento naranja — admin / categoria ── */
+.admin,
+.categoria {
   background: var(--color-accent-bg);
   color: var(--color-accent);
   border-color: #f5d5b0;
 }
-.admin .dot, .categoria .dot {
+.admin .dot,
+.categoria .dot {
   background: var(--color-accent);
 }
 
-/* ── Primario — empleado ── */
+/* ── Verde primario — empleado ── */
 .empleado {
   background: var(--color-primary-50);
   color: var(--color-primary-dark);
@@ -88,10 +96,14 @@
   background: var(--color-primary);
 }
 
+/* ── Azul — sistemas / ilimitado ── */
+.sistemas,
 .ilimitado {
   background: #E6F1FB;
   color: #185FA5;
   border-color: #B5D4F4;
 }
-
-.ilimitado .dot { background: #185FA5; }
+.sistemas .dot,
+.ilimitado .dot {
+  background: #185FA5;
+}

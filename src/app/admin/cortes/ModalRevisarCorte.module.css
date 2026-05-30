@@ -1,31 +1,55 @@
-/* ── Header del turno ── */
-.turnoWrap {
+/* ── Header: empleado ── */
+.empWrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--border-light);
 }
 
-.turnoIcono {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
   background: var(--color-primary-50);
-  color: var(--color-primary);
+  color: var(--color-primary-dark);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
   flex-shrink: 0;
 }
 
-.turnoNombre {
+.empNombre {
   font-size: 15px;
   font-weight: 700;
   color: var(--dark);
 }
 
+.empBadges {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Pill para nombre de turno */
+.turnoNombre {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-primary-50);
+  color: var(--color-primary-dark);
+  border: 1px solid var(--color-primary-light);
+}
+
+/* Rango de fechas */
 .fechas {
   display: flex;
   align-items: center;
@@ -83,6 +107,7 @@
   justify-content: center;
   color: var(--gray);
   flex-shrink: 0;
+  transition: all 0.15s;
 }
 
 .desgloseLabel {
@@ -96,21 +121,25 @@
   color: var(--dark);
 }
 
-/* Fila de total — fondo neutro */
+/* Fila de total en el desglose */
 .desgloseTotal {
-  background: var(--background);
-  border-top: 1px solid var(--border-default);
+  background: var(--color-primary-50);
+  border-top: 1px solid var(--color-primary-light);
 }
 
 .desgloseTotal .desgloseIcono {
   background: white;
-  border-color: var(--border-default);
-  color: var(--dark);
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .desgloseTotal .desgloseLabel {
-  color: var(--dark);
+  color: var(--color-primary-dark);
   font-weight: 600;
+}
+
+.desgloseTotal .desgloseValor {
+  color: var(--color-primary-dark);
 }
 
 /* ── Campos numéricos (patrón del sistema) ── */
@@ -147,75 +176,7 @@
   color: var(--dark);
 }
 
-/* Efectivo esperado — siempre destacado */
-.campoEsperado {
-  background: var(--color-primary-50) !important;
-  border: 1px solid var(--color-primary-light);
-}
-
-.campoEsperado .campoLabel {
-  color: var(--color-primary-dark);
-}
-
-.campoEsperado .campoValor {
-  color: var(--color-primary-dark);
-}
-
-/* ── Input de efectivo contado ── */
-.inputLabel {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dark);
-  display: block;
-  margin-bottom: var(--space-2);
-}
-
-.inputWrap {
-  display: flex;
-  align-items: center;
-  border: 1.5px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: white;
-  overflow: hidden;
-  transition: border-color 0.15s;
-}
-
-.inputWrap:focus-within {
-  border-color: var(--color-primary);
-}
-
-.inputPrefix {
-  padding: 0 var(--space-3);
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--gray);
-  background: var(--background);
-  border-right: 1px solid var(--border-light);
-  height: 44px;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.inputContado {
-  flex: 1;
-  border: none;
-  outline: none;
-  padding: 0 var(--space-3);
-  font-family: var(--font-family);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--dark);
-  height: 44px;
-  background: transparent;
-}
-
-.inputContado::placeholder {
-  color: var(--gray);
-  font-weight: 400;
-}
-
-/* ── Bloque de diferencia (live) ── */
+/* ── Bloque de diferencia ── */
 .diferencia {
   display: flex;
   align-items: center;
@@ -255,16 +216,6 @@
   color: var(--color-success);
 }
 
-.diferenciaEspera {
-  background: var(--background);
-  border: 1px solid var(--border-light);
-}
-
-.diferenciaEspera .diferenciaLabel,
-.diferenciaEspera .diferenciaValor {
-  color: var(--gray);
-}
-
 .diferenciaLabel {
   font-size: 12px;
   font-weight: 700;
@@ -280,21 +231,99 @@
   font-weight: 800;
 }
 
-/* ── Aviso antes de confirmar ── */
-.aviso {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-warning-bg);
-  border: 1px solid var(--color-warning-border);
+/* ── Nota del admin ── */
+.notaTextarea {
+  width: 100%;
+  border: 1.5px solid var(--border-light);
   border-radius: var(--radius-md);
-  font-size: 12px;
-  color: var(--color-warning);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-family);
+  font-size: 13px;
+  color: var(--dark);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  background: white;
+}
+
+.notaTextarea:focus {
+  border-color: var(--color-primary);
+}
+
+.notaTextarea::placeholder {
+  color: var(--gray);
+  font-weight: 400;
+}
+
+/* Nota ya guardada (solo lectura) */
+.notaExistente {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 13px;
+  color: var(--dark);
   line-height: 1.5;
 }
 
-.avisoIcono {
+.notaExistenteTitulo {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+ 
+/* ── Footer condicional ── */
+/* Márgenes negativos = cancela el padding del body del Modal
+   → queda flush en bordes izq/der/abajo, igual que el footer nativo */
+.accionesFooter {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) 0px;
+  border-top: 1px solid var(--border-light);
   flex-shrink: 0;
-  margin-top: 1px;
+}
+ 
+.btnSuccess {
+  flex: 2;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  background: var(--color-primary); 
+  color: white;
+}
+ 
+.btnSuccess:hover   { opacity: 0.88; }
+.btnSuccess:disabled { opacity: 0.5; cursor: not-allowed; }
+ 
+.btnDanger {
+  flex: 1;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  background: white;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-error);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btnDanger:hover    { background: var(--color-error-bg); }
+.btnDanger:disabled { opacity: 0.5; cursor: not-allowed; }
+ 
+.modalError {
+  font-size: 12px;
+  color: var(--color-error);
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
 }

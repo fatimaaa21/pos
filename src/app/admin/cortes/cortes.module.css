@@ -1,234 +1,27 @@
 .avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 800;
   flex-shrink: 0;
 }
 
+/* Botones de acción */
 .actionBtn {
-  background: transparent;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: 4px 8px;
-  cursor: pointer;
-  color: var(--gray);
-  display: flex;
-  align-items: center;
-  transition: background 0.12s, color 0.12s;
-}
-
-.actionBtn:hover {
-  background: var(--color-primary-50);
-  color: var(--color-primary);
-}
-
-/* ── Modal meta (fechas y nombre turno) ── */
-.modalMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 12px;
-  color: var(--gray);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-1);
-}
-
-.modalMetaSep {
-  color: var(--border-strong);
-}
-
-.modalTurnoNombre {
-  background: var(--color-primary-50);
-  color: var(--color-primary-dark);
-  border-radius: var(--radius-full);
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-/* ── Desglose por método ── */
-.modalDesglose {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-
-.modalDesgloseRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  font-size: 12px;
-  color: var(--dark);
-  border-bottom: 1px solid var(--border-light);
-}
-
-.modalDesgloseRow:last-child {
-  border-bottom: none;
-}
-
-.modalDesgloseIcon {
-  color: var(--gray);
-  flex-shrink: 0;
-}
-
-.modalDesgloseValor {
-  margin-left: auto;
-  font-weight: 600;
-}
-
-/* ── Resumen numérico ── */
-.modalResumen {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.modalResumenRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border-light);
-  font-size: 13px;
-}
-
-.modalResumenRow:last-child {
-  border-bottom: none;
-}
-
-.modalResumenLabel {
-  color: var(--gray);
-}
-
-.modalResumenValor {
-  font-weight: 600;
-  color: var(--dark);
-}
-
-/* Fila de diferencia con color dinámico */
-.modalDiferencia {
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  margin-top: var(--space-1);
-}
-
-.modalDiferencia[data-tipo="faltante"] {
-  background: var(--color-error-bg);
-}
-
-.modalDiferencia[data-tipo="faltante"] .modalResumenLabel,
-.modalDiferencia[data-tipo="faltante"] .modalResumenValor {
-  color: var(--color-error);
-}
-
-.modalDiferencia[data-tipo="sobrante"] {
-  background: var(--color-accent-bg);
-}
-
-.modalDiferencia[data-tipo="sobrante"] .modalResumenLabel,
-.modalDiferencia[data-tipo="sobrante"] .modalResumenValor {
-  color: var(--color-accent);
-}
-
-.modalDiferencia[data-tipo="ok"] {
-  background: var(--color-success-bg);
-}
-
-.modalDiferencia[data-tipo="ok"] .modalResumenLabel,
-.modalDiferencia[data-tipo="ok"] .modalResumenValor {
-  color: var(--color-success);
-}
-
-/* ── Nota textarea ── */
-.notaTextarea {
-  width: 100%;
-  border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-family);
-  font-size: 13px;
-  color: var(--dark);
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.15s;
-}
-
-.notaTextarea:focus {
-  border-color: var(--color-primary);
-}
-
-/* Nota ya guardada (solo lectura) */
-.notaExistente {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  background: var(--color-accent-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  font-size: 12px;
-  color: var(--dark);
-}
-
-.notaExistenteTitulo {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* ── Botones del modal ── */
-.modalBtnRow {
-  display: flex;
-  gap: var(--space-3);
-  justify-content: flex-end;
-  margin-top: var(--space-2);
-}
-
-.btnSuccess {
-  background: var(--color-success);
-  color: white;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-5);
-  font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.btnSuccess:hover   { opacity: 0.88; }
-.btnSuccess:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btnDanger {
   background: transparent;
-  color: var(--color-error);
-  border: 1.5px solid var(--color-error);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-5);
-  font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: 700;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.btnDanger:hover    { background: var(--color-error-bg); }
-.btnDanger:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.modalError {
-  font-size: 12px;
-  color: var(--color-error);
-  font-weight: 600;
-  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--gray);
 }
