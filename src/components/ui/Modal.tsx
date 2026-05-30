@@ -20,6 +20,8 @@ interface ModalProps {
   cargando?: boolean;
   deshabilitado?: boolean;
 
+  sinFooter?: boolean;
+
   // Feedback
   error?: string | null;
 
@@ -36,6 +38,7 @@ export function Modal({
   onConfirmar,
   labelConfirmar = "Confirmar",
   labelCancelar = "Cancelar",
+  sinFooter = false,
   varianteConfirmar = "primario",
   cargando = false,
   deshabilitado = false,
@@ -104,7 +107,7 @@ export function Modal({
         </div>
 
         {/* Footer — solo si hay acción de confirmar O si se quiere solo el cancelar */}
-        {(onConfirmar !== undefined || labelCancelar) && (
+        {!sinFooter && (onConfirmar !== undefined || labelCancelar) && (
           <div className={styles.footer}>
             <button
               type="button"

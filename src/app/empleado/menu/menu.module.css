@@ -89,9 +89,9 @@
   align-items: center;
   gap: var(--space-2);
   padding: 9px var(--space-4);
-  background: var(--color-error-bg);
-  color: var(--color-error);
-  border: 1px solid var(--color-error-border);
+  background: var(--white);
+  color: var(--gray);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   font-family: var(--font-family);
   font-size: 13px;
@@ -103,8 +103,9 @@
 }
 
 .btnCerrarCaja:hover {
-  background: var(--color-error);
-  color: white;
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
 }
 
 /* ── Desglose dentro del modal ── */

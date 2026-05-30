@@ -17,6 +17,11 @@ import type { CorteCaja, VentasDelTurno } from "@/types";
 import { crearVenta }         from "@/lib/actions/ventas";
 import styles from "./menu.module.css";
 
+const VENTAS_VACIO: VentasDelTurno = {
+  eTotalEfectivo: 0, eTotalTarjeta: 0,
+  eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
+};
+
 export interface ItemCarritoMenu {
   producto: ProductoConStock;
   cantidad: number;
@@ -31,7 +36,7 @@ interface Props {
   ventasDelTurno: VentasDelTurno; 
 }
 
-export function MenuClient({ categorias, productos, tieneTurno, metodosPago, corte, ventasDelTurno }: Props) {
+export function MenuClient({ categorias, productos, tieneTurno, metodosPago, corte, ventasDelTurno = VENTAS_VACIO }: Props) {
   const [categoriaActiva, setCategoriaActiva] = useState<string>("todas");
   const [busqueda, setBusqueda]   = useState("");
   const router                    = useRouter();
@@ -254,9 +259,9 @@ export function MenuClient({ categorias, productos, tieneTurno, metodosPago, cor
         </Modal>
       )}
 
-      {modalCerrarCaja && corte && (
+      {tieneTurno && corte && modalCerrarCaja && (
         <ModalCerrarCaja
-          corte={corte}
+          corte={corte}                    // ← ahora TypeScript sabe que no es null
           ventasDelTurno={ventasDelTurno}
           onClose={() => setModalCerrarCaja(false)}
           onCerrado={() => {

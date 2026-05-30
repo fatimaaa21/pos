@@ -6,8 +6,8 @@ type Variante =
   | "activo"    // activo/inactivo — toggle de estado
   | "inactivo"
   | "sistemas"  // rol: sistemas
-  | "admin"     // rol: admin
-  | "empleado"  // rol: empleado / "En turno"
+  | "admin"     // rol: admin / "En turno"
+  | "empleado"  // rol: empleado
   | "pendiente" // estado amarillo: pendiente de revisión
   | "bajo"      // stock bajo
   | "agotado"   // stock agotado / neutral

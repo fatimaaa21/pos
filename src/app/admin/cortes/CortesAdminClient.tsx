@@ -24,7 +24,7 @@ interface Props {
 // Mapeo de estado → variante de Badge válida + etiqueta legible.
 // Cada variante tiene su clase CSS definida en Badge.module.css.
 const ESTADO_CONFIG = {
-  abierto:    { label: "En turno",   variante: "empleado"  },  // verde primario
+  abierto:    { label: "En turno",   variante: "admin"  },  // verde primario
   pendiente:  { label: "Pendiente",  variante: "pendiente" },  // amarillo
   aprobado:   { label: "Aprobado",   variante: "activo"    },  // verde éxito
   diferencia: { label: "Diferencia", variante: "error"     },  // rojo
@@ -146,13 +146,11 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
       key: "acciones",
       label: "Acciones",
       render: (c) => (
-        <button
-          className={styles.actionBtn}
-          onClick={() => setCorteVer(c)}
-          title="Ver / revisar"
-        >
-          <Eye size={16} />
-        </button>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <ActionBtn title="Ver detalles" onClick={() => setCorteVer(c)}>
+            <Eye size={18} />
+            </ActionBtn>
+        </div>
       ),
     },
   ];
@@ -213,5 +211,26 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
         />
       )}
     </div>
+  );
+}
+
+function ActionBtn({
+  children, title, onClick, danger, loading,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick: () => void;
+  danger?: boolean;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={loading}
+      className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""}`}
+    >
+      {loading ? "⏳" : children}
+    </button>
   );
 }
