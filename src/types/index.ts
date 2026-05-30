@@ -153,7 +153,8 @@ export interface DetalleVenta {
 }
 
 export interface DetalleVentaConProducto extends DetalleVenta {
-  producto?: { tNameProduct: string; ImgProduct?: string } | null;
+  producto?:     { tNameProduct: string; ImgProduct?: string } | null;
+  presentacion?: { tNombre: string } | null;   // ← agregar esta línea
 }
 
 export interface VentasDelTurno {

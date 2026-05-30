@@ -21,7 +21,7 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Métodos de pago activos ───────────────────────────────────────────────
+  // ── Métodos de pago ───────────────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago")
@@ -37,7 +37,6 @@ export default async function MenuPage() {
       .select("eCodPay, tNamePay, tIconPay, descripcion, bStatePay")
       .in("eCodPay", idsSeleccionados)
       .eq("bStatePay", true);
-
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
@@ -79,11 +78,11 @@ export default async function MenuPage() {
       const esTarjeta  = (id: string) => (metodosMap.get(id) ?? "").includes("tarjeta");
 
       ventasDelTurno = {
-        eTotalEfectivo: ventasTurno.filter((v) => esEfectivo(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
-        eTotalTarjeta:  ventasTurno.filter((v) => esTarjeta(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
+        eTotalEfectivo:      ventasTurno.filter((v) =>  esEfectivo(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
+        eTotalTarjeta:       ventasTurno.filter((v) =>  esTarjeta(v.fkeMetodoPago)).reduce((a, v)  => a + v.eTotal, 0),
         eTotalTransferencia: ventasTurno.filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
-        eTotalVentas: ventasTurno.reduce((a, v) => a + v.eTotal, 0),
-        eNumVentas:   ventasTurno.length,
+        eTotalVentas:        ventasTurno.reduce((a, v) => a + v.eTotal, 0),
+        eNumVentas:          ventasTurno.length,
       };
     }
   }
@@ -95,14 +94,15 @@ export default async function MenuPage() {
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Inventario: lotes activos (por producto O por presentación) ───────────
-  const { data: lotes, error } = await supabase
+  // ── Lotes activos — adminClient para bypassear RLS y leer fkeCodPresentacion ──
+  const { data: lotes, error } = await adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
+    .eq("fkeCodCompany", fkeCodCompany)        // solo lotes del negocio actual
     .eq("bStateInventory", true)
     .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
 
-  if (error) console.error("Error menú:", JSON.stringify(error));
+  if (error) console.error("Error menú lotes:", JSON.stringify(error));
 
   if (!lotes || lotes.length === 0) {
     return (
@@ -118,8 +118,8 @@ export default async function MenuPage() {
   }
 
   // ── Separar lotes con y sin presentación ─────────────────────────────────
-  const lotesSinPres  = lotes.filter((l) => !l.fkeCodPresentacion);
-  const lotesConPres  = lotes.filter((l) =>  l.fkeCodPresentacion);
+  const lotesSinPres = lotes.filter((l: any) => !l.fkeCodPresentacion);
+  const lotesConPres = lotes.filter((l: any) =>  l.fkeCodPresentacion);
 
   // Stock por producto (sin presentación)
   const stockProducto    = new Map<string, number>();
@@ -129,52 +129,47 @@ export default async function MenuPage() {
     if (l.bUnlimitedInventory) {
       infinitoProducto.set(l.fkeCodProduct, true);
     } else {
-      const actual = stockProducto.get(l.fkeCodProduct) ?? 0;
-      stockProducto.set(l.fkeCodProduct, actual + (l.eCantRestante ?? 0));
+      stockProducto.set(l.fkeCodProduct, (stockProducto.get(l.fkeCodProduct) ?? 0) + (l.eCantRestante ?? 0));
     }
   }
 
   // Stock por presentación
-  const stockPorPres    = new Map<string, number>();    // key = fkeCodPresentacion
+  const stockPorPres    = new Map<string, number>();
   const infinitoPorPres = new Map<string, boolean>();
 
   for (const l of lotesConPres) {
-    const pid = l.fkeCodPresentacion!;
+    const pid = l.fkeCodPresentacion as string;
     if (l.bUnlimitedInventory) {
       infinitoPorPres.set(pid, true);
     } else {
-      const actual = stockPorPres.get(pid) ?? 0;
-      stockPorPres.set(pid, actual + (l.eCantRestante ?? 0));
+      stockPorPres.set(pid, (stockPorPres.get(pid) ?? 0) + (l.eCantRestante ?? 0));
     }
   }
 
-  // ── Productos con stock ───────────────────────────────────────────────────
-  // IDs de productos que tienen cualquier stock activo
+  // ── IDs de productos con cualquier stock activo ───────────────────────────
   const idsConStock = [
     ...new Set([
-      ...lotesSinPres.map((l) => l.fkeCodProduct),
-      ...lotesConPres.map((l) => l.fkeCodProduct),
+      ...lotesSinPres.map((l: any) => l.fkeCodProduct as string),
+      ...lotesConPres.map((l: any) => l.fkeCodProduct as string),
     ]),
   ];
 
-  const { data: productos } = await supabase
+  const { data: productos } = await adminClient
     .from("productos")
     .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
     .in("eCodProduct", idsConStock)
     .eq("bStateProduct", true);
 
-  // ── Presentaciones activas con stock ─────────────────────────────────────
-  // Buscar detalles de las presentaciones con inventario
-  const presentacionIds = [...new Set(lotesConPres.map((l) => l.fkeCodPresentacion!))];
+  // ── Presentaciones activas con inventario ─────────────────────────────────
+  const presentacionIds = [...new Set(lotesConPres.map((l: any) => l.fkeCodPresentacion as string))];
   let presentacionesDetalle: any[] = [];
 
   if (presentacionIds.length > 0) {
-    const { data: pres } = await supabase
+    const { data: pres } = await adminClient
       .from("presentaciones")
       .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion")
       .in("eCodPresentacion", presentacionIds)
       .eq("bStatePresentacion", true);
-
     presentacionesDetalle = pres ?? [];
   }
 
@@ -182,14 +177,15 @@ export default async function MenuPage() {
   const presByProducto = new Map<string, PresentacionConStock[]>();
 
   for (const p of presentacionesDetalle) {
-    const stock   = stockPorPres.get(p.eCodPresentacion) ?? 0;
-    const bInf    = infinitoPorPres.get(p.eCodPresentacion) ?? false;
+    const bInf  = infinitoPorPres.get(p.eCodPresentacion) ?? false;
+    const stock = bInf ? Number.MAX_SAFE_INTEGER : (stockPorPres.get(p.eCodPresentacion) ?? 0);
+
     const pcs: PresentacionConStock = {
       eCodPresentacion:   p.eCodPresentacion,
       tNombre:            p.tNombre,
       ePricePresentacion: p.ePricePresentacion,
       eCostPresentacion:  p.eCostPresentacion,
-      stockDisponible:    bInf ? Number.MAX_SAFE_INTEGER : stock,
+      stockDisponible:    stock,
       bInfinito:          bInf,
     };
 
@@ -203,12 +199,11 @@ export default async function MenuPage() {
     const pres = presByProducto.get(p.eCodProduct);
 
     if (pres && pres.length > 0) {
-      // Producto con presentaciones:
-      // • stockDisponible = suma de todas las presentaciones (para mostrar disponibilidad total)
-      // • bInfinito = true si alguna presentación es ilimitada
-      const totalStock = pres.reduce((acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible), 0);
       const anyInfinito = pres.some((pr) => pr.bInfinito);
-
+      const totalStock  = pres.reduce(
+        (acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible),
+        0
+      );
       return {
         eCodProduct:     p.eCodProduct,
         tNameProduct:    p.tNameProduct,
@@ -221,17 +216,16 @@ export default async function MenuPage() {
       };
     }
 
-    // Producto sin presentaciones (comportamiento original)
+    // Sin presentaciones — comportamiento original
+    const bInf = infinitoProducto.get(p.eCodProduct) ?? false;
     return {
       eCodProduct:     p.eCodProduct,
       tNameProduct:    p.tNameProduct,
       fkeCodCategory:  p.fkeCodCategory,
       ePriceProduct:   p.ePriceProduct,
       ImgProduct:      p.ImgProduct,
-      bInfinito:       infinitoProducto.get(p.eCodProduct) ?? false,
-      stockDisponible: infinitoProducto.get(p.eCodProduct)
-        ? Number.MAX_SAFE_INTEGER
-        : (stockProducto.get(p.eCodProduct) ?? 0),
+      bInfinito:       bInf,
+      stockDisponible: bInf ? Number.MAX_SAFE_INTEGER : (stockProducto.get(p.eCodProduct) ?? 0),
     };
   });
 
