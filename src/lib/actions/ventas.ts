@@ -6,9 +6,10 @@ import { revalidatePath }    from "next/cache";
 import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
-  eCodProduct:    string;
-  cantidad:       number;
-  precioUnitario: number;
+  eCodProduct:       string;
+  eCodPresentacion?: string;   // null/undefined = producto sin presentaciones
+  cantidad:          number;
+  precioUnitario:    number;
 }
 
 export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) {
@@ -31,14 +32,22 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
 
     const fkeCodCompany = perfil.fkeCodCompany;
 
-    // 3. Validar stock — los ilimitados se saltan esta validación
+    // ── Validar stock por ítem ────────────────────────────────────────────────
     for (const item of items) {
-      const { data: lote, error: loteError } = await adminClient
+      let query = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
         .eq("fkeCodProduct", item.eCodProduct)
-        .eq("bStateInventory", true)
-        .single();
+        .eq("bStateInventory", true);
+
+      // Filtrar por presentación o por ausencia de presentación
+      if (item.eCodPresentacion) {
+        query = query.eq("fkeCodPresentacion", item.eCodPresentacion);
+      } else {
+        query = query.is("fkeCodPresentacion", null);
+      }
+
+      const { data: lote, error: loteError } = await query.single();
 
       if (loteError || !lote) {
         return { error: "Producto sin inventario activo" };
@@ -51,13 +60,13 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
       }
     }
 
-    // 4. Calcular total
+    // ── Total ─────────────────────────────────────────────────────────────────
     const eTotal = items.reduce(
       (acc, i) => acc + i.precioUnitario * i.cantidad,
       0
     );
 
-    // 5. Insertar encabezado de venta
+    // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient
       .from("ventas")
       .insert({
@@ -74,13 +83,14 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
       return { error: `Error al crear venta: ${ventaError?.message}` };
     }
 
-    // 6. Insertar detalle
+    // ── Detalle de venta ──────────────────────────────────────────────────────
     const detalle = items.map((i) => ({
-      fkeCodVenta:     venta.eCodVenta,
-      fkeCodProduct:   i.eCodProduct,
-      eCantidad:       i.cantidad,
-      ePrecioUnitario: i.precioUnitario,
-      eSubtotal:       i.precioUnitario * i.cantidad,
+      fkeCodVenta:         venta.eCodVenta,
+      fkeCodProduct:       i.eCodProduct,
+      fkeCodPresentacion:  i.eCodPresentacion ?? null,   // nuevo
+      eCantidad:           i.cantidad,
+      ePrecioUnitario:     i.precioUnitario,
+      eSubtotal:           i.precioUnitario * i.cantidad,
     }));
 
     const { error: detalleError } = await adminClient
@@ -91,15 +101,21 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
       return { error: `Error al guardar detalle: ${detalleError.message}` };
     }
 
-    // 7. Descontar inventario — los ilimitados NO se descuentan
+    // ── Descontar inventario ──────────────────────────────────────────────────
     for (const item of items) {
-      const { data: lote } = await adminClient
+      let query = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
         .eq("fkeCodProduct", item.eCodProduct)
-        .eq("bStateInventory", true)
-        .single();
+        .eq("bStateInventory", true);
 
+      if (item.eCodPresentacion) {
+        query = query.eq("fkeCodPresentacion", item.eCodPresentacion);
+      } else {
+        query = query.is("fkeCodPresentacion", null);
+      }
+
+      const { data: lote } = await query.single();
       if (!lote) continue;
 
       if (lote.bUnlimitedInventory) {

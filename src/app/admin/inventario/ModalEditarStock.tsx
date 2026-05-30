@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal, ModalField, ModalInput, ModalInfo } from "@/components/ui/Modal";
 import { editarStock } from "@/lib/actions/inventario";
+import { createClient } from "@/lib/supabase/client";
 import { Package } from "lucide-react";
 import type { InventarioConProducto } from "./InventarioClient";
 
@@ -12,6 +13,11 @@ interface Props {
   onEditado: (actualizado: InventarioConProducto) => void;
 }
 
+interface PresentacionInfo {
+  tNombre:            string;
+  ePricePresentacion: number;
+}
+
 export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -19,6 +25,24 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
     eCantAgregar: "",
     eStockMinimo: (inventario.eStockMinimo ?? 0).toString(),
   });
+  const [presentacion, setPresentacion] = useState<PresentacionInfo | null>(null);
+
+  // Cargar nombre de la presentación si este lote la tiene
+  useEffect(() => {
+    const pid = (inventario as any).fkeCodPresentacion as string | null | undefined;
+    if (!pid) return;
+
+    async function cargar() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("presentaciones")
+        .select("tNombre, ePricePresentacion")
+        .eq("eCodPresentacion", pid)
+        .single();
+      if (data) setPresentacion(data as PresentacionInfo);
+    }
+    cargar();
+  }, [(inventario as any).fkeCodPresentacion]);
 
   async function handleConfirmar() {
     setLoading(true);
@@ -39,10 +63,10 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
     }
   }
 
-  const cantAgregar    = parseFloat(form.eCantAgregar) || 0;
-  const nuevasCantidad = (inventario.eCantIngresada ?? 0) + cantAgregar;
+  const cantAgregar     = parseFloat(form.eCantAgregar) || 0;
+  const nuevasCantidad  = (inventario.eCantIngresada ?? 0) + cantAgregar;
   const nuevosRestantes = (inventario.eCantRestante ?? 0) + cantAgregar;
-  const deshabilitado  = cantAgregar <= 0;
+  const deshabilitado   = cantAgregar <= 0;
 
   return (
     <Modal
@@ -54,7 +78,7 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
       deshabilitado={deshabilitado}
       error={error}
     >
-      {/* Preview del producto */}
+      {/* Preview del producto + presentación */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -84,9 +108,25 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
             {inventario.productos?.tNameProduct ?? "—"}
           </div>
-          <div style={{ fontSize: 12, color: "var(--gray)" }}>
-            {inventario.productos?.categorias?.tNameCategory ?? "Sin categoría"}
-          </div>
+          {/* Presentación — visible cuando el lote tiene una */}
+          {presentacion ? (
+            <div style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "var(--color-primary-light)",
+              borderRadius: "var(--radius-sm)",
+              padding: "1px 8px",
+              fontSize: 11, fontWeight: 700,
+              color: "var(--color-primary-dark)",
+              marginTop: 3,
+            }}>
+              {presentacion.tNombre} — ${presentacion.ePricePresentacion.toFixed(2)}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: "var(--gray)" }}>
+              {inventario.productos?.categorias?.tNameCategory ?? "Sin categoría"}
+            </div>
+          )}
         </div>
       </div>
 

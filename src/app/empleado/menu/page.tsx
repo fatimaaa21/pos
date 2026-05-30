@@ -1,7 +1,10 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { MenuClient }        from "./MenuClient";
-import type { Categoria, ProductoConStock, CorteCaja, VentasDelTurno } from "@/types";
+import type {
+  Categoria, ProductoConStock,
+  PresentacionConStock, CorteCaja, VentasDelTurno,
+} from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
 export default async function MenuPage() {
@@ -18,7 +21,7 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Métodos de pago activos para el negocio ───────────────────────────────
+  // ── Métodos de pago activos ───────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago")
@@ -38,7 +41,7 @@ export default async function MenuPage() {
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
-  // ── Turno activo del empleado ─────────────────────────────────────────────
+  // ── Turno activo ──────────────────────────────────────────────────────────
   const { data: corteAbierto } = await adminClient
     .from("cortes_caja")
     .select("*")
@@ -48,15 +51,10 @@ export default async function MenuPage() {
 
   const tieneTurno = corteAbierto !== null;
 
-  // ── Ventas acumuladas en el turno actual ──────────────────────────────────
-  // Se calcula aquí (server) para que ModalCerrarCaja tenga datos frescos
-  // sin necesitar otro fetch desde el cliente.
+  // ── Ventas del turno ──────────────────────────────────────────────────────
   let ventasDelTurno: VentasDelTurno = {
-    eTotalEfectivo:      0,
-    eTotalTarjeta:       0,
-    eTotalTransferencia: 0,
-    eTotalVentas:        0,
-    eNumVentas:          0,
+    eTotalEfectivo: 0, eTotalTarjeta: 0,
+    eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
   };
 
   if (corteAbierto) {
@@ -67,8 +65,6 @@ export default async function MenuPage() {
       .gte("fhCreateVenta", corteAbierto.fhInicioTurno);
 
     if (ventasTurno && ventasTurno.length > 0) {
-      // Resolver nombres de métodos para clasificar (efectivo vs tarjeta vs resto)
-      // fkeMetodoPago es un UUID dinámico, no el string "efectivo"
       const metodosIds = [...new Set(ventasTurno.map((v) => v.fkeMetodoPago))];
       const { data: metodosInfo } = await adminClient
         .from("metodos_pago")
@@ -83,15 +79,9 @@ export default async function MenuPage() {
       const esTarjeta  = (id: string) => (metodosMap.get(id) ?? "").includes("tarjeta");
 
       ventasDelTurno = {
-        eTotalEfectivo: ventasTurno
-          .filter((v) => esEfectivo(v.fkeMetodoPago))
-          .reduce((a, v) => a + v.eTotal, 0),
-        eTotalTarjeta: ventasTurno
-          .filter((v) => esTarjeta(v.fkeMetodoPago))
-          .reduce((a, v) => a + v.eTotal, 0),
-        eTotalTransferencia: ventasTurno
-          .filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago))
-          .reduce((a, v) => a + v.eTotal, 0),
+        eTotalEfectivo: ventasTurno.filter((v) => esEfectivo(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
+        eTotalTarjeta:  ventasTurno.filter((v) => esTarjeta(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
+        eTotalTransferencia: ventasTurno.filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago)).reduce((a, v) => a + v.eTotal, 0),
         eTotalVentas: ventasTurno.reduce((a, v) => a + v.eTotal, 0),
         eNumVentas:   ventasTurno.length,
       };
@@ -105,16 +95,15 @@ export default async function MenuPage() {
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Inventario: lotes con stock > 0 ó infinitos, ambos activos ────────────
+  // ── Inventario: lotes activos (por producto O por presentación) ───────────
   const { data: lotes, error } = await supabase
     .from("vista_inventario")
-    .select("fkeCodProduct, eCantRestante, bUnlimitedInventory")
+    .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
     .eq("bStateInventory", true)
     .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
 
   if (error) console.error("Error menú:", JSON.stringify(error));
 
-  // Retorno temprano si no hay productos — turno/métodos siguen pasando
   if (!lotes || lotes.length === 0) {
     return (
       <MenuClient
@@ -128,7 +117,45 @@ export default async function MenuPage() {
     );
   }
 
-  const idsConStock = [...new Set(lotes.map((l) => l.fkeCodProduct))];
+  // ── Separar lotes con y sin presentación ─────────────────────────────────
+  const lotesSinPres  = lotes.filter((l) => !l.fkeCodPresentacion);
+  const lotesConPres  = lotes.filter((l) =>  l.fkeCodPresentacion);
+
+  // Stock por producto (sin presentación)
+  const stockProducto    = new Map<string, number>();
+  const infinitoProducto = new Map<string, boolean>();
+
+  for (const l of lotesSinPres) {
+    if (l.bUnlimitedInventory) {
+      infinitoProducto.set(l.fkeCodProduct, true);
+    } else {
+      const actual = stockProducto.get(l.fkeCodProduct) ?? 0;
+      stockProducto.set(l.fkeCodProduct, actual + (l.eCantRestante ?? 0));
+    }
+  }
+
+  // Stock por presentación
+  const stockPorPres    = new Map<string, number>();    // key = fkeCodPresentacion
+  const infinitoPorPres = new Map<string, boolean>();
+
+  for (const l of lotesConPres) {
+    const pid = l.fkeCodPresentacion!;
+    if (l.bUnlimitedInventory) {
+      infinitoPorPres.set(pid, true);
+    } else {
+      const actual = stockPorPres.get(pid) ?? 0;
+      stockPorPres.set(pid, actual + (l.eCantRestante ?? 0));
+    }
+  }
+
+  // ── Productos con stock ───────────────────────────────────────────────────
+  // IDs de productos que tienen cualquier stock activo
+  const idsConStock = [
+    ...new Set([
+      ...lotesSinPres.map((l) => l.fkeCodProduct),
+      ...lotesConPres.map((l) => l.fkeCodProduct),
+    ]),
+  ];
 
   const { data: productos } = await supabase
     .from("productos")
@@ -136,30 +163,77 @@ export default async function MenuPage() {
     .in("eCodProduct", idsConStock)
     .eq("bStateProduct", true);
 
-  // Calcular stock y marcar infinitos
-  const stockPorProducto    = new Map<string, number>();
-  const infinitoPorProducto = new Map<string, boolean>();
+  // ── Presentaciones activas con stock ─────────────────────────────────────
+  // Buscar detalles de las presentaciones con inventario
+  const presentacionIds = [...new Set(lotesConPres.map((l) => l.fkeCodPresentacion!))];
+  let presentacionesDetalle: any[] = [];
 
-  for (const lote of lotes) {
-    if (lote.bUnlimitedInventory) {
-      infinitoPorProducto.set(lote.fkeCodProduct, true);
-    } else {
-      const actual = stockPorProducto.get(lote.fkeCodProduct) ?? 0;
-      stockPorProducto.set(lote.fkeCodProduct, actual + (lote.eCantRestante ?? 0));
-    }
+  if (presentacionIds.length > 0) {
+    const { data: pres } = await supabase
+      .from("presentaciones")
+      .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion")
+      .in("eCodPresentacion", presentacionIds)
+      .eq("bStatePresentacion", true);
+
+    presentacionesDetalle = pres ?? [];
   }
 
-  const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => ({
-    eCodProduct:     p.eCodProduct,
-    tNameProduct:    p.tNameProduct,
-    fkeCodCategory:  p.fkeCodCategory,
-    ePriceProduct:   p.ePriceProduct,
-    ImgProduct:      p.ImgProduct,
-    bInfinito:       infinitoPorProducto.get(p.eCodProduct) ?? false,
-    stockDisponible: infinitoPorProducto.get(p.eCodProduct)
-      ? Number.MAX_SAFE_INTEGER
-      : (stockPorProducto.get(p.eCodProduct) ?? 0),
-  }));
+  // Agrupar presentaciones por producto
+  const presByProducto = new Map<string, PresentacionConStock[]>();
+
+  for (const p of presentacionesDetalle) {
+    const stock   = stockPorPres.get(p.eCodPresentacion) ?? 0;
+    const bInf    = infinitoPorPres.get(p.eCodPresentacion) ?? false;
+    const pcs: PresentacionConStock = {
+      eCodPresentacion:   p.eCodPresentacion,
+      tNombre:            p.tNombre,
+      ePricePresentacion: p.ePricePresentacion,
+      eCostPresentacion:  p.eCostPresentacion,
+      stockDisponible:    bInf ? Number.MAX_SAFE_INTEGER : stock,
+      bInfinito:          bInf,
+    };
+
+    const lista = presByProducto.get(p.fkeCodProduct) ?? [];
+    lista.push(pcs);
+    presByProducto.set(p.fkeCodProduct, lista);
+  }
+
+  // ── Armar ProductoConStock ────────────────────────────────────────────────
+  const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => {
+    const pres = presByProducto.get(p.eCodProduct);
+
+    if (pres && pres.length > 0) {
+      // Producto con presentaciones:
+      // • stockDisponible = suma de todas las presentaciones (para mostrar disponibilidad total)
+      // • bInfinito = true si alguna presentación es ilimitada
+      const totalStock = pres.reduce((acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible), 0);
+      const anyInfinito = pres.some((pr) => pr.bInfinito);
+
+      return {
+        eCodProduct:     p.eCodProduct,
+        tNameProduct:    p.tNameProduct,
+        fkeCodCategory:  p.fkeCodCategory,
+        ePriceProduct:   p.ePriceProduct,
+        ImgProduct:      p.ImgProduct,
+        stockDisponible: anyInfinito ? Number.MAX_SAFE_INTEGER : totalStock,
+        bInfinito:       anyInfinito,
+        presentaciones:  pres,
+      };
+    }
+
+    // Producto sin presentaciones (comportamiento original)
+    return {
+      eCodProduct:     p.eCodProduct,
+      tNameProduct:    p.tNameProduct,
+      fkeCodCategory:  p.fkeCodCategory,
+      ePriceProduct:   p.ePriceProduct,
+      ImgProduct:      p.ImgProduct,
+      bInfinito:       infinitoProducto.get(p.eCodProduct) ?? false,
+      stockDisponible: infinitoProducto.get(p.eCodProduct)
+        ? Number.MAX_SAFE_INTEGER
+        : (stockProducto.get(p.eCodProduct) ?? 0),
+    };
+  });
 
   return (
     <MenuClient
