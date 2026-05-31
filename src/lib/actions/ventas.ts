@@ -7,12 +7,18 @@ import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
   eCodProduct:       string;
-  eCodPresentacion?: string;   // null/undefined = producto sin presentaciones
+  eCodPresentacion?: string;
   cantidad:          number;
   precioUnitario:    number;
 }
 
-export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) {
+const IVA_RATE = 0.16;
+
+export async function crearVenta(
+  items: ItemVenta[],
+  fkeMetodoPago: MetodoPago,
+  aplicarIva: boolean = true,   // ← nuevo parámetro con safe default
+) {
   try {
     const supabase    = await createClient();
     const adminClient = createAdminClient();
@@ -40,7 +46,6 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
         .eq("fkeCodProduct", item.eCodProduct)
         .eq("bStateInventory", true);
 
-      // Filtrar por presentación o por ausencia de presentación
       if (item.eCodPresentacion) {
         query = query.eq("fkeCodPresentacion", item.eCodPresentacion);
       } else {
@@ -60,11 +65,10 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
       }
     }
 
-    // ── Total ─────────────────────────────────────────────────────────────────
-    const eTotal = items.reduce(
-      (acc, i) => acc + i.precioUnitario * i.cantidad,
-      0
-    );
+    // ── Total con o sin IVA ───────────────────────────────────────────────────
+    const subtotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
+    const eTotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0)
+    // aplicarIva solo afecta cómo se *muestra* el desglose, no el total guardado
 
     // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient
@@ -87,7 +91,7 @@ export async function crearVenta(items: ItemVenta[], fkeMetodoPago: MetodoPago) 
     const detalle = items.map((i) => ({
       fkeCodVenta:         venta.eCodVenta,
       fkeCodProduct:       i.eCodProduct,
-      fkeCodPresentacion:  i.eCodPresentacion ?? null,   // nuevo
+      fkeCodPresentacion:  i.eCodPresentacion ?? null,
       eCantidad:           i.cantidad,
       ePrecioUnitario:     i.precioUnitario,
       eSubtotal:           i.precioUnitario * i.cantidad,

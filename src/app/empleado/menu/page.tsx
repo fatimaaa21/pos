@@ -21,14 +21,17 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Métodos de pago ───────────────────────────────────────────────────────
+  // ── Configuración del negocio (métodos + IVA) ─────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("metodosPago")
+    .select("metodosPago, aplicarIva")
     .eq("eCodCompany", fkeCodCompany)
     .single();
 
   const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
+  // Si la columna aún no existe en DB, `aplicarIva` vendrá null → default true
+  const aplicarIva: boolean = negocio?.aplicarIva ?? true;
+
   let metodosPago: MetodoPagoGlobal[] = [];
 
   if (idsSeleccionados.length > 0) {
@@ -94,11 +97,11 @@ export default async function MenuPage() {
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Lotes activos — adminClient para bypassear RLS y leer fkeCodPresentacion ──
+  // ── Lotes activos ─────────────────────────────────────────────────────────
   const { data: lotes, error } = await adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
-    .eq("fkeCodCompany", fkeCodCompany)        // solo lotes del negocio actual
+    .eq("fkeCodCompany", fkeCodCompany)
     .eq("bStateInventory", true)
     .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
 
@@ -113,6 +116,7 @@ export default async function MenuPage() {
         tieneTurno={tieneTurno}
         corte={(corteAbierto as CorteCaja | null) ?? null}
         ventasDelTurno={ventasDelTurno}
+        aplicarIva={aplicarIva}
       />
     );
   }
@@ -121,7 +125,6 @@ export default async function MenuPage() {
   const lotesSinPres = lotes.filter((l: any) => !l.fkeCodPresentacion);
   const lotesConPres = lotes.filter((l: any) =>  l.fkeCodPresentacion);
 
-  // Stock por producto (sin presentación)
   const stockProducto    = new Map<string, number>();
   const infinitoProducto = new Map<string, boolean>();
 
@@ -133,7 +136,6 @@ export default async function MenuPage() {
     }
   }
 
-  // Stock por presentación
   const stockPorPres    = new Map<string, number>();
   const infinitoPorPres = new Map<string, boolean>();
 
@@ -146,7 +148,6 @@ export default async function MenuPage() {
     }
   }
 
-  // ── IDs de productos con cualquier stock activo ───────────────────────────
   const idsConStock = [
     ...new Set([
       ...lotesSinPres.map((l: any) => l.fkeCodProduct as string),
@@ -160,7 +161,6 @@ export default async function MenuPage() {
     .in("eCodProduct", idsConStock)
     .eq("bStateProduct", true);
 
-  // ── Presentaciones activas con inventario ─────────────────────────────────
   const presentacionIds = [...new Set(lotesConPres.map((l: any) => l.fkeCodPresentacion as string))];
   let presentacionesDetalle: any[] = [];
 
@@ -173,7 +173,6 @@ export default async function MenuPage() {
     presentacionesDetalle = pres ?? [];
   }
 
-  // Agrupar presentaciones por producto
   const presByProducto = new Map<string, PresentacionConStock[]>();
 
   for (const p of presentacionesDetalle) {
@@ -194,7 +193,6 @@ export default async function MenuPage() {
     presByProducto.set(p.fkeCodProduct, lista);
   }
 
-  // ── Armar ProductoConStock ────────────────────────────────────────────────
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => {
     const pres = presByProducto.get(p.eCodProduct);
 
@@ -216,7 +214,6 @@ export default async function MenuPage() {
       };
     }
 
-    // Sin presentaciones — comportamiento original
     const bInf = infinitoProducto.get(p.eCodProduct) ?? false;
     return {
       eCodProduct:     p.eCodProduct,
@@ -237,6 +234,7 @@ export default async function MenuPage() {
       tieneTurno={tieneTurno}
       corte={(corteAbierto as CorteCaja | null) ?? null}
       ventasDelTurno={ventasDelTurno}
+      aplicarIva={aplicarIva}
     />
   );
 }
