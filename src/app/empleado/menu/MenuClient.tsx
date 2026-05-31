@@ -25,7 +25,6 @@ const VENTAS_VACIO: VentasDelTurno = {
   eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
 };
 
-/** Clave única por ítem en el carrito (producto + presentación opcional) */
 function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): string {
   return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
 }
@@ -37,11 +36,12 @@ interface Props {
   metodosPago:    MetodoPagoGlobal[];
   corte:          CorteCaja | null;
   ventasDelTurno: VentasDelTurno;
+  aplicarIva:     boolean;   // ← nueva prop
 }
 
 export function MenuClient({
   categorias, productos, tieneTurno, metodosPago,
-  corte, ventasDelTurno = VENTAS_VACIO,
+  corte, ventasDelTurno = VENTAS_VACIO, aplicarIva,
 }: Props) {
   const [categoriaActiva, setCategoriaActiva] = useState<string>("todas");
   const [busqueda, setBusqueda]               = useState("");
@@ -51,7 +51,6 @@ export function MenuClient({
   const [ventaExitosa, setVentaExitosa]       = useState<string | null>(null);
   const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
 
-  // ── Filtrado ──────────────────────────────────────────────────────────────
   const productosFiltrados = productos.filter((p) => {
     const coincideCategoria =
       categoriaActiva === "todas" || p.fkeCodCategory === categoriaActiva;
@@ -69,7 +68,6 @@ export function MenuClient({
     ),
   };
 
-  // ── Agregar al carrito ────────────────────────────────────────────────────
   function agregarProducto(producto: ProductoConStock, presentacion?: PresentacionConStock) {
     if (!tieneTurno) return;
     setErrorVenta(null);
@@ -90,7 +88,6 @@ export function MenuClient({
     });
   }
 
-  // ── Cambiar cantidad ──────────────────────────────────────────────────────
   function cambiarCantidad(key: string, delta: number) {
     setErrorVenta(null);
     setCarrito((prev) =>
@@ -112,7 +109,6 @@ export function MenuClient({
     setErrorVenta(null);
   }
 
-  // ── Finalizar venta ───────────────────────────────────────────────────────
   async function handleFinalizar(metodoPago: MetodoPago) {
     if (!tieneTurno) return;
     setErrorVenta(null);
@@ -124,7 +120,8 @@ export function MenuClient({
         cantidad:          i.cantidad,
         precioUnitario:    i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct,
       })),
-      metodoPago
+      metodoPago,
+      aplicarIva,   // ← se pasa al server action
     );
 
     if (result.error) { setErrorVenta(result.error); return; }
@@ -137,7 +134,6 @@ export function MenuClient({
     router.refresh();
   }
 
-  // ── Modal turno ───────────────────────────────────────────────────────────
   const [modalTurno,   setModalTurno]   = useState(false);
   const [fondoInicial, setFondoInicial] = useState("");
   const [nombreTurno,  setNombreTurno]  = useState("");
@@ -158,7 +154,6 @@ export function MenuClient({
 
   return (
     <>
-      {/* Banner turno no iniciado */}
       {!tieneTurno && (
         <div className={styles.bannerTurno}>
           <div className={styles.bannerTexto}>
@@ -174,7 +169,6 @@ export function MenuClient({
         </div>
       )}
 
-      {/* Catálogo */}
       <div className={`${styles.layout} ${!tieneTurno ? styles.layoutBloqueado : ""}`}>
         <div className={styles.buscadorRow}>
           <div className={styles.buscadorFlex}>
@@ -200,7 +194,6 @@ export function MenuClient({
         />
       </div>
 
-      {/* Panel de pedido */}
       <PedidoPanel
         items={carrito}
         metodosPago={metodosPago}
@@ -209,6 +202,7 @@ export function MenuClient({
         onFinalizar={handleFinalizar}
         error={errorVenta}
         bloqueado={!tieneTurno}
+        aplicarIva={aplicarIva}
       />
 
       {ventaExitosa && (
@@ -218,7 +212,6 @@ export function MenuClient({
         />
       )}
 
-      {/* Modal iniciar turno */}
       {modalTurno && (
         <Modal
           titulo="Iniciar turno"

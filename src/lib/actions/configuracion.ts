@@ -12,6 +12,7 @@ export interface ConfigNegocio {
   imgCompany:   string | null;
   moneda:       string;
   zona_horaria: string;
+  aplicarIva:   boolean;
   // metodosPago se gestiona por separado en metodos-pago.ts
 }
 
@@ -33,7 +34,7 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
 
     const { data: negocio } = await supabase
       .from("negocios")
-      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria")
+      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria, aplicarIva")
       .eq("eCodCompany", perfil.fkeCodCompany)
       .single();
 
@@ -45,6 +46,8 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
       imgCompany:   negocio.imgCompany   ?? null,
       moneda:       negocio.moneda       ?? "MXN",
       zona_horaria: negocio.zona_horaria ?? "America/Mexico_City",
+      // Si la columna no existe aún en DB, el valor vendrá como null → default true
+      aplicarIva:   negocio.aplicarIva   ?? true,
     };
   } catch {
     return null;
@@ -53,7 +56,7 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
-/** Guarda solo los datos generales del negocio (sin metodosPago) */
+/** Guarda los datos generales del negocio (sin metodosPago) */
 export async function guardarConfigNegocio(formData: FormData) {
   try {
     const adminClient = createAdminClient();
@@ -74,6 +77,7 @@ export async function guardarConfigNegocio(formData: FormData) {
     const imgCompany   = formData.get("imgCompany")   as string;
     const moneda       = formData.get("moneda")        as string;
     const zona_horaria = formData.get("zona_horaria")  as string;
+    const aplicarIva   = formData.get("aplicarIva") === "true";
 
     const { error } = await adminClient
       .from("negocios")
@@ -82,6 +86,7 @@ export async function guardarConfigNegocio(formData: FormData) {
         imgCompany:   imgCompany || null,
         moneda,
         zona_horaria,
+        aplicarIva,
       })
       .eq("eCodCompany", perfil.fkeCodCompany);
 
@@ -89,6 +94,7 @@ export async function guardarConfigNegocio(formData: FormData) {
 
     revalidatePath("/admin/configuracion");
     revalidatePath("/admin/dashboard");
+    revalidatePath("/empleado/menu");
     return { ok: true };
   } catch (e: any) {
     return { error: `Error inesperado: ${e?.message ?? e}` };

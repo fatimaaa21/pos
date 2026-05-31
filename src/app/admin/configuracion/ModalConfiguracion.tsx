@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Globe, Check } from "lucide-react";
+import { X, Check } from "lucide-react";
 import * as Icons from "lucide-react";
 import { guardarConfigNegocio, type ConfigNegocio } from "@/lib/actions/configuracion";
 import { guardarMetodosNegocio, type MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
@@ -39,11 +39,58 @@ const TABS: { id: Tab; label: string }[] = [
 
 interface Props {
   config:     ConfigNegocio;
-  catalogo:   MetodoPagoGlobal[];  // métodos activos definidos por Sistemas
-  activados:  string[];            // eCodPay[] que el negocio tiene seleccionados
+  catalogo:   MetodoPagoGlobal[];
+  activados:  string[];
   codCompany: string;
   onCerrar:   () => void;
   onGuardado?: () => void;
+}
+
+// ── Toggle ────────────────────────────────────────────────────────────────────
+
+function Toggle({
+  activo,
+  onChange,
+  label,
+}: {
+  activo: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={activo}
+      aria-label={label}
+      onClick={() => onChange(!activo)}
+      style={{
+        width: 38,
+        height: 22,
+        borderRadius: 11,
+        border: "none",
+        background: activo ? "var(--color-primary)" : "var(--border-strong)",
+        position: "relative",
+        cursor: "pointer",
+        transition: "background 0.2s",
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 3,
+          left: activo ? 18 : 3,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "white",
+          transition: "left 0.18s",
+          boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+        }}
+      />
+    </button>
+  );
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -67,10 +114,10 @@ export function ModalConfiguracion({
     imgCompany:   config.imgCompany ?? "",
     moneda:       config.moneda      ?? "MXN",
     zona_horaria: config.zona_horaria ?? "America/Mexico_City",
+    aplicarIva:   config.aplicarIva  ?? true,
   });
 
   // ── Estado tab Métodos de pago ────────────────────────────────────────────
-  // Usamos eCodPay[] como fuente de verdad, con fallback a array vacío
   const [metodosPago, setMetodosPago] = useState<string[]>(activados ?? []);
 
   // Cerrar con Escape
@@ -92,7 +139,7 @@ export function ModalConfiguracion({
   function toggleMetodo(eCodPay: string) {
     setMetodosPago((prev) => {
       const yaActivo = prev.includes(eCodPay);
-      if (yaActivo && prev.length === 1) return prev; // al menos uno
+      if (yaActivo && prev.length === 1) return prev;
       return yaActivo
         ? prev.filter((id) => id !== eCodPay)
         : [...prev, eCodPay];
@@ -108,6 +155,7 @@ export function ModalConfiguracion({
     fd.append("imgCompany",   form.imgCompany);
     fd.append("moneda",       form.moneda);
     fd.append("zona_horaria", form.zona_horaria);
+    fd.append("aplicarIva",   String(form.aplicarIva));
 
     const [resConfig, resMetodos] = await Promise.all([
       guardarConfigNegocio(fd),
@@ -129,7 +177,8 @@ export function ModalConfiguracion({
     form.tNameCompany !== config.tNameCompany        ||
     form.imgCompany   !== (config.imgCompany ?? "")  ||
     form.moneda       !== (config.moneda ?? "MXN")   ||
-    form.zona_horaria !== (config.zona_horaria ?? "America/Mexico_City");
+    form.zona_horaria !== (config.zona_horaria ?? "America/Mexico_City") ||
+    form.aplicarIva   !== (config.aplicarIva ?? true);
 
   const activadosBase = activados ?? [];
   const hayChangesPagos =
@@ -138,7 +187,6 @@ export function ModalConfiguracion({
 
   const hayChanges = hayChangesGeneral || hayChangesPagos;
 
-  // ── Iniciales del negocio para el fallback del logo ───────────────────────
   const inicialesNegocio = (form.tNameCompany || config.tNameCompany)
     .split(" ")
     .map((n: string) => n[0])
@@ -227,9 +275,7 @@ export function ModalConfiguracion({
               </div>
 
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>
-                  Moneda
-                </label>
+                <label className={styles.fieldLabel}>Moneda</label>
                 <div className={styles.selectWrap}>
                   <select
                     className={styles.input}
@@ -257,6 +303,44 @@ export function ModalConfiguracion({
                   </select>
                 </div>
               </div>
+
+              {/* ── IVA ── */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "var(--space-3) var(--space-4)",
+                  background: form.aplicarIva
+                    ? "var(--color-primary-50)"
+                    : "var(--background)",
+                  border: `1px solid ${form.aplicarIva ? "var(--color-primary-light)" : "var(--border-default)"}`,
+                  borderRadius: "var(--radius-md)",
+                  transition: "all 0.18s",
+                }}
+              >
+                <div>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
+                    Aplicar IVA (16%)
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--gray)" }}>
+                    {form.aplicarIva
+                      ? "El IVA se suma al subtotal en cada venta"
+                      : "Los precios se cobran sin IVA adicional"}
+                  </p>
+                </div>
+                <Toggle
+                  activo={form.aplicarIva}
+                  onChange={(v) => setForm((p) => ({ ...p, aplicarIva: v }))}
+                  label="Aplicar IVA"
+                />
+              </div>
+
+              {!form.aplicarIva && (
+                <div className={styles.infoBox}>
+                  Al desactivar el IVA, los precios de tus productos se cobran tal cual están registrados.
+                </div>
+              )}
             </>
           )}
 

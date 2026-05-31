@@ -11,14 +11,15 @@ import { ModalEfectivo } from "@/components/ui/ModalEfectivo/ModalEfectivo";
 interface Props {
   items:             ItemCarritoMenu[];
   metodosPago:       MetodoPagoGlobal[];
-  onCambiarCantidad: (key: string, delta: number) => void;  // key = carritoKey
+  onCambiarCantidad: (key: string, delta: number) => void;
   onLimpiar:         () => void;
   onFinalizar:       (metodoPago: MetodoPago) => Promise<void>;
   error?:            string | null;
   bloqueado?:        boolean;
+  aplicarIva?:       boolean;   // ← nueva prop; default true para no romper si no se pasa
 }
 
-const IVA = 0.16;
+const IVA_RATE = 0.16;
 
 /** Clave única por ítem — debe coincidir con la de MenuClient */
 function carritoKey(item: ItemCarritoMenu): string {
@@ -43,18 +44,18 @@ export function PedidoPanel({
   onFinalizar,
   error,
   bloqueado = false,
+  aplicarIva = true,
 }: Props) {
-  const [metodoPago, setMetodoPago]             = useState<string>(metodosPago[0]?.eCodPay ?? "");
-  const [cargando, setCargando]                 = useState(false);
+  const [metodoPago, setMetodoPago]              = useState<string>(metodosPago[0]?.eCodPay ?? "");
+  const [cargando, setCargando]                  = useState(false);
   const [modalEfectivoAbierto, setModalEfectivo] = useState(false);
 
-  // Precio por ítem: presentación si existe, si no el base del producto
   const precioItem = (item: ItemCarritoMenu) =>
     item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct;
 
-  const subtotal = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
-  const iva      = subtotal * IVA;
-  const total    = subtotal + iva;
+  const total    = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0)
+  const subtotal = aplicarIva ? total / (1 + IVA_RATE) : total
+  const iva      = aplicarIva ? total - subtotal : 0
 
   const metodoSeleccionado = metodosPago.find((m) => m.eCodPay === metodoPago);
   const metodoEsEfectivo   = metodoSeleccionado ? esMetodoEfectivo(metodoSeleccionado) : false;
@@ -110,7 +111,6 @@ export function PedidoPanel({
 
               return (
                 <div key={key} className={styles.item}>
-                  {/* Imagen */}
                   <div className={styles.itemImg}>
                     {item.producto.ImgProduct ? (
                       <img src={item.producto.ImgProduct} alt={item.producto.tNameProduct} />
@@ -119,7 +119,6 @@ export function PedidoPanel({
                     )}
                   </div>
 
-                  {/* Info */}
                   <div className={styles.itemInfo}>
                     <p className={styles.itemNombre}>
                       {item.producto.tNameProduct}
@@ -134,7 +133,6 @@ export function PedidoPanel({
                     </span>
                   </div>
 
-                  {/* Controles */}
                   <div className={styles.itemControles}>
                     <button
                       className={styles.btnCantidad}
@@ -166,10 +164,21 @@ export function PedidoPanel({
               <span className={styles.totalLabel}>Sub Total</span>
               <span className={styles.totalValor}>${subtotal.toFixed(2)}</span>
             </div>
-            <div className={styles.lineaTotal}>
-              <span className={styles.totalLabel}>IVA (16%)</span>
-              <span className={styles.totalValor}>${iva.toFixed(2)}</span>
-            </div>
+
+            {/* La línea de IVA solo aparece cuando está habilitado */}
+            {aplicarIva ? (
+              <div className={styles.lineaTotal}>
+                <span className={styles.totalLabel}>IVA (16%)</span>
+                <span className={styles.totalValor}>${iva.toFixed(2)}</span>
+              </div>
+            ) : (
+              <div className={styles.lineaTotal}>
+                <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>
+                  Sin IVA
+                </span>
+              </div>
+            )}
+
             <div className={styles.separador} />
             <div className={styles.lineaTotal}>
               <span className={styles.totalFinalLabel}>Monto Total</span>
