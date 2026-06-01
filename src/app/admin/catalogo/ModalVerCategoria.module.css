@@ -8,15 +8,17 @@
   border-bottom: 1px solid var(--border-light);
 }
 
-.avatar img {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-lg);
-  background: transparent;
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-xl);
+  background: var(--color-primary-50);
+  border: 1.5px solid var(--color-primary-light);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  color: var(--color-primary);
+  overflow: hidden;
 }
 
 .avatarNombre {

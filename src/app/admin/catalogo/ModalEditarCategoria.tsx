@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
 import { editarCategoria } from "@/lib/actions/categorias";
-import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
+import { IconPickerInput } from "@/components/ui/IconPickerInput/IconPickerInput";
 import type { Categoria } from "@/types";
 
 interface Props {
@@ -53,13 +53,12 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
       error={error}
       ancho="sm"
     >
-      <ModalField label="Imagen">
-        <ImageUploadInput
-        value={form.ImgCategory}
-        onChange={(url) => setForm((prev) => ({ ...prev, ImgCategory: url }))}
-        placeholder="Subir imagen de categoría"
-        bucket="category-images"
-        storagePath={`categorias/${categoria.eCodCategory}`}
+      <ModalField label="Ícono">
+        <IconPickerInput
+          value={form.ImgCategory}
+          onChange={(val) => setForm((prev) => ({ ...prev, ImgCategory: val }))}
+          bucket="category-images"
+          storagePath={`categorias/${categoria.eCodCategory}`}
         />
       </ModalField>
 

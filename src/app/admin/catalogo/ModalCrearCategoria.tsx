@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
 import { crearCategoria } from "@/lib/actions/categorias";
 import type { Categoria } from "@/types";
-import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
+import { IconPickerInput } from "@/components/ui/IconPickerInput/IconPickerInput";
 
 interface Props {
   onClose: () => void;
@@ -45,7 +45,7 @@ export function ModalCrearCategoria({ onClose, onCreado }: Props) {
     }
   }
 
-  const deshabilitado = !form.tNameCategory.trim() || !form.ImgCategory;
+const deshabilitado = !form.tNameCategory.trim(); // ← quita el || !form.ImgCategory
 
   return (
     <Modal
@@ -58,17 +58,14 @@ export function ModalCrearCategoria({ onClose, onCreado }: Props) {
       error={error}
       ancho="sm"
     >
-        <ModalField label="Imagen" required>
-            {/* Sin eCodCategory aún → usamos timestamp como path temporal.
-            // Después de crear, el path queda fijo en Storage aunque el nombre sea con timestamp.*/}
-            <ImageUploadInput
+        <ModalField label="Ícono" required>
+          <IconPickerInput
             value={form.ImgCategory}
-            onChange={(url) => setForm({ ...form, ImgCategory: url })}
-            placeholder="Subir imagen de categoría"
+            onChange={(val) => setForm({ ...form, ImgCategory: val })}
             bucket="category-images"
-            storagePath={`categorias/new_${Date.now()}`}   // temporal, se fija al subir
-            />
-      </ModalField>
+            storagePath={`categorias/new_${uid}`}
+          />
+        </ModalField>
       
       <ModalField label="Nombre de la categoría" required>
         <ModalInput
