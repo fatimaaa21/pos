@@ -5,7 +5,6 @@ import { Eye } from "lucide-react";
 import * as Icons from "lucide-react";
 import { PageHeader }   from "@/components/ui/PageHeader";
 import { StatCards }    from "@/components/ui/Statscards";
-import { Buscador }     from "@/components/ui/Buscador";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
@@ -182,13 +181,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }
 
   return (
     <div className="container">
-      <div className="header">
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar folio, empleado o producto..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Ventas"
