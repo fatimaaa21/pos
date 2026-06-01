@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
 import { StatCards } from "@/components/ui/Statscards";
@@ -21,36 +20,106 @@ interface Props {
   categorias: Categoria[];
 }
 
+// ── Opciones para el filtro "Productos" ────────────────────────────────────────
+// Se pasan como opcionesMetodo al TablaToolbar — el slot single-select
+// genérico escribe en filtros.metodo, que el filtrado interpreta como
+// "estado de productos" para esta vista.
+const OPCIONES_PRODUCTOS = [
+  { value: "todos",          label: "Todos"                    },
+  { value: "con_activos",    label: "Con productos activos"    },
+  { value: "sin_productos",  label: "Sin productos"            },
+  { value: "solo_inactivos", label: "Solo productos inactivos" },
+];
+
+// ── Helper: clasifica el estado de productos de una categoría ─────────────────
+function clasificarProductos(c: Categoria): string {
+  const todos = c.productos ?? [];
+  if (todos.length === 0) return "sin_productos";
+  const activos = todos.filter((p) => p.bStateProduct).length;
+  return activos > 0 ? "con_activos" : "solo_inactivos";
+}
+
+// ── Helper: comprueba si una fecha cae dentro del período elegido ─────────────
+function estaEnPeriodo(fechaISO: string | undefined | null, periodo: string): boolean {
+  if (!fechaISO || periodo === "todo") return true;
+  const d     = new Date(fechaISO);
+  const ahora = new Date();
+  if (periodo === "hoy") {
+    return (
+      d.getFullYear() === ahora.getFullYear() &&
+      d.getMonth()    === ahora.getMonth()    &&
+      d.getDate()     === ahora.getDate()
+    );
+  }
+  if (periodo === "semana") {
+    const inicio = new Date(ahora);
+    inicio.setHours(0, 0, 0, 0);
+    inicio.setDate(inicio.getDate() - 7);
+    return d >= inicio;
+  }
+  if (periodo === "mes") {
+    return (
+      d.getMonth()    === ahora.getMonth() &&
+      d.getFullYear() === ahora.getFullYear()
+    );
+  }
+  return true;
+}
+
 export function CatalogoClient({ categorias: inicial }: Props) {
   const [categorias, setCategorias] = useState<Categoria[]>(inicial);
-  // Map de eCodCategory → timestamp — se actualiza cada vez que se edita una categoría.
-  // Esto fuerza que el <img> recargue la imagen aunque la URL base sea la misma.
-  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
-    Object.fromEntries(inicial.map((c) => [c.eCodCategory, Date.now()]))
-  );
-  
-  const [busqueda, setBusqueda] = useState("");
+
+  // Cache-busters: fuerzan al <img> a recargar tras editar una categoría
+  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
+
+
+  // ── Estado de filtros ─────────────────────────────────────────────────────
+  // BUG CORREGIDO: antes existían dos estados separados —
+  //   const [busqueda, setBusqueda] = useState("")  ← Buscador externo
+  //   filtros.busqueda              ← TablaToolbar interno
+  // El filtrado solo leía filtros.busqueda, así que el Buscador externo
+  // no tenía ningún efecto. Ahora ambos componentes escriben en el mismo
+  // estado: filtros.busqueda.
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
-    roles: [],
-    estados: [],
+    roles:    [],
+    estados:  [],
+    periodo:  "todo",    // período de CREACIÓN de la categoría
+    metodo:   "todos",   // reutilizado como filtro de "estado de productos"
   });
-  const [modalCrear, setModalCrear] = useState(false);
+
+  // Modales
+  const [modalCrear,      setModalCrear]     = useState(false);
   const [categoriaEditar, setCategoriaEditar] = useState<Categoria | null>(null);
-  const [categoriaVer, setCategoriaVer] = useState<Categoria | null>(null);
-  const [toggleando, setToggleando] = useState<string | null>(null);
+  const [categoriaVer,    setCategoriaVer]   = useState<Categoria | null>(null);
+
+  // Acciones en curso
+  const [toggleando,    setToggleando]   = useState<string | null>(null);
+  const [eliminando,    setEliminando]   = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [eliminando, setEliminando] = useState<string | null>(null);
-  const [ts] = useState(() => Date.now());
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = categorias.filter((c) => {
-    const texto = filtros.busqueda.toLowerCase();
-    const coincideTexto = !texto || c.tNameCategory.toLowerCase().includes(texto);
-    const estadoValor = c.bStateCategory ? "activo" : "inactivo";
+    // 1. Búsqueda de texto (Buscador externo + search interno del Toolbar
+    //    alimentan el mismo filtros.busqueda → ya no están desconectados)
+    const texto = filtros.busqueda.toLowerCase().trim();
+    const coincideTexto =
+      !texto || c.tNameCategory.toLowerCase().includes(texto);
+
+    // 2. Estado activo / inactivo
+    const estadoValor   = c.bStateCategory ? "activo" : "inactivo";
     const coincideEstado =
       filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-    return coincideTexto && coincideEstado;
+
+    // 3. Período de creación de la categoría
+    const coincidePeriodo = estaEnPeriodo(c.fhCreateCategory, filtros.periodo ?? "todo");
+
+    // 4. Estado de productos (slot "metodo" del Toolbar)
+    const filtroProductos = filtros.metodo ?? "todos";
+    const coincideProductos =
+      filtroProductos === "todos" || clasificarProductos(c) === filtroProductos;
+
+    return coincideTexto && coincideEstado && coincidePeriodo && coincideProductos;
   });
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -67,14 +136,16 @@ export function CatalogoClient({ categorias: inicial }: Props) {
           : c
       )
     );
-    // Nuevo timestamp → el <img> recarga la imagen del bucket aunque la URL sea igual
     setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodCategory]: Date.now() }));
     setCategoriaEditar(null);
   }
 
   async function handleToggleEstado(categoria: Categoria) {
     setToggleando(categoria.eCodCategory);
-    const result = await toggleEstadoCategoria(categoria.eCodCategory, !categoria.bStateCategory);
+    const result = await toggleEstadoCategoria(
+      categoria.eCodCategory,
+      !categoria.bStateCategory
+    );
     if (!result?.error) {
       setCategorias((prev) =>
         prev.map((c) =>
@@ -97,7 +168,9 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     const result = await eliminarCategoria(categoria.eCodCategory);
 
     if (!result?.error) {
-      setCategorias((prev) => prev.filter((c) => c.eCodCategory !== categoria.eCodCategory));
+      setCategorias((prev) =>
+        prev.filter((c) => c.eCodCategory !== categoria.eCodCategory)
+      );
     } else {
       alert(`Error al eliminar categoría: ${result.error}`);
     }
@@ -105,24 +178,28 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  const totalActivas = categorias.filter((c) => c.bStateCategory).length;
+  const totalActivas = categorias.filter((c) =>  c.bStateCategory).length;
+  const conProductos = categorias.filter((c) => (c.productos?.length ?? 0) > 0).length;
+  const sinProductos = categorias.filter((c) => (c.productos?.length ?? 0) === 0).length;
 
   // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Categoria>[] = [
-    // Reemplaza la columna "tNameCategory" en el array `columnas` de CatalogoClient.tsx
-
     {
       key: "tNameCategory",
       label: "Categoría",
       render: (c) => {
-        const ts = imgTimestamps[c.eCodCategory] ?? Date.now();
+        const ts = imgTimestamps[c.eCodCategory];
         return (
           <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {c.ImgCategory ? (
+            {c.ImgCategory && (
+              // Solo añade ?t= cuando existe un timestamp (tras editar).
+              // En la carga inicial no hay timestamp → URL limpia → sin mismatch.
               <img
-                src={`${c.ImgCategory.split("?")[0]}?t=${ts}`}
+                src={ts
+                  ? `${c.ImgCategory.split("?")[0]}?t=${ts}`
+                  : c.ImgCategory.split("?")[0]}
               />
-            ) : null }
+            )}
             <span>{c.tNameCategory}</span>
           </div>
         );
@@ -132,14 +209,11 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       key: "productos",
       label: "Productos",
       render: (c) => {
-        const total = c.productos?.length ?? 0;
         const activos = c.productos?.filter((p) => p.bStateProduct).length ?? 0;
         return (
           <div className={styles.productosCell}>
             {activos > 0 ? (
-              <span>
-                {activos} activo{activos !== 1 ? "s" : ""}
-              </span>
+              <span>{activos} activo{activos !== 1 ? "s" : ""}</span>
             ) : (
               <span>Sin productos</span>
             )}
@@ -156,7 +230,9 @@ export function CatalogoClient({ categorias: inicial }: Props) {
       key: "fhUpdateCategory",
       label: "Última actualización",
       render: (c) => (
-        <span>{c.fhUpdateCategory ? formatRelativo(c.fhUpdateCategory) : "Sin cambios"}</span>
+        <span>
+          {c.fhUpdateCategory ? formatRelativo(c.fhUpdateCategory) : "Sin cambios"}
+        </span>
       ),
     },
     {
@@ -194,12 +270,14 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     },
   ];
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="container">
+      {/* Buscador externo: ahora escribe en filtros.busqueda (corregido) */}
       <div className="header">
         <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
+          valor={filtros.busqueda}
+          onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
           placeholder="Buscar categoría..."
         />
       </div>
@@ -210,19 +288,33 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         boton={{ label: "Nueva categoría", onClick: () => setModalCrear(true) }}
       />
 
-      {/* Stats */}
+      {/* Stat extra: con/sin productos para ver el estado del catálogo de un vistazo */}
       <StatCards stats={[
-        { label: "Total categorías",  value: categorias.length, variante: "primary" },
-        { label: "Activas",         value: totalActivas, variante: "success" },
-        { label: "Inactivas",         value: categorias.length - totalActivas, variante: "accent" },
+        { label: "Total categorías", value: categorias.length, variante: "primary" },
+        { label: "Activas",          value: totalActivas,       variante: "success" },
+        { label: "Con productos",    value: conProductos,       variante: "accent"  },
+        { label: "Sin productos",    value: sinProductos,       variante: "neutral" },
       ]} />
 
-      {/* Filtros */}
+      {/*
+        TablaToolbar — filtros añadidos respecto a la versión anterior:
+
+        mostrarPeriodo   → filtra por fecha de CREACIÓN de la categoría
+                           (Hoy / Esta semana / Este mes / Todo)
+
+        opcionesMetodo   → slot single-select reutilizado para el estado
+                           de productos de cada categoría:
+                           Todos / Con activos / Sin productos / Solo inactivos
+                           El valor elegido se almacena en filtros.metodo y
+                           el bloque de filtrado de arriba lo interpreta.
+      */}
       <TablaToolbar
         filtros={filtros}
         onChange={setFiltros}
         total={filtradas.length}
         ocultarRol
+        mostrarPeriodo
+        opcionesMetodo={OPCIONES_PRODUCTOS}
       />
 
       <DataTable
@@ -235,7 +327,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         vacio="No se encontraron categorías"
       />
 
-      {/* Modales */}
       {modalCrear && (
         <ModalCrearCategoria
           onClose={() => setModalCrear(false)}
@@ -263,9 +354,9 @@ function ActionBtn({
   children, title, onClick, danger, loading,
 }: {
   children: React.ReactNode;
-  title: string;
-  onClick: () => void;
-  danger?: boolean;
+  title:    string;
+  onClick:  () => void;
+  danger?:  boolean;
   loading?: boolean;
 }) {
   return (

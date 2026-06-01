@@ -22,9 +22,7 @@ interface Props {
 
 export function ProductClient({ productos: inicial }: Props) {
   const [productos, setProductos] = useState<Producto[]>(inicial);
-  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
-    Object.fromEntries(inicial.map((p) => [p.eCodProduct, Date.now()]))
-  );
+  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({

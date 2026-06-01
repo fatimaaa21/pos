@@ -1,26 +1,10 @@
-import { redirect }            from "next/navigation";
-import { getConfigNegocio }    from "@/lib/actions/configuracion";
-import { getMetodosParaAdmin } from "@/lib/actions/metodos-pago";
-import { ConfiguracionClient } from "./configuracionClient";
+// src/app/admin/configuracion/page.tsx
+//
+// La configuración ya no vive en esta ruta.
+// El modal se abre directamente desde el Sidebar usando el store de Zustand,
+// sin navegación. Esta redirección evita un 404 si alguien llega por URL directa.
+import { redirect } from "next/navigation";
 
-export default async function ConfiguracionPage() {
-  const [config, { catalogo, activados, codCompany }] = await Promise.all([
-    getConfigNegocio(),
-    getMetodosParaAdmin(),
-  ]);
-
-  if (!config) redirect("/admin/dashboard");
-
-  // Filtrar activados que ya no existan en el catálogo vigente
-  const codsValidos     = new Set(catalogo.map((m) => m.eCodPay));
-  const activadosLimpios = activados.filter((id) => codsValidos.has(id));
-
-  return (
-    <ConfiguracionClient
-      config={config}
-      catalogo={catalogo}
-      activados={activadosLimpios}
-      codCompany={codCompany}
-    />
-  );
+export default function ConfiguracionPage() {
+  redirect("/admin/dashboard");
 }
