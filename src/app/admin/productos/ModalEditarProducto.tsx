@@ -221,6 +221,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       {/* Imagen */}
       <ModalField label="Imagen">

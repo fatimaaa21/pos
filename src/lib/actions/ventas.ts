@@ -12,12 +12,10 @@ interface ItemVenta {
   precioUnitario:    number;
 }
 
-const IVA_RATE = 0.16;
-
 export async function crearVenta(
   items: ItemVenta[],
   fkeMetodoPago: MetodoPago,
-  aplicarIva: boolean = true,   // ← nuevo parámetro con safe default
+  aplicarIva: boolean = true,
 ) {
   try {
     const supabase    = await createClient();
@@ -65,10 +63,10 @@ export async function crearVenta(
       }
     }
 
-    // ── Total con o sin IVA ───────────────────────────────────────────────────
-    const subtotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
-    const eTotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0)
-    // aplicarIva solo afecta cómo se *muestra* el desglose, no el total guardado
+    // ── Total a guardar ───────────────────────────────────────────────────────
+    // Los precios ya incluyen IVA. eTotal = lo que realmente se cobra.
+    // aplicarIva afecta solo cómo se muestra el desglose en pantalla, no el total.
+    const eTotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
 
     // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient

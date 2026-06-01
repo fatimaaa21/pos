@@ -5,7 +5,6 @@ import { Eye } from "lucide-react";
 import * as Icons from "lucide-react";
 import { PageHeader }   from "@/components/ui/PageHeader";
 import { StatCards }    from "@/components/ui/Statscards";
-import { Buscador }     from "@/components/ui/Buscador";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
@@ -30,6 +29,7 @@ interface Props {
   ventas:      VentaAdmin[];
   empleados:   { id: string; nombre: string }[];
   metodosPago: MetodoPagoGlobal[];
+  aplicarIva:  boolean;
 }
 
 // ── Helper: badge de método dinámico ─────────────────────────────────────────
@@ -75,7 +75,7 @@ function estaEnPeriodo(fechaISO: string, periodo: string): boolean {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
+export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }: Props) {
   const [busqueda,      setBusqueda]      = useState("");
   const [filtros,       setFiltros]       = useState<FiltrosUsuario>({
     busqueda:  "",
@@ -88,7 +88,6 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [ventaVer,      setVentaVer]      = useState<VentaAdmin | null>(null);
 
-  // Opciones de método dinámicas desde el catálogo
   const opcionesMetodo = useMemo(() => [
     { value: "todos", label: "Todos" },
     ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),
@@ -182,13 +181,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
 
   return (
     <div className="container">
-      <div className="header">
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar folio, empleado o producto..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Ventas"
@@ -227,6 +220,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
         <ModalVerVenta
           venta={ventaVer}
           metodosPago={metodosPago}
+          aplicarIva={aplicarIva}
           onClose={() => setVentaVer(null)}
         />
       )}

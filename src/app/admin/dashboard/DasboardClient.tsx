@@ -1,5 +1,16 @@
 "use client";
 
+// ── React hooks — necesarios para el fix de hidratación ──────────────────────
+// formatDuracion llamaba Date.now() durante SSR y de nuevo durante la
+// hidratación del cliente. Como pasa tiempo entre ambas ejecuciones, el
+// resultado difería (ej. "27h 23m" vs "27h 24m") y React lanzaba el error
+// de hidratación.
+//
+// Fix: ahora el servidor renderiza "—" (sin calcular duraciones) y el cliente
+// setea `ahora` en el primer useEffect. Además, un interval de 60 s mantiene
+// los contadores vivos mientras el admin tiene la página abierta.
+import { useState, useEffect } from "react";
+
 import Link from "next/link";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -106,8 +117,14 @@ function getFechaLong(): string {
   });
 }
 
-function formatDuracion(desde: string): string {
-  const diff    = Date.now() - new Date(desde).getTime();
+// ── formatDuracion — FIX de hidratación ───────────────────────────────────
+// Antes: `Date.now()` se llamaba en SSR y otra vez en el cliente →
+//        los resultados diferían → React lanzaba el error de hidratación.
+// Ahora: recibe `ahora: Date` desde el componente. El componente solo tiene
+//        una fecha real en el cliente (useState null → useEffect), así que
+//        el servidor nunca llega a llamar esta función.
+function formatDuracion(desde: string, ahora: Date): string {
+  const diff    = ahora.getTime() - new Date(desde).getTime();
   const horas   = Math.floor(diff / (1000 * 60 * 60));
   const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   if (horas === 0) return `${minutos}m`;
@@ -193,8 +210,19 @@ export function DashboardClient({
   topProductos,
 }: DashboardClientProps) {
 
-  const tendVentas  = calcTendencia(totalHoy, totalAyer);
-  const tendTxns    = numVentasAyer > 0
+  // ── Fix de hidratación ───────────────────────────────────────────────────
+  // `null` → el servidor no genera ningún texto de duración.
+  // El cliente lo setea al montar (sin mismatch) y lo refresca cada minuto.
+  const [ahora, setAhora] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setAhora(new Date());
+    const id = setInterval(() => setAhora(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const tendVentas = calcTendencia(totalHoy, totalAyer);
+  const tendTxns   = numVentasAyer > 0
     ? numVentas - numVentasAyer
     : null;
 
@@ -487,12 +515,10 @@ export function DashboardClient({
               <div className={styles.topProductosList}>
                 {topProductos.map((producto, idx) => (
                   <div key={producto.eCodProduct} className={styles.topProductoItem}>
-                    {/* Posición */}
                     <span className={`${styles.topProductoRank} ${idx === 0 ? styles.topProductoRankPrimero : ""}`}>
                       {idx + 1}
                     </span>
 
-                    {/* Imagen / fallback */}
                     <div className={styles.topProductoImg}>
                       {producto.ImgProduct ? (
                         <img
@@ -507,7 +533,6 @@ export function DashboardClient({
                       )}
                     </div>
 
-                    {/* Nombre + categoría */}
                     <div className={styles.topProductoInfo}>
                       <p className={styles.topProductoNombre}>{producto.tNameProduct}</p>
                       {producto.categoria && (
@@ -515,7 +540,6 @@ export function DashboardClient({
                       )}
                     </div>
 
-                    {/* Stats: revenue + unidades */}
                     <div className={styles.topProductoStats}>
                       <span className={styles.topProductoRevenue}>
                         {fmtFull(producto.totalRevenue)}
@@ -538,9 +562,7 @@ export function DashboardClient({
           <div className={styles.card}>
             <div className={styles.cardHeader}>
               <div>
-                <p className={styles.cardTitulo}>
-                  Turnos activos
-                </p>
+                <p className={styles.cardTitulo}>Turnos activos</p>
                 <p className={styles.cardSub}>
                   {turnosAbiertos.length === 0
                     ? "Sin turnos en curso"
@@ -569,12 +591,23 @@ export function DashboardClient({
                       </div>
                       <div className={styles.turnoInfo}>
                         <p className={styles.turnoNombre}>{nombre}</p>
+                        {/*
+                          FIX: antes → formatDuracion(turno.fhInicioTurno)
+                          llamaba Date.now() durante SSR y producía un resultado
+                          distinto al del cliente → error de hidratación.
+
+                          Ahora → `ahora` es null en el servidor (no hay cálculo)
+                          y Date real en el cliente (useEffect). El "—" es el
+                          placeholder hasta que el cliente monta.
+                        */}
                         <p className={styles.turnoMeta}>
                           <Clock
                             size={9}
                             style={{ display: "inline", marginRight: 3 }}
                           />
-                          {formatDuracion(turno.fhInicioTurno)} ·{" "}
+                          {ahora
+                            ? `${formatDuracion(turno.fhInicioTurno, ahora)} · `
+                            : "— · "}
                           {turno.ventasTurno.count} venta
                           {turno.ventasTurno.count !== 1 ? "s" : ""}
                         </p>

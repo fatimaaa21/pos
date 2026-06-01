@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Trash2, Pencil } from "lucide-react";
 import type { Inventario, Producto } from "@/types";
-import { Buscador } from "@/components/ui/Buscador";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCards } from "@/components/ui/Statscards";
 import { type FiltrosUsuario, TablaToolbar } from "@/components/ui/TablaToolbar";
@@ -283,13 +282,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
 
   return (
     <div className="container">
-      <div className="header">
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar producto..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Inventario"

@@ -51,6 +51,7 @@ export function ModalEditarCategoria({ categoria, onClose, onEditado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Imagen">
         <ImageUploadInput

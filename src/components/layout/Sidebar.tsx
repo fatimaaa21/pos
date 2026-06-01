@@ -1,9 +1,11 @@
+// src/components/layout/Sidebar.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/lib/actions/auth";
+import { useConfiguracionStore } from "@/lib/stores/configuracion";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
 import {
@@ -23,25 +25,25 @@ import {
 } from "lucide-react";
 
 const navAdmin = [
-  { icon: LayoutDashboard,  label: "Dashboard",  href: "/admin/dashboard"   },
-  { icon: BookOpenText,     label: "Catálogo",   href: "/admin/catalogo"    },
-  { icon: Package,          label: "Productos",  href: "/admin/productos"   },
-  { icon: ClipboardPenLine, label: "Inventario", href: "/admin/inventario"  },
-  { icon: BarChart2,        label: "Ventas",     href: "/admin/ventasAdmin" },
-  { icon: Calculator,       label: "Cortes de caja",     href: "/admin/cortes"       },
-  { icon: Users,            label: "Usuarios",   href: "/admin/usuarios"    },
+  { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"   },
+  { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
+  { icon: Package,          label: "Productos",       href: "/admin/productos"   },
+  { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
+  { icon: BarChart2,        label: "Ventas",          href: "/admin/ventasAdmin" },
+  { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
+  { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
 ];
 
 const navEmpleado = [
-  { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"            },
-  { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"      },
-  { icon: Users,            label: "Mis ventas", href: "/empleado/ventasEmpleado"  },
+  { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
+  { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
+  { icon: Users,            label: "Mis ventas", href: "/empleado/ventasEmpleado" },
 ];
 
 const navSistemas = [
-  { icon: LayoutDashboard,   label: "Dashboard",     href: "/sistemas/dashboard"   },
-  { icon: Building2,         label: "Negocios",      href: "/sistemas/negocios"    },
-  { icon: CircleDollarSign,  label: "Pagos", href: "/sistemas/metodosPago" },
+  { icon: LayoutDashboard,  label: "Dashboard", href: "/sistemas/dashboard"   },
+  { icon: Building2,        label: "Negocios",  href: "/sistemas/negocios"    },
+  { icon: CircleDollarSign, label: "Pagos",     href: "/sistemas/metodosPago" },
 ];
 
 interface NegocioInfo {
@@ -59,8 +61,11 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
   const [popupAbierto, setPopupAbierto] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
+  // Store de configuración — abre el modal sin navegar a una ruta
+  const abrirConfiguracion = useConfiguracionStore((s) => s.abrir);
+
   const nav =
-    perfil.tRolUser === "admin"    ? navAdmin :
+    perfil.tRolUser === "admin"    ? navAdmin    :
     perfil.tRolUser === "sistemas" ? navSistemas :
     navEmpleado;
 
@@ -93,17 +98,12 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [popupAbierto]);
 
-  // ── Logo header según rol ─────────────────────────────────────────────────
+  // ── Logo según rol ─────────────────────────────────────────────────────────
   function renderLogo() {
-    // Sistemas: logo de Kivi desde /public
     if (esSistemas) {
       return (
         <div className={styles.logo}>
-          <img
-            src="/kivi-logo.svg"
-            alt="Kivi"
-            className={styles.logoImg}
-          />
+          <img src="/kivi-logo.svg" alt="Kivi" className={styles.logoImg} />
           <div className={styles.logoTextos}>
             <div className={styles.logoText}>Kivi</div>
           </div>
@@ -111,7 +111,6 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
       );
     }
 
-    // Admin / Empleado: logo del negocio o fallback de iniciales
     return (
       <div className={styles.logo}>
         {negocio?.imgCompany ? (
@@ -121,9 +120,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
             className={styles.logoImg}
           />
         ) : (
-          <div className={styles.logoFallback}>
-            {inicialesNegocio}
-          </div>
+          <div className={styles.logoFallback}>{inicialesNegocio}</div>
         )}
         <div className={styles.logoTextos}>
           <div className={styles.logoText}>
@@ -159,6 +156,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
       {/* ── Footer de usuario ── */}
       <div className={styles.actionsUser} ref={popupRef}>
 
+        {/* Popup del admin */}
         {esAdmin && popupAbierto && (
           <div className={styles.userPopup}>
             <div className={styles.userPopupHeader}>
@@ -171,14 +169,20 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
 
             <div className={styles.userPopupDivider} />
 
-            <Link
-              href="/admin/configuracion"
+            {/*
+              Antes: <Link href="/admin/configuracion"> → navegaba a una ruta
+              Ahora: <button> que abre el modal sobre la página actual
+            */}
+            <button
               className={styles.userPopupItem}
-              onClick={() => setPopupAbierto(false)}
+              onClick={() => {
+                abrirConfiguracion();
+                setPopupAbierto(false);
+              }}
             >
               <Settings size={14} />
               <span>Configuración</span>
-            </Link>
+            </button>
 
             <div className={styles.userPopupDivider} />
 
@@ -194,6 +198,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
           </div>
         )}
 
+        {/* Botón/usuario en footer */}
         {esAdmin ? (
           <button
             className={styles.userBtn}

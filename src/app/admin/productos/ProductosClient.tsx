@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import type { Producto, Categoria } from "@/types";
-import { Buscador } from "@/components/ui/Buscador";
 import { PageHeader } from "@/components/ui/PageHeader";
 import styles from "./productos.module.css";
 import { toggleEstadoProducto, eliminarProducto } from "@/lib/actions/productos";
@@ -22,9 +21,7 @@ interface Props {
 
 export function ProductClient({ productos: inicial }: Props) {
   const [productos, setProductos] = useState<Producto[]>(inicial);
-  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>(() =>
-    Object.fromEntries(inicial.map((p) => [p.eCodProduct, Date.now()]))
-  );
+  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
@@ -219,13 +216,7 @@ export function ProductClient({ productos: inicial }: Props) {
 
   return (
     <div className="container">
-      <div className="header">
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar producto..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Productos"

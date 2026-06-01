@@ -50,6 +50,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Nombre completo" required>
         <ModalInput

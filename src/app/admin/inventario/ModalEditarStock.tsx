@@ -77,6 +77,7 @@ export function ModalEditarStock({ inventario, onClose, onEditado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       {/* Preview del producto + presentación */}
       <div style={{
