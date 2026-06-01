@@ -19,6 +19,15 @@ export default async function VentasAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
+  // ── Configuración del negocio ─────────────────────────────────────────────
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("aplicarIva")
+    .eq("eCodCompany", fkeCodCompany)
+    .single();
+
+  const aplicarIva: boolean = negocio?.aplicarIva ?? true;
+
   // ── Ventas ────────────────────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
@@ -42,7 +51,7 @@ export default async function VentasAdminPage() {
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
-  // ── Detalles (ahora incluye fkeCodPresentacion) ───────────────────────────
+  // ── Detalles ──────────────────────────────────────────────────────────────
   const ids = (ventas ?? []).map((v) => v.eCodVenta);
   let detalles: any[] = [];
 
@@ -134,6 +143,7 @@ export default async function VentasAdminPage() {
       ventas={ventasCompletas}
       empleados={empleadosFiltro}
       metodosPago={metodosPago}
+      aplicarIva={aplicarIva}
     />
   );
 }

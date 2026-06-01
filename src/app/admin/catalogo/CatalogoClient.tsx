@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Buscador } from "@/components/ui/Buscador";
 import { StatCards } from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
@@ -273,14 +272,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="container">
-      {/* Buscador externo: ahora escribe en filtros.busqueda (corregido) */}
-      <div className="header">
-        <Buscador
-          valor={filtros.busqueda}
-          onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
-          placeholder="Buscar categoría..."
-        />
-      </div>
+        <div className="header"/>
 
       <PageHeader
         titulo="Categorías"

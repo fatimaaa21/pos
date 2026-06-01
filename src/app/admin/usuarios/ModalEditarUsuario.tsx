@@ -52,6 +52,7 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Nombre completo" required>
         <ModalInput

@@ -135,6 +135,7 @@ export function ModalCrearProducto({ onClose, onCreado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Imagen" required>
         <ImageUploadInput

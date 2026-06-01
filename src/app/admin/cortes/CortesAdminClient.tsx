@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { Eye }               from "lucide-react";
 import { PageHeader }        from "@/components/ui/PageHeader";
-import { Buscador }          from "@/components/ui/Buscador";
 import { StatCards }         from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge }             from "@/components/ui/Badge";
@@ -265,13 +264,7 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="container">
-      <div className="header">
-        <Buscador
-          valor={filtros.busqueda}
-          onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
-          placeholder="Buscar empleado o turno..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Cortes de caja"

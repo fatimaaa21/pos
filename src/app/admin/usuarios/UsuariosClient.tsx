@@ -3,7 +3,6 @@
 import { useState } from "react";
 import type { Perfil } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Buscador } from "@/components/ui/Buscador";
 import { StatCards } from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
@@ -162,13 +161,7 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   return (
     <div className="container">
 
-      <div className="header">
-        <Buscador
-          valor={filtros.busqueda}
-          onChange={(value) => setFiltros((prev) => ({ ...prev, busqueda: value }))}
-          placeholder="Buscar usuario..."
-        />
-      </div>
+      <div className="header" />
 
       <PageHeader
         titulo="Usuarios"

@@ -30,6 +30,7 @@ interface Props {
   ventas:      VentaAdmin[];
   empleados:   { id: string; nombre: string }[];
   metodosPago: MetodoPagoGlobal[];
+  aplicarIva:  boolean;
 }
 
 // ── Helper: badge de método dinámico ─────────────────────────────────────────
@@ -75,7 +76,7 @@ function estaEnPeriodo(fechaISO: string, periodo: string): boolean {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
+export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }: Props) {
   const [busqueda,      setBusqueda]      = useState("");
   const [filtros,       setFiltros]       = useState<FiltrosUsuario>({
     busqueda:  "",
@@ -88,7 +89,6 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [ventaVer,      setVentaVer]      = useState<VentaAdmin | null>(null);
 
-  // Opciones de método dinámicas desde el catálogo
   const opcionesMetodo = useMemo(() => [
     { value: "todos", label: "Todos" },
     ...metodosPago.map((m) => ({ value: m.eCodPay, label: m.tNamePay })),
@@ -227,6 +227,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago }: Props) {
         <ModalVerVenta
           venta={ventaVer}
           metodosPago={metodosPago}
+          aplicarIva={aplicarIva}
           onClose={() => setVentaVer(null)}
         />
       )}

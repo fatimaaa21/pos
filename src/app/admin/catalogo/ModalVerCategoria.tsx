@@ -82,9 +82,10 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
                 <span className={styles.productoIndicadorActivo} />
                 <span className={styles.productoNombre}>{p.tNameProduct}</span>
                 <span className={styles.productoPrecio}>
-                  {p.ePriceProduct.toLocaleString("es-AR", {
+                  {p.ePriceProduct.toLocaleString("es-MX", {
                     style: "currency",
-                    currency: "ARS",
+                    currency: "MXN",
+                    minimumFractionDigits: 2,
                   })}
                 </span>
               </div>
@@ -98,7 +99,7 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
                   {p.ePriceProduct.toLocaleString("es-MX", {
                     style: "currency",
                     currency: "MXN",
-                    minimumFractionDigits: 0,
+                    minimumFractionDigits: 2,
                   })}
                 </span>
               </div>

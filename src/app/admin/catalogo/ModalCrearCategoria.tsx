@@ -56,6 +56,7 @@ export function ModalCrearCategoria({ onClose, onCreado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
         <ModalField label="Imagen" required>
             {/* Sin eCodCategory aún → usamos timestamp como path temporal.
