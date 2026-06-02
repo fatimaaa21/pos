@@ -1,5 +1,5 @@
 import { parseImgCategory } from "@/lib/utils/img-category";
-import { ICONOS_CATEGORIAS } from "@/lib/icons/categorias-iconos";
+import { ICONOS_CATEGORIAS } from "@/components/icons/categorias-iconos";
 
 interface Props {
   value: string | null | undefined;
@@ -24,7 +24,7 @@ export function IconoCategoria({ value, size = 28, color }: Props) {
       <img
         src={parsed.url}
         alt=""
-        style={{ width: size, height: size, objectFit: "cover", borderRadius: 4 }}
+        style={{ width: size, height: size, objectFit: "cover" }}
       />
     );
   }
@@ -33,11 +33,8 @@ export function IconoCategoria({ value, size = 28, color }: Props) {
     const item = ICONOS_CATEGORIAS.find((i) => i.key === parsed.key);
     if (!item) return <FallbackIcono size={size} />;
 
-    if (item.tipo === "lucide") {
-      return <item.Icon size={size} strokeWidth={1.5} color={color} />;
-    }
-    if (item.tipo === "custom") {
-      return <img src={item.src} alt="" style={{ width: size, height: size }} />;
+    if (item.tipo === "lucide" || item.tipo === "custom") {
+        return <item.Icon size={size} strokeWidth={1.5} color={color} />;
     }
   }
 

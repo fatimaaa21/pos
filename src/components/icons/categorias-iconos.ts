@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import React from "react";
 import {
   Coffee, Utensils, UtensilsCrossed, ChefHat,
   ShoppingBag, ShoppingCart, Package, Box, Tag,
@@ -6,6 +7,9 @@ import {
   Fish, Wine, Beer, IceCream, Cake, Cookie,
   Wheat, Milk, Pizza, Sandwich, Salad,
 } from "lucide-react";
+
+import { MuffinIcon } from "@/components/icons/categorias/MuffinIcon";
+
 
 interface IconoLucide {
   key: string;
@@ -18,7 +22,7 @@ interface IconoCustom {
   key: string;
   label: string;
   tipo: "custom";
-  src: string; // ruta desde /public, ej: "/icons/categorias/pan-dulce.svg"
+  Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 }
 
 export type IconoItem = IconoLucide | IconoCustom;
@@ -63,5 +67,5 @@ export const ICONOS_CATEGORIAS: IconoItem[] = [
 
   // ── Íconos diseñados por ti ──
   // Agrega tus SVGs en /public/icons/categorias/ y añade entradas aquí:
-  // { key: "pan-dulce", label: "Pan Dulce", tipo: "custom", src: "/icons/categorias/pan-dulce.svg" },
+    { key: "muffin", label: "Muffin", tipo: "custom", Icon: MuffinIcon },
 ];

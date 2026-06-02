@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Search, X, ImageIcon } from "lucide-react";
-import { ICONOS_CATEGORIAS } from "@/lib/icons/categorias-iconos";
+import { ICONOS_CATEGORIAS } from "@/components/icons/categorias-iconos";
 import { parseImgCategory } from "@/lib/utils/img-category";
 import { IconoCategoria } from "@/components/ui/IconoCategoria";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
@@ -68,31 +68,30 @@ export function IconPickerInput({
   return (
     <div className={styles.wrapper} ref={wrapperRef}>
       {/* Trigger */}
-      <div className={styles.triggerRow}>
-        <button
-            type="button"
-            className={`${styles.trigger} ${abierto ? styles.triggerActivo : ""}`}
-            onClick={() => setAbierto((v) => !v)}
-        >
-            <div className={styles.preview}>
-            {tieneValor ? (
-                <span className={styles.previewIcono}>
-                <IconoCategoria value={value} size={20} color="var(--color-primary)" />
+        <div className={styles.triggerRow}>
+            <button
+                type="button"
+                className={`${styles.trigger} ${abierto ? styles.triggerActivo : ""}`}
+                onClick={() => setAbierto((v) => !v)}
+            >
+                <div className={styles.preview}>
+                {tieneValor ? (
+                    <span className={styles.previewIcono}>
+                    <IconoCategoria value={value} size={20} color="var(--color-primary)" />
+                    </span>
+                ) : (
+                    <ImageIcon size={15} strokeWidth={1.5} />
+                )}
+                </div>
+                <span className={`${styles.label} ${!tieneValor ? styles.placeholder : ""}`}>
+                {etiquetaActual}
                 </span>
-            ) : (
-                <ImageIcon size={15} strokeWidth={1.5} />
-            )}
-            </div>
-            <span className={`${styles.label} ${!tieneValor ? styles.placeholder : ""}`}>
-            {etiquetaActual}
-            </span>
-        </button>
-
-        {tieneValor && (
-            <button type="button" className={styles.btnLimpiar} onClick={limpiar} title="Quitar">
-            <X size={13} />
+                {tieneValor && (
+                    <button type="button" className={styles.btnLimpiar} onClick={limpiar} title="Quitar">
+                    <X size={13} />
+                    </button>
+                )}
             </button>
-        )}
         </div>
 
       {/* Panel */}

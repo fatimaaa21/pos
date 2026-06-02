@@ -79,8 +79,8 @@ export function CategoriaCarrusel({
               <div className={`${styles.iconWrap} ${activa ? styles.iconWrapActiva : ""}`}>
                 <IconoCategoria
                   value={cat.ImgCategory}
-                  size={28}
-                  color={activa ? "var(--color-primary)" : "var(--gray)"}
+                  size={48}
+                  color={activa ? "var(--color-primary-dark)" : "var(--color-primary)"}
                 />
               </div>
               <div className={styles.textos}>
