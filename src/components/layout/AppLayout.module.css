@@ -11,3 +11,18 @@
   padding: 24px;
   background: #f8f7f4;
 }
+
+/* Mobile: padding top para dejar espacio al botón hamburger */
+@media (max-width: 768px) {
+  .main {
+    padding: 16px;
+    padding-top: 68px;
+  }
+}
+
+/* Tablet: padding ligero */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .main {
+    padding: 20px;
+  }
+}

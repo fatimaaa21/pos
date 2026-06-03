@@ -1,116 +1,78 @@
 .wrapper {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-    flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
 }
 
-/* ── Flechas ── */
 .flecha {
-    width: 30px;
-    height: 30px;
-    border-radius: var(--radius-md);
-    border: 1.5px solid var(--border-default);
-    background: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--gray);
-    flex-shrink: 0;
-    transition: all 0.15s;
-    box-shadow: var(--shadow-sm);
+  width: 30px; height: 30px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-default);
+  background: white;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gray);
+  flex-shrink: 0;
+  transition: all 0.15s;
+  box-shadow: var(--shadow-sm);
 }
 
-.flecha:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: var(--color-primary-50);
-}
+.flecha:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-50); }
 
-/* ── Track scrolleable ── */
 .track {
-    display: flex;
-    gap: var(--space-4);
-    overflow-x: auto;
-    scroll-behavior: smooth;
-    scrollbar-width: none;
-    flex: 1;
-    padding: var(--space-1) 0;
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  flex: 1;
+  padding: var(--space-1) 0;
 }
 
-.track::-webkit-scrollbar {
-    display: none;
-}
+.track::-webkit-scrollbar { display: none; }
 
-/* ── Tarjeta de categoría ── */
 .card {
-    width: 150px;
-    display: flex;
-    flex-direction: column;
-    align-items: left;
-    gap: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-lg);
-    border: 1.5px solid var(--border-default);
-    background: white;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.18s;
-    box-shadow: var(--shadow-sm);
+  width: 150px;
+  display: flex;
+  flex-direction: column;
+  align-items: left;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1.5px solid var(--border-default);
+  background: white;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.18s;
+  box-shadow: var(--shadow-sm);
 }
 
-.card:hover {
-    border-color: var(--color-primary-light);
-    background: var(--color-primary-50);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
-}
+.card:hover { border-color: var(--color-primary-light); background: var(--color-primary-50); transform: translateY(-1px); }
+.cardActiva { border-color: var(--color-primary); background: var(--color-primary-50); }
 
-.cardActiva {
-    border-color: var(--color-primary);
-    background: var(--color-primary-50);
-    box-shadow: var(--shadow-sm);
-}
+.iconWrap { width: 52px; height: 52px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; color: var(--color-primary); overflow: hidden; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+.iconWrapActiva { color: var(--color-primary-dark); }
 
-/* ── Contenedor del icono / imagen ── */
-.iconWrap {
-    width: 52px;
-    height: 52px;
-    border-radius: var(--radius-md);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-primary);
-    overflow: hidden;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
+.textos { display: flex; flex-direction: column; gap: var(--space-1); }
+.nombre { font-size: 13px; font-weight: 700; color: var(--dark); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
+.conteo { font-size: 11px; font-weight: 500; text-align: left; color: var(--gray); }
 
-.iconWrapActiva {
-    color: var(--color-primary-dark);
-}
+/* Mobile: tarjetas más compactas */
+@media (max-width: 768px) {
+  .wrapper { gap: var(--space-2); }
 
-/* ── Textos ── */
-.textos {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-}
+  .flecha { width: 26px; height: 26px; }
 
-.nombre {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--dark);
-    text-align: left;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 88px;
-}
+  .track { gap: var(--space-3); }
 
-.conteo {
-    font-size: 11px;
-    font-weight: 500;
-    text-align: left;
-    color: var(--gray);
+  .card {
+    width: 110px;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .iconWrap { width: 36px; height: 36px; }
+  .nombre   { font-size: 12px; max-width: 70px; }
+  .conteo   { font-size: 10px; }
 }

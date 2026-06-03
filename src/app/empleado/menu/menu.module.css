@@ -1,15 +1,14 @@
-/* ── Layout del catálogo — ocupa todo el ancho menos el panel fijo ── */
+/* ── Layout del catálogo ── */
 .layout {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  /* deja espacio a la derecha para el PedidoPanel fijo */
   padding-right: calc(300px + var(--space-4));
   min-height: 100%;
   overflow: hidden;
 }
 
-/* ── Banner de turno no iniciado ── */
+/* ── Banner de turno ── */
 .bannerTurno {
   display: flex;
   align-items: center;
@@ -23,66 +22,32 @@
   margin-bottom: var(--space-6);
 }
 
-.bannerTexto {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
+.bannerTexto { display: flex; align-items: center; gap: var(--space-3); }
+.bannerIcono { color: var(--color-warning); flex-shrink: 0; }
 
-.bannerIcono {
-  color: var(--color-warning);
-  flex-shrink: 0;
-}
-
-.bannerTitulo {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-warning);
-  margin: 0;
-}
-
-.bannerSub {
-  font-size: 12px;
-  color: var(--color-warning);
-  opacity: 0.8;
-  margin: 2px 0 0 0;
-}
+.bannerTitulo { font-size: 13px; font-weight: 700; color: var(--color-warning); margin: 0; }
+.bannerSub    { font-size: 12px; color: var(--color-warning); opacity: 0.8; margin: 2px 0 0 0; }
 
 .bannerBtn {
   background: var(--color-warning);
   color: white;
+  border: none;
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-4);
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: opacity 0.15s;
-  flex-shrink: 0;
+  font-family: var(--font-family);
+  font-size: 12px; font-weight: 700;
+  text-decoration: none; white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 0.15s; flex-shrink: 0;
 }
 
-.bannerBtn:hover {
-  opacity: 0.88;
-}
+.bannerBtn:hover { opacity: 0.88; }
 
-/* Catálogo con overlay cuando no hay turno */
-.layoutBloqueado {
-  opacity: 0.45;
-  pointer-events: none;
-  user-select: none;
-}
+.layoutBloqueado { opacity: 0.45; pointer-events: none; user-select: none; }
 
 /* ── Buscador + botón cerrar caja ── */
-.buscadorRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.buscadorFlex {
-  flex: 1;
-  min-width: 0;
-}
+.buscadorRow { display: flex; align-items: center; gap: var(--space-3); }
+.buscadorFlex { flex: 1; min-width: 0; }
 
 .btnCerrarCaja {
   display: inline-flex;
@@ -94,125 +59,68 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
   transition: background 0.15s;
 }
 
-.btnCerrarCaja:hover {
-  background: var(--color-primary-50);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-}
+.btnCerrarCaja:hover { background: var(--color-primary-50); color: var(--color-primary); border: 1px solid var(--color-primary); }
 
-/* ── Desglose dentro del modal ── */
-.modalSeccionTitulo {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gray);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 0;
-}
-
-.modalSeparador {
-  border: none;
-  border-top: 1px solid var(--border-light);
-}
-
-.modalDesgloseFila {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 13px;
-  color: var(--dark);
-  padding: var(--space-1) 0;
-}
-
-.modalDesgloseIcono {
-  color: var(--gray);
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.modalDesgloseLabel {
-  flex: 1;
-  color: var(--gray);
-}
-
-.modalDesgloseValor {
-  font-weight: 600;
-  color: var(--dark);
-}
-
+/* ── Modal ── */
+.modalSeccionTitulo { font-size: 12px; font-weight: 700; color: var(--gray); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+.modalSeparador { border: none; border-top: 1px solid var(--border-light); }
+.modalDesgloseFila { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--dark); padding: var(--space-1) 0; }
+.modalDesgloseIcono { color: var(--gray); display: flex; align-items: center; flex-shrink: 0; }
+.modalDesgloseLabel { flex: 1; color: var(--gray); }
+.modalDesgloseValor { font-weight: 600; color: var(--dark); }
 .modalDesgloseTotal .modalDesgloseLabel,
-.modalDesgloseTotal .modalDesgloseValor {
-  font-weight: 700;
-  color: var(--dark);
+.modalDesgloseTotal .modalDesgloseValor { font-weight: 700; color: var(--dark); }
+
+.modalInputWrap { display: flex; align-items: center; border: 1px solid var(--border-default); border-radius: var(--radius-md); overflow: hidden; background: white; transition: border-color 0.15s; }
+.modalInputWrap:focus-within { border-color: var(--color-primary); }
+.modalInputPrefix, .modalInputSuffix { padding: 0 var(--space-3); font-size: 13px; font-weight: 600; color: var(--gray); background: var(--background); height: 40px; display: flex; align-items: center; flex-shrink: 0; }
+.modalInputWrap :global(.input), .modalInputWrap input { border: none !important; border-radius: 0 !important; flex: 1; }
+
+.modalDiferencia { display: flex; align-items: center; gap: var(--space-2); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); font-size: 12px; font-weight: 600; }
+.modalDiferenciaOk       { background: var(--color-success-bg); color: var(--color-success); }
+.modalDiferenciaFaltante { background: var(--color-error-bg);   color: var(--color-error);   }
+.modalDiferenciaSobrante { background: var(--color-accent-bg);  color: var(--color-accent);  }
+
+/* ── Tablet: panel más estrecho ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .layout {
+    padding-right: calc(260px + var(--space-3));
+  }
+
+  .bannerTurno {
+    margin-right: calc(260px + var(--space-3));
+  }
 }
 
-/* Input con prefijo dentro del modal */
-.modalInputWrap {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  background: white;
-  transition: border-color 0.15s;
-}
+/* ── Mobile: sin panel lateral, espacio para la barra del carrito ── */
+@media (max-width: 768px) {
+  .layout {
+    padding-right: 0;
+    padding-bottom: 80px;
+    gap: var(--space-4);
+  }
 
-.modalInputWrap:focus-within {
-  border-color: var(--color-primary);
-}
+  .bannerTurno {
+    margin-right: 0;
+    margin-bottom: var(--space-4);
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
 
-.modalInputPrefix,
-.modalInputSuffix {
-  padding: 0 var(--space-3);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--gray);
-  background: var(--background);
-  height: 40px;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-}
+  .bannerBtn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
 
-/* Override para que el ModalInput no tenga borde propio dentro del wrap */
-.modalInputWrap :global(.input),
-.modalInputWrap input {
-  border: none !important;
-  border-radius: 0 !important;
-  flex: 1;
-}
-
-/* ── Diferencia badge en modal ── */
-.modalDiferencia {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.modalDiferenciaOk {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.modalDiferenciaFaltante {
-  background: var(--color-error-bg);
-  color: var(--color-error);
-}
-
-.modalDiferenciaSobrante {
-  background: var(--color-accent-bg);
-  color: var(--color-accent);
+  .btnCerrarCaja {
+    font-size: 12px;
+    padding: 8px var(--space-3);
+  }
 }

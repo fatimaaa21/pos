@@ -22,6 +22,8 @@ import {
   ChevronUp,
   CircleDollarSign,
   Calculator,
+  Menu,
+  X,
 } from "lucide-react";
 
 const navAdmin = [
@@ -58,10 +60,10 @@ interface SidebarProps {
 
 export function Sidebar({ perfil, negocio }: SidebarProps) {
   const pathname = usePathname();
-  const [popupAbierto, setPopupAbierto] = useState(false);
+  const [popupAbierto,  setPopupAbierto]  = useState(false);
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
 
-  // Store de configuración — abre el modal sin navegar a una ruta
   const abrirConfiguracion = useConfiguracionStore((s) => s.abrir);
 
   const nav =
@@ -86,6 +88,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
     .join("")
     .toUpperCase() ?? "??";
 
+  // Cerrar popup al click afuera
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
@@ -97,6 +100,26 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [popupAbierto]);
+
+  // Bloquear scroll del body cuando el drawer está abierto
+  useEffect(() => {
+    if (drawerAbierto) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerAbierto]);
+
+  // Cerrar drawer en cambio de ruta
+  useEffect(() => {
+    setDrawerAbierto(false);
+  }, [pathname]);
+
+  function cerrarDrawer() {
+    setDrawerAbierto(false);
+    setPopupAbierto(false);
+  }
 
   // ── Logo según rol ─────────────────────────────────────────────────────────
   function renderLogo() {
@@ -132,107 +155,128 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
   }
 
   return (
-    <aside className={styles.sidebar}>
+    <>
+      {/* ── Botón hamburger — solo visible en mobile ── */}
+      <button
+        className={styles.hamburger}
+        onClick={() => setDrawerAbierto((v) => !v)}
+        aria-label={drawerAbierto ? "Cerrar menú" : "Abrir menú"}
+      >
+        {drawerAbierto ? <X size={18} /> : <Menu size={18} />}
+      </button>
 
-      {/* ── Logo ── */}
-      {renderLogo()}
+      {/* ── Overlay mobile ── */}
+      {drawerAbierto && (
+        <div
+          className={styles.overlay}
+          onClick={cerrarDrawer}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* ── Navegación ── */}
-      <nav className={styles.nav}>
-        {nav.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`${styles.navItem} ${
-              pathname === item.href ? styles.navItemActive : ""
-            }`}
-          >
-            <item.icon size={16} className={styles.navIcon} />
-            <span>{item.label}</span>
-          </Link>
-        ))}
-      </nav>
+      {/* ── Sidebar ── */}
+      <aside className={`${styles.sidebar} ${drawerAbierto ? styles.sidebarOpen : ""}`}>
 
-      {/* ── Footer de usuario ── */}
-      <div className={styles.actionsUser} ref={popupRef}>
+        {/* Logo */}
+        {renderLogo()}
 
-        {/* Popup del admin */}
-        {esAdmin && popupAbierto && (
-          <div className={styles.userPopup}>
-            <div className={styles.userPopupHeader}>
+        {/* Navegación */}
+        <nav className={styles.nav}>
+          {nav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={item.label}
+              className={`${styles.navItem} ${
+                pathname === item.href ? styles.navItemActive : ""
+              }`}
+              onClick={cerrarDrawer}
+            >
+              <item.icon size={16} className={styles.navIcon} />
+              <span>{item.label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Footer de usuario */}
+        <div className={styles.actionsUser} ref={popupRef}>
+
+          {/* Popup del admin */}
+          {esAdmin && popupAbierto && (
+            <div className={styles.userPopup}>
+              <div className={styles.userPopupHeader}>
+                <div className={styles.avatar}>{iniciales}</div>
+                <div>
+                  <p className={styles.userName}>{perfil.tNameUser}</p>
+                  <p className={styles.userRol}>{perfil.tRolUser}</p>
+                </div>
+              </div>
+
+              <div className={styles.userPopupDivider} />
+
+              <button
+                className={styles.userPopupItem}
+                onClick={() => {
+                  abrirConfiguracion();
+                  setPopupAbierto(false);
+                  cerrarDrawer();
+                }}
+              >
+                <Settings size={14} />
+                <span>Configuración</span>
+              </button>
+
+              <div className={styles.userPopupDivider} />
+
+              <form action={logout}>
+                <button
+                  type="submit"
+                  className={`${styles.userPopupItem} ${styles.userPopupItemDanger}`}
+                >
+                  <LogOut size={14} />
+                  <span>Cerrar sesión</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Avatar + info en el footer */}
+          {esAdmin ? (
+            <button
+              className={styles.userBtn}
+              onClick={() => setPopupAbierto((v) => !v)}
+              aria-label="Opciones de usuario"
+              title={perfil.tNameUser}
+            >
               <div className={styles.avatar}>{iniciales}</div>
-              <div>
+              <div className={styles.userInfo}>
                 <p className={styles.userName}>{perfil.tNameUser}</p>
                 <p className={styles.userRol}>{perfil.tRolUser}</p>
               </div>
-            </div>
-
-            <div className={styles.userPopupDivider} />
-
-            {/*
-              Antes: <Link href="/admin/configuracion"> → navegaba a una ruta
-              Ahora: <button> que abre el modal sobre la página actual
-            */}
-            <button
-              className={styles.userPopupItem}
-              onClick={() => {
-                abrirConfiguracion();
-                setPopupAbierto(false);
-              }}
-            >
-              <Settings size={14} />
-              <span>Configuración</span>
+              <ChevronUp
+                size={14}
+                className={`${styles.userChevron} ${popupAbierto ? styles.userChevronOpen : ""}`}
+              />
             </button>
-
-            <div className={styles.userPopupDivider} />
-
-            <form action={logout}>
-              <button
-                type="submit"
-                className={`${styles.userPopupItem} ${styles.userPopupItemDanger}`}
-              >
-                <LogOut size={14} />
-                <span>Cerrar sesión</span>
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* Botón/usuario en footer */}
-        {esAdmin ? (
-          <button
-            className={styles.userBtn}
-            onClick={() => setPopupAbierto((v) => !v)}
-            aria-label="Opciones de usuario"
-          >
-            <div className={styles.avatar}>{iniciales}</div>
-            <div className={styles.userInfo}>
-              <p className={styles.userName}>{perfil.tNameUser}</p>
-              <p className={styles.userRol}>{perfil.tRolUser}</p>
-            </div>
-            <ChevronUp
-              size={14}
-              className={`${styles.userChevron} ${popupAbierto ? styles.userChevronOpen : ""}`}
-            />
-          </button>
-        ) : (
-          <>
-            <div className={styles.user}>
-              <div className={styles.avatar}>{iniciales}</div>
-              <div>
-                <div className={styles.userName}>{perfil.tNameUser}</div>
-                <div className={styles.userRol}>{perfil.tRolUser}</div>
+          ) : (
+            <>
+              <div className={styles.user} title={perfil.tNameUser}>
+                <div className={styles.avatar}>{iniciales}</div>
+                <div className={styles.userInfo}>
+                  <div className={styles.userName}>{perfil.tNameUser}</div>
+                  <div className={styles.userRol}>{perfil.tRolUser}</div>
+                </div>
               </div>
-            </div>
-            <form action={logout}>
-              <button className={styles.navItem}>
-                <LogOut size={14} color="var(--color-primary)" />
-                Cerrar Sesión
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-    </aside>
+              <form action={logout}>
+                <button className={styles.navItem} title="Cerrar sesión" onClick={cerrarDrawer}>
+                  <LogOut size={14} color="var(--color-primary)" className={styles.navIcon} />
+                  <span>Cerrar Sesión</span>
+                </button>
+              </form>
+            </>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }

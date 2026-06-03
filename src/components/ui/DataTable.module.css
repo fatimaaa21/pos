@@ -4,15 +4,16 @@
   border: 1px solid var(--border-light);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* ── Tabla ── */
 .table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 560px;
 }
 
-/* ── Encabezado ── */
 .headerCell {
   padding: 10px var(--space-4);
   text-align: left;
@@ -27,39 +28,27 @@
   border-bottom: 1px solid var(--border-light);
 }
 
-/* ── Filas ── */
 .row {
   transition: background 0.12s ease;
   cursor: default;
   border-bottom: 1px solid var(--border-light);
 }
 
-.row:last-child {
-  border-bottom: none;
-}
+.row:last-child { border-bottom: none; }
+.row:hover { background: var(--color-primary-50); }
 
-.row:hover {
-  background: var(--color-primary-50);
-}
+.rowSelected { background: var(--color-primary-50); }
+.rowSelected:hover { background: var(--color-primary-light); }
 
-.rowSelected {
-  background: var(--color-primary-50);
-}
-
-.rowSelected:hover {
-  background: var(--color-primary-light);
-}
-
-/* ── Celdas ── */
 .cell {
   padding: 12px var(--space-4);
   font-family: var(--font-family);
   font-size: 13px;
   font-weight: 500;
   color: var(--dark);
+  white-space: nowrap;
 }
 
-/* ── Checkbox ── */
 .checkboxCol {
   width: 40px;
   padding: 12px var(--space-4);
@@ -95,11 +84,8 @@
   display: block;
 }
 
-.checkbox:hover:not(:checked) {
-  border-color: var(--color-primary);
-}
+.checkbox:hover:not(:checked) { border-color: var(--color-primary); }
 
-/* ── Estado vacío ── */
 .emptyCell {
   padding: var(--space-12) var(--space-4);
   text-align: center;
@@ -111,7 +97,6 @@
   color: var(--gray);
 }
 
-/* ── Skeletons ── */
 .skeletonWrapper {
   display: flex;
   flex-direction: column;
