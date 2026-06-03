@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Categoria } from "@/types";
+import { IconoCategoria } from "@/components/ui/IconoCategoria";
 import styles from "./CategoriaCarrusel.module.css";
 
 interface Props {
@@ -76,15 +77,11 @@ export function CategoriaCarrusel({
               onClick={() => onSeleccionar(cat.eCodCategory)}
             >
               <div className={`${styles.iconWrap} ${activa ? styles.iconWrapActiva : ""}`}>
-                {cat.ImgCategory ? (
-                  <img
-                    src={cat.ImgCategory}
-                    alt={cat.tNameCategory}
-                    className={styles.img}
-                  />
-                ) : (
-                  <IconoCaja />
-                )}
+                <IconoCategoria
+                  value={cat.ImgCategory}
+                  size={48}
+                  color={activa ? "var(--color-primary-dark)" : "var(--color-primary)"}
+                />
               </div>
               <div className={styles.textos}>
                 <span className={styles.nombre}>{cat.tNameCategory}</span>

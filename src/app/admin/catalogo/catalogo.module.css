@@ -1,14 +1,10 @@
-/* Avatar en tabla */
-.avatar img {
+.avatarIcono {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-family);
-  font-size: 12px;
-  font-weight: 800;
   flex-shrink: 0;
 }
 

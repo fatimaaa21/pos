@@ -1,0 +1,353 @@
+/* ══════════════════════════════════════════════════════
+   ticket.module.css
+   Estilos para la vista previa en pantalla y para
+   la impresión térmica de 80mm (72mm de contenido).
+   ══════════════════════════════════════════════════════ */
+
+/* ── @page: instrucciones para la impresora ── */
+@media print {
+  @page {
+    size: 72mm auto;   /* ancho fijo, alto automático según contenido */
+    margin: 3mm 4mm;   /* margen mínimo: térmicas tienen ~4mm de borde físico */
+  }
+}
+
+/* ═══════════════════════════════════════════
+   PANTALLA — simula papel térmico en escritorio
+   ═══════════════════════════════════════════ */
+
+@media screen {
+  .wrapper {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto;
+    background: #b8b8b8;
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        rgba(0,0,0,0.03) 8px,
+        rgba(0,0,0,0.03) 16px
+      );
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 48px;
+    gap: 14px;
+    font-family: 'Courier New', Courier, monospace;
+  }
+
+  /* Barra de herramientas */
+  .acciones {
+    display: flex;
+    gap: 8px;
+    width: 272px; /* 72mm × 3.78px/mm ≈ 272px */
+    flex-shrink: 0;
+  }
+
+  .label {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #555;
+    text-align: center;
+  }
+
+  /* Botón imprimir */
+  .btnPrint {
+    flex: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: #27500A;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-decoration: none;
+  }
+
+  .btnPrint:hover {
+    background: #1a3a06;
+  }
+
+  /* Botón cerrar */
+  .btnClose {
+    flex: 1;
+    padding: 10px 12px;
+    background: white;
+    color: #666;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btnClose:hover {
+    background: #f0f0f0;
+  }
+
+  /* El ticket en pantalla: papel blanco con sombra */
+  .ticket {
+    width: 272px;
+    background: white;
+    padding: 6mm 5mm;
+    box-shadow:
+      0 2px 8px rgba(0,0,0,0.25),
+      0 12px 32px rgba(0,0,0,0.15);
+    flex-shrink: 0;
+    position: relative;
+
+    /* Efecto de papel: borde superior ligeramente irregular */
+    border-top: 1px solid #e8e8e8;
+  }
+
+  /* "Rasgado" decorativo arriba y abajo del ticket */
+  .ticket::before,
+  .ticket::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background-image: radial-gradient(circle at 50% 0%, white 3px, transparent 3px);
+    background-size: 12px 6px;
+  }
+
+  .ticket::before {
+    top: -6px;
+    background-image: radial-gradient(circle at 50% 0%, #b8b8b8 3px, white 3px);
+  }
+
+  .ticket::after {
+    bottom: -6px;
+    background-image: radial-gradient(circle at 50% 100%, #b8b8b8 3px, white 3px);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   IMPRESIÓN — 72mm, sin decoración de pantalla
+   ═══════════════════════════════════════════ */
+
+@media print {
+  .wrapper {
+    background: white;
+    padding: 0;
+    margin: 0;
+    display: block;
+    position: static;
+    overflow: visible;
+  }
+
+  /* Ocultar botones */
+  .acciones {
+    display: none !important;
+  }
+
+  .label {
+    display: none !important;
+  }
+
+  .ticket {
+    width: 100%;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+  }
+
+  .ticket::before,
+  .ticket::after {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   CONTENIDO DEL TICKET
+   (aplica tanto en pantalla como en impresión)
+   ═══════════════════════════════════════════ */
+
+.ticket {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #000;
+}
+
+/* ── Logo del negocio ── */
+.logo {
+  display: block;
+  width: 28mm;
+  height: auto;
+  margin: 0 auto 3mm;
+  /* Las térmicas suelen imprimir imágenes en escala de grises */
+  filter: grayscale(100%) contrast(1.4);
+}
+
+/* ── Nombre del negocio ── */
+.nombreNegocio {
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin: 0 0 1mm;
+}
+
+.sistemaNombre {
+  font-size: 8px;
+  text-align: center;
+  color: #666;
+  margin: 0 0 2mm;
+  letter-spacing: 0.5px;
+}
+
+/* ── Separadores ── */
+.sep {
+  font-size: 10px;
+  color: #000;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  margin: 1.5mm 0;
+  letter-spacing: -0.5px; /* compacta los guiones */
+}
+
+/* ── Fila genérica key: value ── */
+.fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0.5mm 0;
+  font-size: 10px;
+}
+
+.filaLabel {
+  color: #444;
+  flex-shrink: 0;
+}
+
+.filaValor {
+  text-align: right;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+/* ── Folio ── */
+.folio {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 1px;
+  margin: 1.5mm 0;
+}
+
+/* ── Header columnas de items ── */
+.itemsHeader {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px;
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #555;
+  margin: 0.5mm 0;
+}
+
+/* ── Item individual ── */
+.item {
+  margin: 1.5mm 0;
+}
+
+.itemNombreFila {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.itemNombre {
+  font-size: 10.5px;
+  font-weight: 700;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.itemPresentacion {
+  font-size: 9px;
+  color: #555;
+  font-weight: 400;
+}
+
+.itemCantidad {
+  font-size: 10px;
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.itemSubtotal {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.itemUnitario {
+  font-size: 8.5px;
+  color: #666;
+  padding-left: 2px;
+}
+
+/* ── Sección de totales ── */
+.totales {
+  margin: 0;
+}
+
+.totalLinea {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 10px;
+  margin: 0.5mm 0;
+}
+
+.totalLineaDestacada {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13.5px;
+  font-weight: 900;
+  margin: 1.5mm 0 0.5mm;
+  letter-spacing: 0.5px;
+}
+
+/* ── Pie de ticket ── */
+.gracias {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  margin: 1mm 0;
+}
+
+.pieInfo {
+  text-align: center;
+  font-size: 8px;
+  color: #666;
+  margin: 0.5mm 0;
+  line-height: 1.4;
+}

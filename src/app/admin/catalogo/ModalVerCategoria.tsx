@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { formatFechaHora, formatRelativo } from "@/lib/utils/fecha";
+import { IconoCategoria } from "@/components/ui/IconoCategoria";
 import type { Categoria } from "@/types";
 import styles from "./ModalVerCategoria.module.css";
 
@@ -31,14 +32,9 @@ export function ModalVerCategoria({ categoria, onClose }: Props) {
     >
       {/* ── Imagen ── */}
       <div className={styles.avatarWrap}>
-        {imgSrc ? (
           <div className={styles.avatar}>
-            <img
-              src={imgSrc}
-              alt={categoria.tNameCategory}
-            />
+                <IconoCategoria value={categoria.ImgCategory} size={48} color="var(--color-primary)" />
           </div>
-        ) : null}
         <div className={styles.avatarNombre}>{categoria.tNameCategory}</div>
         <div className={styles.badges}>
           <Badge activo={categoria.bStateCategory} />

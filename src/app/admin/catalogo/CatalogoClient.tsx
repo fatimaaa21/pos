@@ -14,6 +14,7 @@ import { toggleEstadoCategoria, eliminarCategoria } from "@/lib/actions/categori
 import { ModalCrearCategoria } from "./ModalCrearCategoria";
 import { ModalVerCategoria } from "./ModalVerCategoria";
 import { ModalEditarCategoria } from "./ModalEditarCategoria";
+import { IconoCategoria } from "@/components/ui/IconoCategoria";
 
 interface Props {
   categorias: Categoria[];
@@ -186,23 +187,18 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     {
       key: "tNameCategory",
       label: "Categoría",
-      render: (c) => {
-        const ts = imgTimestamps[c.eCodCategory];
-        return (
-          <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {c.ImgCategory && (
-              // Solo añade ?t= cuando existe un timestamp (tras editar).
-              // En la carga inicial no hay timestamp → URL limpia → sin mismatch.
-              <img
-                src={ts
-                  ? `${c.ImgCategory.split("?")[0]}?t=${ts}`
-                  : c.ImgCategory.split("?")[0]}
-              />
-            )}
-            <span>{c.tNameCategory}</span>
+      render: (c) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className={styles.avatarIcono}>
+            <IconoCategoria
+              value={c.ImgCategory}
+              size={18}
+              color="var(--color-primary)"
+            />
           </div>
-        );
-      },
+          <span>{c.tNameCategory}</span>
+        </div>
+      ),
     },
     {
       key: "productos",
