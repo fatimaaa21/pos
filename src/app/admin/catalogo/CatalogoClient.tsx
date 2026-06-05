@@ -85,7 +85,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     roles:    [],
     estados:  [],
     periodo:  "todo",    // período de CREACIÓN de la categoría
-    metodo:   "todos",   // reutilizado como filtro de "estado de productos"
+    estadoFiltro: "todos",
   });
 
   // Modales
@@ -115,7 +115,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     const coincidePeriodo = estaEnPeriodo(c.fhCreateCategory, filtros.periodo ?? "todo");
 
     // 4. Estado de productos (slot "metodo" del Toolbar)
-    const filtroProductos = filtros.metodo ?? "todos";
+    const filtroProductos = filtros.estadoFiltro ?? "todos";
     const coincideProductos =
       filtroProductos === "todos" || clasificarProductos(c) === filtroProductos;
 
@@ -302,7 +302,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         total={filtradas.length}
         ocultarRol
         mostrarPeriodo
-        opcionesMetodo={OPCIONES_PRODUCTOS}
+        opcionesEstadoFiltro={OPCIONES_PRODUCTOS}
       />
 
       <DataTable

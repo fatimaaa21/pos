@@ -1,14 +1,24 @@
+/* ════════════════════════════════════════════════
+   SIDEBAR — Kivi POS
+   Desktop : 160px sticky
+   Tablet  : 60px icon-only
+   Mobile  : drawer overlay desde la izquierda
+   ════════════════════════════════════════════════ */
+
 .sidebar {
   width: 160px;
   background: white;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 93vh;
   position: sticky;
-  top: 0;
-  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  margin: 24px 0 24px 24px;
   padding: 24px 12px;
   gap: 24px;
+  border-right: 1px solid var(--border-light);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 50;
 }
 
 /* ── Logo del negocio ── */
@@ -17,8 +27,7 @@
   align-items: center;
   gap: 10px;
 }
- 
-/* Imagen real del negocio */
+
 .logoImg {
   width: 36px;
   height: 36px;
@@ -27,8 +36,7 @@
   flex-shrink: 0;
   border: 1px solid var(--border-light);
 }
- 
-/* Fallback con iniciales cuando no hay imagen */
+
 .logoFallback {
   width: 36px;
   height: 36px;
@@ -43,11 +51,12 @@
   flex-shrink: 0;
   letter-spacing: 0.02em;
 }
- 
+
 .logoTextos {
   min-width: 0;
+  transition: opacity 0.2s ease, width 0.2s ease;
 }
- 
+
 .logoText {
   font-family: var(--font-family);
   color: var(--dark);
@@ -83,6 +92,8 @@
   text-align: left;
   text-decoration: none;
   transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .navItem:hover {
@@ -92,7 +103,7 @@
 
 .navItem:hover .navIcon {
   color: white;
-}
+} 
 
 .navItemActive {
   background: var(--color-primary);
@@ -105,9 +116,7 @@
 
 .navIcon {
   color: var(--color-primary);
-  flex-shrink: 0;
 }
-
 /* ── Footer de usuario ── */
 .actionsUser {
   display: flex;
@@ -116,7 +125,6 @@
   position: relative;
 }
 
-/* Área clickeable para admin */
 .userBtn {
   display: flex;
   align-items: center;
@@ -129,23 +137,26 @@
   cursor: pointer;
   transition: background 0.15s;
   text-align: left;
+  overflow: hidden;
 }
 
 .userBtn:hover {
   background: var(--color-primary-50);
 }
 
-/* Para empleado/sistemas (sin popup) */
 .user {
   background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;
+  overflow: hidden;
 }
 
 .userInfo {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, width 0.2s ease;
 }
 
 .avatar {
@@ -181,11 +192,11 @@
   color: var(--gray);
   flex-shrink: 0;
   transition: transform 0.2s ease;
-  transform: rotate(180deg); /* apunta abajo por defecto */
+  transform: rotate(180deg);
 }
 
 .userChevronOpen {
-  transform: rotate(0deg); /* apunta arriba cuando está abierto */
+  transform: rotate(0deg);
 }
 
 /* ── Popup ── */
@@ -250,4 +261,243 @@
 .userPopupItemDanger:hover {
   background: var(--color-error-bg);
   color: var(--color-error);
+}
+
+/* ────────────────────────────────────────
+   HAMBURGER — solo visible en mobile
+   ──────────────────────────────────────── */
+.hamburger {
+  display: none;
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 200;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: white;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.hamburger:hover {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-light);
+}
+
+/* ────────────────────────────────────────
+   OVERLAY — solo en mobile cuando abierto
+   ──────────────────────────────────────── */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 149;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ════════════════════════════════════════
+   TABLET  768px – 1024px
+   Icon-only sidebar (60px)
+   ════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar {
+    width: 60px;
+    padding: 20px 8px;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .logo {
+    justify-content: center;
+  }
+
+  .logoTextos {
+    display: none;
+  }
+
+  .nav {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .navItem {
+    justify-content: center;
+    padding: 10px;
+    width: 40px;
+    gap: 0;
+    position: relative;
+  }
+
+  /* Label como tooltip en tablet */
+  .navItem span {
+    display: none;
+  }
+
+  .navItem[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--dark);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .actionsUser {
+    align-items: center;
+    width: 100%;
+  }
+
+  .userBtn {
+    justify-content: center;
+    padding: 8px;
+    width: 40px;
+  }
+
+  .userInfo,
+  .userChevron {
+    display: none;
+  }
+
+  .user {
+    justify-content: center;
+  }
+
+  .userName,
+  .userRol {
+    display: none;
+  }
+
+  .userPopup {
+    left: calc(100% + 8px);
+    bottom: 0;
+    right: auto;
+    min-width: 180px;
+  }
+
+  /* Logout button en tablet: solo icono */
+  .navItem.logoutBtn {
+    justify-content: center;
+    width: 40px;
+  }
+
+  .navItem.logoutBtn span {
+    display: none;
+  }
+}
+
+/* ═══════════════════════════════════════════
+   Agrega estos estilos a tu Sidebar.module.css
+   (o reemplaza las secciones correspondientes)
+   ═══════════════════════════════════════════ */
+
+/* ── Logo row: logo + botón cerrar en mobile ── */
+.logoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Botón X dentro del sidebar — oculto en desktop/tablet */
+.btnCerrarDrawer {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btnCerrarDrawer:hover {
+  background: var(--background);
+  color: var(--dark);
+}
+
+/* ════════════════════════════════════════
+   TABLET — ajuste del logoRow
+   ════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .logoRow {
+    justify-content: center;
+  }
+}
+
+/* ════════════════════════════════════════
+   MOBILE — mostrar X dentro del sidebar,
+   el hamburger externo YA NO muestra X
+   ════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Mostrar el botón X dentro del sidebar */
+  .btnCerrarDrawer {
+    display: flex;
+  }
+
+  /* El hamburger externo siempre muestra ≡ (ya no necesita cambiar a X) */
+  .hamburger {
+    display: flex;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    margin: 0;
+    border-radius: 0;
+    height: 100dvh;
+    height: 100vh;
+    width: 240px;
+    z-index: 150;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .sidebarOpen {
+    transform: translateX(0);
+    animation: drawerIn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @keyframes drawerIn {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
+  }
+
+  .overlay {
+    display: block;
+  }
 }

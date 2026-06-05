@@ -1,4 +1,4 @@
-/* ── Overlay (idéntico al Modal.module.css existente) ── */
+/* ── Overlay ── */
 .overlay {
   position: fixed;
   inset: 0;
@@ -45,7 +45,6 @@
   gap: var(--space-3);
 }
 
-/* Logo real del negocio en el header */
 .headerLogoImg {
   width: 36px;
   height: 36px;
@@ -55,7 +54,6 @@
   border: 1px solid var(--border-light);
 }
 
-/* Fallback con iniciales cuando no hay logo */
 .headerLogoFallback {
   width: 36px;
   height: 36px;
@@ -128,16 +126,13 @@
   white-space: nowrap;
 }
 
-.tab:hover {
-  color: var(--dark);
-}
+.tab:hover { color: var(--dark); }
 
 .tabActivo {
   color: var(--color-primary-dark);
   border-bottom-color: var(--color-primary);
 }
 
-/* Indicador de cambios sin guardar en el tab */
 .tabDot {
   display: inline-block;
   width: 6px;
@@ -196,13 +191,8 @@
   appearance: none;
 }
 
-.input:focus {
-  border-color: var(--color-primary);
-}
-
-.input::placeholder {
-  color: var(--gray);
-}
+.input:focus { border-color: var(--color-primary); }
+.input::placeholder { color: var(--gray); }
 
 .selectWrap {
   position: relative;
@@ -300,7 +290,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--dark);
-  flex: 1;        /* empuja el check al extremo cuando no hay .metodoTextos */
+  flex: 1;
 }
 
 .metodoCheck {
@@ -375,10 +365,7 @@
   border-color: var(--border-strong);
 }
 
-.btnCancelar:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btnCancelar:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btnGuardar {
   flex: 2;
@@ -394,16 +381,57 @@
   transition: background 0.15s;
 }
 
-.btnGuardar:hover:not(:disabled) {
-  background: var(--color-primary-dark);
-}
+.btnGuardar:hover:not(:disabled) { background: var(--color-primary-dark); }
+.btnGuardar:disabled { opacity: 0.45; cursor: not-allowed; }
+.btnGuardado { background: var(--color-success) !important; opacity: 1 !important; }
 
-.btnGuardar:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
+/* ══════════════════════════════════════════
+   MOBILE — bottom sheet
+   ══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  .overlay {
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+  }
 
-.btnGuardado {
-  background: var(--color-success) !important;
-  opacity: 1 !important;
+  .sheet {
+    max-width: 100%;
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    max-height: 92dvh;
+    max-height: 92vh;
+    animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .header {
+    position: relative;
+    padding-top: 20px;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    background: var(--border-default);
+    border-radius: var(--radius-full);
+  }
+
+  .body {
+    padding: var(--space-4);
+  }
+
+  .footer {
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 }
