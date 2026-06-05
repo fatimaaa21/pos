@@ -15,6 +15,8 @@ import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
 import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { StatCards } from "@/components/ui/Statscards";
+import toast from "react-hot-toast";
+
 
 interface Props {
   productos: Producto[];
@@ -91,6 +93,7 @@ export function ProductClient({ productos: inicial }: Props) {
   function handleProductoCreado(nuevo: Producto) {
     setProductos((prev) => [nuevo, ...prev]);
     setModalCrear(false);
+    toast.success(`"${nuevo.tNameProduct}" creado correctamente`);
   }
 
   function handleProductoEditado(actualizado: Producto) {
@@ -99,6 +102,7 @@ export function ProductClient({ productos: inicial }: Props) {
     );
     setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
     setProductoEditar(null);
+    toast.success(`"${actualizado.tNameProduct}" actualizado`);
   }
 
   async function handleToggleEstado(producto: Producto) {
@@ -107,9 +111,15 @@ export function ProductClient({ productos: inicial }: Props) {
     if (!result?.error) {
       setProductos((prev) =>
         prev.map((p) =>
-          p.eCodProduct === producto.eCodProduct ? { ...p, bStateProduct: !p.bStateProduct } : p
+          p.eCodProduct === producto.eCodProduct
+            ? { ...p, bStateProduct: !p.bStateProduct }
+            : p
         )
       );
+      const nuevoEstado = !producto.bStateProduct;
+      toast.success(`"${producto.tNameProduct}" ${nuevoEstado ? "activado" : "desactivado"}`);
+    } else {
+      toast.error(`No se pudo cambiar el estado: ${result.error}`);
     }
     setToggleando(null);
   }
@@ -118,23 +128,23 @@ export function ProductClient({ productos: inicial }: Props) {
   setProductoAEliminar(producto);
 }
  
-async function confirmarEliminar() {
-  if (!productoAEliminar) return;
-  setEliminando(productoAEliminar.eCodProduct);
-  const result = await eliminarProducto(productoAEliminar.eCodProduct);
-  setEliminando(null);
-  if (!result?.error) {
-    setProductos((prev) =>
-      prev.filter((p) => p.eCodProduct !== productoAEliminar.eCodProduct)
-    );
-    setProductoAEliminar(null);
-  } else {
-    // El error se mostrará dentro del mismo modal vía el prop error del Modal.
-    // Si prefieres, puedes agregar un estado de error local aquí.
-    alert(`Error al eliminar: ${result.error}`);
-    setProductoAEliminar(null);
+  async function confirmarEliminar() {
+    if (!productoAEliminar) return;
+    setEliminando(productoAEliminar.eCodProduct);
+    const result = await eliminarProducto(productoAEliminar.eCodProduct);
+    setEliminando(null);
+    if (!result?.error) {
+      setProductos((prev) =>
+        prev.filter((p) => p.eCodProduct !== productoAEliminar.eCodProduct)
+      );
+      toast.success(`"${productoAEliminar.tNameProduct}" eliminado`);
+      setProductoAEliminar(null);
+    } else {
+      toast.error(result.error);
+      setProductoAEliminar(null);
+    }
   }
-}
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivos = productos.filter((p) => p.bStateProduct).length;
 
@@ -222,8 +232,6 @@ async function confirmarEliminar() {
 
   return (
     <div className="container">
-      <div className="header" />
-
       <PageHeader
         titulo="Productos"
         descripcion="Gestiona los productos"

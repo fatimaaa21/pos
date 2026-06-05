@@ -264,8 +264,6 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="container">
-      <div className="header" />
-
       <PageHeader
         titulo="Cortes de caja"
         descripcion="Revisión de turnos por empleado"
