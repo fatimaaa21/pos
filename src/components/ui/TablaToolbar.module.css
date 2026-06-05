@@ -8,6 +8,7 @@
   flex-wrap: wrap;
   border: 1px solid var(--border-light);
   box-shadow: var(--shadow-sm);
+  /* overflow: visible por defecto — no lo sobreescribir */
 }
 
 /* ── Buscador ── */
@@ -60,6 +61,14 @@
 
 .searchClear:hover { color: var(--dark); }
 
+/* ── Contenedor de filtros ── */
+.toolbarScroll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+}
+
 /* ── Divider ── */
 .divider {
   width: 1px;
@@ -86,22 +95,12 @@
 }
 
 .dropBtn:hover { border-color: var(--color-primary); }
-
-.dropBtnActive {
-  border-color: var(--color-primary);
-  background: var(--color-primary-50);
-}
-
+.dropBtnActive { border-color: var(--color-primary); background: var(--color-primary-50); }
 .dropLabel { font-size: 12px; font-weight: 600; color: var(--gray); }
 .dropValor { font-size: 12px; font-weight: 700; color: var(--dark); }
 .dropBtnActive .dropValor { color: var(--color-primary-dark); }
 
-.chevron {
-  color: var(--gray);
-  transition: transform 0.2s;
-  flex-shrink: 0;
-}
-
+.chevron { color: var(--gray); transition: transform 0.2s; flex-shrink: 0; }
 .chevronOpen { transform: rotate(180deg); }
 
 /* ── Dropdown panel ── */
@@ -109,7 +108,7 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 100;
+  z-index: 200;
   background: white;
   border-radius: var(--radius-md);
   padding: var(--space-1);
@@ -138,89 +137,52 @@
 }
 
 .ddItem:hover { background: var(--background); }
-
-.ddItemActive {
-  background: var(--color-primary-50);
-  color: var(--color-primary-dark);
-  font-weight: 600;
-}
-
+.ddItemActive { background: var(--color-primary-50); color: var(--color-primary-dark); font-weight: 600; }
 .ddItemActive:hover { background: var(--color-primary-50); }
 
-.ddRadio {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-strong);
-  flex-shrink: 0;
-  transition: all 0.12s;
-}
+.ddRadio { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; transition: all 0.12s; }
+.ddRadioOn { border-color: var(--color-primary); background: var(--color-primary); box-shadow: inset 0 0 0 3px white; }
 
-.ddRadioOn {
-  border-color: var(--color-primary);
-  background: var(--color-primary);
-  box-shadow: inset 0 0 0 3px white;
-}
+.ddCheck { width: 14px; height: 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border-strong); flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
+.ddCheckOn { background: var(--color-primary); border-color: var(--color-primary); }
 
-.ddCheck {
-  width: 14px;
-  height: 14px;
-  border-radius: var(--radius-sm);
-  border: 1.5px solid var(--border-strong);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.12s;
-}
-
-.ddCheckOn {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-}
-
-.ddSep {
-  height: 1px;
-  background: var(--border-light);
-  margin: var(--space-1) 0;
-}
+.ddSep { height: 1px; background: var(--border-light); margin: var(--space-1) 0; }
 
 .limpiarBtn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--gray);
-  background: transparent;
-  flex-shrink: 0;
+  width: 28px; height: 28px; border: none; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--gray); background: transparent; flex-shrink: 0;
   transition: background 0.15s, color 0.15s;
 }
 
-.limpiarBtn:hover {
-  background: var(--background);
-  color: var(--dark);
-}
+.limpiarBtn:hover { background: var(--background); color: var(--dark); }
 
-/* ── Mobile: scrollable horizontal row de filtros ── */
+/* ════════════════════════════════════════
+   MOBILE
+   El toolbar exterior NO tiene overflow
+   El .toolbarScroll es quien scrollea
+   ════════════════════════════════════════ */
 @media (max-width: 768px) {
   .toolbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     padding: var(--space-2);
-    gap: var(--space-1);
   }
 
-  .toolbar::-webkit-scrollbar { display: none; }
-
+  /* El buscador ocupa todo el ancho */
   .searchWrap {
-    min-width: 140px;
-    flex-shrink: 0;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  /* Los filtros van en una segunda fila que scrollea horizontalmente */
+  .toolbarScroll {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    /* SIN overflow — los dropdowns caen hacia abajo sin recorte */
   }
 
   .divider { display: none; }
@@ -230,11 +192,13 @@
     flex-shrink: 0;
   }
 
+  /* Mostrar solo el valor, ocultar la etiqueta "Estado:", "Rol:", etc. */
   .dropLabel { display: none; }
 
-  /* Dropdown se abre hacia arriba en mobile para no quedar fuera */
+  /* Dropdown siempre hacia abajo — sin clipping */
   .dropdown {
-    top: auto;
-    bottom: calc(100% + 6px);
+    top: calc(100% + 6px);
+    bottom: auto;
+    z-index: 200;
   }
 }

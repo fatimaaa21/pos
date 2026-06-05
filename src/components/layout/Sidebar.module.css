@@ -103,7 +103,7 @@
 
 .navItem:hover .navIcon {
   color: white;
-}
+} 
 
 .navItemActive {
   background: var(--color-primary);
@@ -116,9 +116,7 @@
 
 .navIcon {
   color: var(--color-primary);
-  flex-shrink: 0;
 }
-
 /* ── Footer de usuario ── */
 .actionsUser {
   display: flex;
@@ -408,11 +406,69 @@
   }
 }
 
+/* ═══════════════════════════════════════════
+   Agrega estos estilos a tu Sidebar.module.css
+   (o reemplaza las secciones correspondientes)
+   ═══════════════════════════════════════════ */
+
+/* ── Logo row: logo + botón cerrar en mobile ── */
+.logoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Botón X dentro del sidebar — oculto en desktop/tablet */
+.btnCerrarDrawer {
+  display: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btnCerrarDrawer:hover {
+  background: var(--background);
+  color: var(--dark);
+}
+
 /* ════════════════════════════════════════
-   MOBILE  ≤ 768px
-   Drawer overlay desde la izquierda
+   TABLET — ajuste del logoRow
+   ════════════════════════════════════════ */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .logoRow {
+    justify-content: center;
+  }
+}
+
+/* ════════════════════════════════════════
+   MOBILE — mostrar X dentro del sidebar,
+   el hamburger externo YA NO muestra X
    ════════════════════════════════════════ */
 @media (max-width: 768px) {
+  /* Mostrar el botón X dentro del sidebar */
+  .btnCerrarDrawer {
+    display: flex;
+  }
+
+  /* El hamburger externo siempre muestra ≡ (ya no necesita cambiar a X) */
   .hamburger {
     display: flex;
   }
@@ -421,16 +477,24 @@
     position: fixed;
     top: 0;
     left: 0;
+    margin: 0;
+    border-radius: 0;
     height: 100dvh;
     height: 100vh;
+    width: 240px;
     z-index: 150;
     transform: translateX(-100%);
     box-shadow: var(--shadow-lg);
-    width: 220px;
   }
 
   .sidebarOpen {
     transform: translateX(0);
+    animation: drawerIn 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  @keyframes drawerIn {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
   }
 
   .overlay {

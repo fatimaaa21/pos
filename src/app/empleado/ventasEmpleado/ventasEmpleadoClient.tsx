@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { ShoppingBag, TrendingUp } from "lucide-react";
-import { Buscador }     from "@/components/ui/Buscador";
 import { StatCards }    from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { formatFechaHora } from "@/lib/utils/fecha";
@@ -105,12 +104,6 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
 
   return (
     <div className={styles.layout}>
-      <Buscador
-        valor={busqueda}
-        onChange={setBusqueda}
-        placeholder="Buscar folio o producto..."
-      />
-
       {/* Banner total del día */}
       <div className={styles.banner}>
         <div className={styles.bannerLeft}>

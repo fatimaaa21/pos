@@ -1,10 +1,11 @@
+// src/components/ui/TablaToolbar.tsx
+// Cambio: los filtros van dentro de .toolbarScroll para que
+// el overflow-x no corte los dropdowns verticalmente.
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Search, ChevronDown, X, Check, RefreshCw, Banknote, CreditCard, Smartphone } from "lucide-react";
 import styles from "./TablaToolbar.module.css";
-
-// ── Tipos públicos ────────────────────────────────────────────────────────────
 
 export interface FiltrosUsuario {
   busqueda:    string;
@@ -15,6 +16,7 @@ export interface FiltrosUsuario {
   periodo?:    "hoy" | "semana" | "mes" | "todo";
   metodo?:     string;
   empleado?:   string;
+  estadoFiltro?: string; // estado de venta/corte (no usar con estados activo/inactivo)
 }
 
 interface TablaToolbarProps {
@@ -26,13 +28,13 @@ interface TablaToolbarProps {
   opcionesCategorias?: { value: string; label: string }[];
   mostrarStock?:       boolean;
   mostrarPeriodo?:     boolean;
-  mostrarMetodo?:      boolean;                              // legacy hardcodeado
-  opcionesMetodo?:     { value: string; label: string }[];  // dinámico desde DB
+  mostrarMetodo?:      boolean;
+  opcionesMetodo?:     { value: string; label: string }[];
   empleados?:          { id: string; nombre: string }[];
+  opcionesEstadoFiltro?: { value: string; label: string }[];
 }
 
-// ── Sub-componente: Dropdown multi-select ─────────────────────────────────────
-
+// ── DropdownMulti ─────────────────────────────────────────────────────────────
 interface DropdownMultiProps {
   label:         string;
   opciones:      { value: string; label: string }[];
@@ -54,11 +56,9 @@ function DropdownMulti({ label, opciones, seleccionados, onToggle, onLimpiar }: 
   }, []);
 
   const valorMostrado =
-    seleccionados.length === 0
-      ? "Todos"
-      : seleccionados.length === 1
-      ? opciones.find((o) => o.value === seleccionados[0])?.label ?? seleccionados[0]
-      : `${seleccionados.length} selec.`;
+    seleccionados.length === 0 ? "Todos" :
+    seleccionados.length === 1 ? (opciones.find((o) => o.value === seleccionados[0])?.label ?? seleccionados[0]) :
+    `${seleccionados.length} selec.`;
 
   const activo = seleccionados.length > 0;
 
@@ -104,8 +104,7 @@ function DropdownMulti({ label, opciones, seleccionados, onToggle, onLimpiar }: 
   );
 }
 
-// ── Sub-componente: Dropdown single-select ────────────────────────────────────
-
+// ── DropdownSingle ────────────────────────────────────────────────────────────
 interface DropdownSingleProps {
   label:    string;
   opciones: { value: string; label: string; icon?: React.ReactNode }[];
@@ -157,11 +156,7 @@ function DropdownSingle({ label, opciones, valor, onChange }: DropdownSingleProp
                       {sel && <Check size={10} strokeWidth={3} color="white" />}
                     </span>
                   )}
-                  {op.icon && (
-                    <span style={{ display: "flex", alignItems: "center", opacity: 0.65 }}>
-                      {op.icon}
-                    </span>
-                  )}
+                  {op.icon && <span style={{ display: "flex", alignItems: "center", opacity: 0.65 }}>{op.icon}</span>}
                   {op.label}
                 </button>
               </div>
@@ -174,7 +169,6 @@ function DropdownSingle({ label, opciones, valor, onChange }: DropdownSingleProp
 }
 
 // ── Constantes ────────────────────────────────────────────────────────────────
-
 const OPCIONES_STOCK = [
   { value: "disponible", label: "Disponible" },
   { value: "bajo",       label: "Stock bajo" },
@@ -188,7 +182,6 @@ const OPCIONES_PERIODO = [
   { value: "todo",   label: "Todo"        },
 ];
 
-// Método hardcodeado — solo se usa cuando mostrarMetodo=true y no se pasa opcionesMetodo
 const OPCIONES_METODO_LEGACY = [
   { value: "todos",         label: "Todos"         },
   { value: "efectivo",      label: "Efectivo",      icon: <Banknote   size={12} /> },
@@ -197,11 +190,8 @@ const OPCIONES_METODO_LEGACY = [
 ];
 
 // ── Componente principal ──────────────────────────────────────────────────────
-
 export function TablaToolbar({
-  filtros,
-  onChange,
-  total,
+  filtros, onChange, total,
   ocultarRol      = false,
   ocultarEstado   = false,
   opcionesCategorias,
@@ -209,50 +199,35 @@ export function TablaToolbar({
   mostrarPeriodo  = false,
   mostrarMetodo   = false,
   opcionesMetodo,
+  opcionesEstadoFiltro,
   empleados,
 }: TablaToolbarProps) {
 
-  function setBusqueda(busqueda: string) {
-    onChange({ ...filtros, busqueda });
-  }
-
+  function setBusqueda(busqueda: string) { onChange({ ...filtros, busqueda }); }
   function toggleRol(rol: string) {
-    const roles = filtros.roles.includes(rol as "admin" | "empleado")
-      ? filtros.roles.filter((r) => r !== rol)
-      : [...filtros.roles, rol as "admin" | "empleado"];
+    const roles = filtros.roles.includes(rol as any) ? filtros.roles.filter((r) => r !== rol) : [...filtros.roles, rol as any];
     onChange({ ...filtros, roles });
   }
-
   function toggleEstado(estado: string) {
-    const estados = filtros.estados.includes(estado as "activo" | "inactivo")
-      ? filtros.estados.filter((e) => e !== estado)
-      : [...filtros.estados, estado as "activo" | "inactivo"];
+    const estados = filtros.estados.includes(estado as any) ? filtros.estados.filter((e) => e !== estado) : [...filtros.estados, estado as any];
     onChange({ ...filtros, estados });
   }
-
   function toggleCategoria(cat: string) {
     const prev = filtros.categorias ?? [];
-    const categorias = prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat];
-    onChange({ ...filtros, categorias });
+    onChange({ ...filtros, categorias: prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat] });
   }
-
   function toggleStock(stock: string) {
     const prev = filtros.stocks ?? [];
-    const stocks = prev.includes(stock as any)
-      ? prev.filter((s) => s !== stock)
-      : [...prev, stock as "disponible" | "bajo" | "agotado"];
-    onChange({ ...filtros, stocks });
+    onChange({ ...filtros, stocks: prev.includes(stock as any) ? prev.filter((s) => s !== stock) : [...prev, stock as any] });
   }
 
   const hayFiltros =
-    filtros.roles.length > 0 ||
-    filtros.estados.length > 0 ||
-    filtros.busqueda ||
-    (filtros.categorias?.length ?? 0) > 0 ||
-    (filtros.stocks?.length ?? 0) > 0 ||
-    (filtros.periodo  && filtros.periodo  !== "hoy")  ||
-    (filtros.metodo   && filtros.metodo   !== "todos") ||
-    (filtros.empleado && filtros.empleado !== "todos");
+    filtros.roles.length > 0 || filtros.estados.length > 0 || filtros.busqueda ||
+    (filtros.categorias?.length ?? 0) > 0 || (filtros.stocks?.length ?? 0) > 0 ||
+    (filtros.periodo && filtros.periodo !== "hoy") ||
+    (filtros.metodo  && filtros.metodo  !== "todos") ||
+    (filtros.empleado && filtros.empleado !== "todos") ||
+    (filtros.estadoFiltro && filtros.estadoFiltro !== "todos");
 
   const opcionesEmpleado = [
     { value: "todos", label: "Todos" },
@@ -261,8 +236,7 @@ export function TablaToolbar({
 
   return (
     <div className={styles.toolbar}>
-
-      {/* ── Buscador ── */}
+      {/* Buscador: siempre visible, no scrollea */}
       <div className={styles.searchWrap}>
         <Search size={13} className={styles.searchIcon} />
         <input
@@ -279,141 +253,137 @@ export function TablaToolbar({
         )}
       </div>
 
-      {/* ── Estado ── */}
-      {!ocultarEstado && (
-        <>
-          <div className={styles.divider} />
-          <DropdownMulti
-            label="Estado"
-            opciones={[
-              { value: "activo",   label: "Activo"   },
-              { value: "inactivo", label: "Inactivo" },
-            ]}
-            seleccionados={filtros.estados}
-            onToggle={toggleEstado}
-            onLimpiar={() => onChange({ ...filtros, estados: [] })}
-          />
-        </>
-      )}
+      {/* 
+        .toolbarScroll — en mobile este div hace el scroll horizontal.
+        El toolbar exterior queda overflow: visible para que los dropdowns
+        no queden cortados.
+      */}
+      <div className={styles.toolbarScroll}>
 
-      {/* ── Rol ── */}
-      {!ocultarRol && (
-        <>
-          <div className={styles.divider} />
-          <DropdownMulti
-            label="Rol"
-            opciones={[
-              { value: "admin",    label: "Admin"    },
-              { value: "empleado", label: "Empleado" },
-            ]}
-            seleccionados={filtros.roles}
-            onToggle={toggleRol}
-            onLimpiar={() => onChange({ ...filtros, roles: [] })}
-          />
-        </>
-      )}
+        {!ocultarEstado && (
+          <>
+            <div className={styles.divider} />
+            <DropdownMulti
+              label="Estado"
+              opciones={[{ value: "activo", label: "Activo" }, { value: "inactivo", label: "Inactivo" }]}
+              seleccionados={filtros.estados}
+              onToggle={toggleEstado}
+              onLimpiar={() => onChange({ ...filtros, estados: [] })}
+            />
+          </>
+        )}
 
-      {/* ── Categoría ── */}
-      {opcionesCategorias && opcionesCategorias.length > 0 && (
-        <>
-          <div className={styles.divider} />
-          <DropdownMulti
-            label="Categoría"
-            opciones={opcionesCategorias}
-            seleccionados={filtros.categorias ?? []}
-            onToggle={toggleCategoria}
-            onLimpiar={() => onChange({ ...filtros, categorias: [] })}
-          />
-        </>
-      )}
+        {!ocultarRol && (
+          <>
+            <div className={styles.divider} />
+            <DropdownMulti
+              label="Rol"
+              opciones={[{ value: "admin", label: "Admin" }, { value: "empleado", label: "Empleado" }]}
+              seleccionados={filtros.roles}
+              onToggle={toggleRol}
+              onLimpiar={() => onChange({ ...filtros, roles: [] })}
+            />
+          </>
+        )}
 
-      {/* ── Stock ── */}
-      {mostrarStock && (
-        <>
-          <div className={styles.divider} />
-          <DropdownMulti
-            label="Stock"
-            opciones={OPCIONES_STOCK}
-            seleccionados={filtros.stocks ?? []}
-            onToggle={toggleStock}
-            onLimpiar={() => onChange({ ...filtros, stocks: [] })}
-          />
-        </>
-      )}
+        {opcionesCategorias && opcionesCategorias.length > 0 && (
+          <>
+            <div className={styles.divider} />
+            <DropdownMulti
+              label="Categoría"
+              opciones={opcionesCategorias}
+              seleccionados={filtros.categorias ?? []}
+              onToggle={toggleCategoria}
+              onLimpiar={() => onChange({ ...filtros, categorias: [] })}
+            />
+          </>
+        )}
 
-      {/* ── Periodo ── */}
-      {mostrarPeriodo && (
-        <>
-          <div className={styles.divider} />
-          <DropdownSingle
-            label="Período"
-            opciones={OPCIONES_PERIODO}
-            valor={filtros.periodo ?? "hoy"}
-            onChange={(v) => onChange({ ...filtros, periodo: v as FiltrosUsuario["periodo"] })}
-          />
-        </>
-      )}
+        {mostrarStock && (
+          <>
+            <div className={styles.divider} />
+            <DropdownMulti
+              label="Stock"
+              opciones={OPCIONES_STOCK}
+              seleccionados={filtros.stocks ?? []}
+              onToggle={toggleStock}
+              onLimpiar={() => onChange({ ...filtros, stocks: [] })}
+            />
+          </>
+        )}
 
-      {/* ── Método dinámico desde DB ── */}
-      {opcionesMetodo && opcionesMetodo.length > 1 && (
-        <>
-          <div className={styles.divider} />
-          <DropdownSingle
-            label="Método"
-            opciones={opcionesMetodo}
-            valor={filtros.metodo ?? "todos"}
-            onChange={(v) => onChange({ ...filtros, metodo: v })}
-          />
-        </>
-      )}
+        {mostrarPeriodo && (
+          <>
+            <div className={styles.divider} />
+            <DropdownSingle
+              label="Período"
+              opciones={OPCIONES_PERIODO}
+              valor={filtros.periodo ?? "hoy"}
+              onChange={(v) => onChange({ ...filtros, periodo: v as FiltrosUsuario["periodo"] })}
+            />
+          </>
+        )}
 
-      {/* ── Método hardcodeado legacy (cuando no hay opcionesMetodo) ── */}
-      {mostrarMetodo && !opcionesMetodo && (
-        <>
-          <div className={styles.divider} />
-          <DropdownSingle
-            label="Método"
-            opciones={OPCIONES_METODO_LEGACY}
-            valor={filtros.metodo ?? "todos"}
-            onChange={(v) => onChange({ ...filtros, metodo: v })}
-          />
-        </>
-      )}
+        {opcionesMetodo && opcionesMetodo.length > 1 && (
+          <>
+            <div className={styles.divider} />
+            <DropdownSingle
+              label="Método"
+              opciones={opcionesMetodo}
+              valor={filtros.metodo ?? "todos"}
+              onChange={(v) => onChange({ ...filtros, metodo: v })}
+            />
+          </>
+        )}
 
-      {/* ── Empleado ── */}
-      {empleados && empleados.length > 1 && (
-        <>
-          <div className={styles.divider} />
-          <DropdownSingle
-            label="Empleado"
-            opciones={opcionesEmpleado}
-            valor={filtros.empleado ?? "todos"}
-            onChange={(v) => onChange({ ...filtros, empleado: v })}
-          />
-        </>
-      )}
+        {mostrarMetodo && !opcionesMetodo && (
+          <>
+            <div className={styles.divider} />
+            <DropdownSingle
+              label="Método"
+              opciones={OPCIONES_METODO_LEGACY}
+              valor={filtros.metodo ?? "todos"}
+              onChange={(v) => onChange({ ...filtros, metodo: v })}
+            />
+          </>
+        )}
 
-      {/* ── Limpiar todo ── */}
-      {hayFiltros && (
-        <button
-          className={styles.limpiarBtn}
-          onClick={() =>
-            onChange({
-              busqueda:   "",
-              roles:      [],
-              estados:    [],
-              categorias: [],
-              stocks:     [],
-              periodo:    "hoy",
-              metodo:     "todos",
-              empleado:   "todos",
-            })
-          }
-          title="Limpiar filtros"
-        >
-          <RefreshCw size={13} />
-        </button>
-      )}
+
+        {opcionesEstadoFiltro && opcionesEstadoFiltro.length > 1 && (
+          <>
+            <div className={styles.divider} />
+            <DropdownSingle
+              label="Estado"
+              opciones={opcionesEstadoFiltro}
+              valor={filtros.estadoFiltro ?? "todos"}
+              onChange={(v) => onChange({ ...filtros, estadoFiltro: v })}
+            />
+          </>
+        )}
+
+        {empleados && empleados.length > 1 && (
+          <>
+            <div className={styles.divider} />
+            <DropdownSingle
+              label="Empleado"
+              opciones={opcionesEmpleado}
+              valor={filtros.empleado ?? "todos"}
+              onChange={(v) => onChange({ ...filtros, empleado: v })}
+            />
+          </>
+        )}
+
+        {hayFiltros && (
+          <button
+            className={styles.limpiarBtn}
+            onClick={() => onChange({ busqueda: "", roles: [], estados: [], categorias: [], stocks: [], periodo: "hoy", metodo: "todos", empleado: "todos", estadoFiltro: "todos" })}
+            title="Limpiar filtros"
+          >
+            <RefreshCw size={13} />
+          </button>
+        )}
+
+      </div>{/* /toolbarScroll */}
     </div>
   );
 }

@@ -1,28 +1,43 @@
+/* src/components/layout/AppLayout.module.css */
+
 .wrapper {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;        /* evita scroll en el wrapper */
+  gap: 0;
 }
 
 .main {
   flex: 1;
   min-width: 0;
-  min-height: 0;
   overflow-y: auto;
-  padding: 24px;
-  background: #f8f7f4;
+  /* Alinea con el sidebar: mismo margen, mismo border-radius */
+  margin: 24px 0 24px 0;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
 }
 
-/* Mobile: padding top para dejar espacio al botón hamburger */
-@media (max-width: 768px) {
+/* Tablet */
+@media (min-width: 769px) and (max-width: 1024px) {
   .main {
-    padding: 16px;
-    padding-top: 68px;
+    margin: 20px 20px 20px 0;
+    padding: 20px;
   }
 }
 
-/* Tablet: padding ligero */
-@media (min-width: 769px) and (max-width: 1024px) {
+/* Mobile: sin el efecto card */
+@media (max-width: 768px) {
+  .wrapper {
+    height: auto;
+    overflow: visible;
+  }
+
   .main {
-    padding: 20px;
+    margin: 0;
+    border-radius: 0;
+    padding: 16px;
+    padding-top: 68px;   /* espacio para el hamburger */
+    min-height: 100vh;
+    overflow-y: visible;
   }
 }

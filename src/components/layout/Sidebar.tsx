@@ -9,21 +9,10 @@ import { useConfiguracionStore } from "@/lib/stores/configuracion";
 import type { Perfil } from "@/types";
 import styles from "./Sidebar.module.css";
 import {
-  LayoutDashboard,
-  Package,
-  BarChart2,
-  BookOpenText,
-  Users,
-  LogOut,
-  ClipboardList,
-  ClipboardPenLine,
-  Building2,
-  Settings,
-  ChevronUp,
-  CircleDollarSign,
-  Calculator,
-  Menu,
-  X,
+  LayoutDashboard, Package, ReceiptText, BookOpenText,
+  Users, LogOut, ClipboardList, ClipboardPenLine,
+  Building2, Settings, ChevronUp, CircleDollarSign,
+  Calculator, Menu, X,
 } from "lucide-react";
 
 const navAdmin = [
@@ -31,7 +20,7 @@ const navAdmin = [
   { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
   { icon: Package,          label: "Productos",       href: "/admin/productos"   },
   { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
-  { icon: BarChart2,        label: "Ventas",          href: "/admin/ventasAdmin" },
+  { icon: ReceiptText,        label: "Ventas",          href: "/admin/ventasAdmin" },
   { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
   { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
 ];
@@ -39,7 +28,7 @@ const navAdmin = [
 const navEmpleado = [
   { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
   { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
-  { icon: Users,            label: "Mis ventas", href: "/empleado/ventasEmpleado" },
+  { icon: ReceiptText,            label: "Mis ventas", href: "/empleado/ventasEmpleado" },
 ];
 
 const navSistemas = [
@@ -75,121 +64,108 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
   const esSistemas = perfil.tRolUser === "sistemas";
 
   const iniciales = perfil.tNameUser
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+    .split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
 
   const inicialesNegocio = negocio?.tNameCompany
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() ?? "??";
+    .split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() ?? "??";
 
-  // Cerrar popup al click afuera
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
         setPopupAbierto(false);
       }
     }
-    if (popupAbierto) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+    if (popupAbierto) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [popupAbierto]);
 
-  // Bloquear scroll del body cuando el drawer está abierto
   useEffect(() => {
-    if (drawerAbierto) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = drawerAbierto ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [drawerAbierto]);
 
-  // Cerrar drawer en cambio de ruta
-  useEffect(() => {
-    setDrawerAbierto(false);
-  }, [pathname]);
+  useEffect(() => { setDrawerAbierto(false); }, [pathname]);
 
   function cerrarDrawer() {
     setDrawerAbierto(false);
     setPopupAbierto(false);
   }
 
-  // ── Logo según rol ─────────────────────────────────────────────────────────
   function renderLogo() {
     if (esSistemas) {
       return (
-        <div className={styles.logo}>
-          <img src="/kivi-logo.svg" alt="Kivi" className={styles.logoImg} />
-          <div className={styles.logoTextos}>
-            <div className={styles.logoText}>Kivi</div>
+        <div className={styles.logoRow}>
+          <div className={styles.logo}>
+            <img src="/kivi-logo.svg" alt="Kivi" className={styles.logoImg} />
+            <div className={styles.logoTextos}>
+              <div className={styles.logoText}>Kivi</div>
+            </div>
           </div>
+          {/* Botón cerrar — solo visible en mobile */}
+          <button
+            className={styles.btnCerrarDrawer}
+            onClick={cerrarDrawer}
+            aria-label="Cerrar menú"
+          >
+            <X size={16} />
+          </button>
         </div>
       );
     }
 
     return (
-      <div className={styles.logo}>
-        {negocio?.imgCompany ? (
-          <img
-            src={negocio.imgCompany}
-            alt={negocio.tNameCompany}
-            className={styles.logoImg}
-          />
-        ) : (
-          <div className={styles.logoFallback}>{inicialesNegocio}</div>
-        )}
-        <div className={styles.logoTextos}>
-          <div className={styles.logoText}>
-            {negocio?.tNameCompany ?? "Kivi"}
+      <div className={styles.logoRow}>
+        <div className={styles.logo}>
+          {negocio?.imgCompany ? (
+            <img src={negocio.imgCompany} alt={negocio.tNameCompany} className={styles.logoImg} />
+          ) : (
+            <div className={styles.logoFallback}>{inicialesNegocio}</div>
+          )}
+          <div className={styles.logoTextos}>
+            <div className={styles.logoText}>{negocio?.tNameCompany ?? "Kivi"}</div>
           </div>
         </div>
+        {/* Botón cerrar — solo visible en mobile */}
+        <button
+          className={styles.btnCerrarDrawer}
+          onClick={cerrarDrawer}
+          aria-label="Cerrar menú"
+        >
+          <X size={16} />
+        </button>
       </div>
     );
   }
 
   return (
     <>
-      {/* ── Botón hamburger — solo visible en mobile ── */}
-      <button
-        className={styles.hamburger}
-        onClick={() => setDrawerAbierto((v) => !v)}
-        aria-label={drawerAbierto ? "Cerrar menú" : "Abrir menú"}
-      >
-        {drawerAbierto ? <X size={18} /> : <Menu size={18} />}
-      </button>
-
-      {/* ── Overlay mobile ── */}
-      {drawerAbierto && (
-        <div
-          className={styles.overlay}
-          onClick={cerrarDrawer}
-          aria-hidden="true"
-        />
+      {/* Hamburger externo — solo cuando el drawer está CERRADO */}
+      {!drawerAbierto && (
+        <button
+          className={styles.hamburger}
+          onClick={() => setDrawerAbierto(true)}
+          aria-label="Abrir menú"
+        >
+          <Menu size={18} />
+        </button>
       )}
 
-      {/* ── Sidebar ── */}
+      {/* Overlay */}
+      {drawerAbierto && (
+        <div className={styles.overlay} onClick={cerrarDrawer} aria-hidden="true" />
+      )}
+
       <aside className={`${styles.sidebar} ${drawerAbierto ? styles.sidebarOpen : ""}`}>
 
-        {/* Logo */}
         {renderLogo()}
 
-        {/* Navegación */}
         <nav className={styles.nav}>
           {nav.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               title={item.label}
-              className={`${styles.navItem} ${
-                pathname === item.href ? styles.navItemActive : ""
-              }`}
+              className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ""}`}
               onClick={cerrarDrawer}
             >
               <item.icon size={16} className={styles.navIcon} />
@@ -198,10 +174,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
           ))}
         </nav>
 
-        {/* Footer de usuario */}
         <div className={styles.actionsUser} ref={popupRef}>
-
-          {/* Popup del admin */}
           {esAdmin && popupAbierto && (
             <div className={styles.userPopup}>
               <div className={styles.userPopupHeader}>
@@ -211,28 +184,17 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
                   <p className={styles.userRol}>{perfil.tRolUser}</p>
                 </div>
               </div>
-
               <div className={styles.userPopupDivider} />
-
               <button
                 className={styles.userPopupItem}
-                onClick={() => {
-                  abrirConfiguracion();
-                  setPopupAbierto(false);
-                  cerrarDrawer();
-                }}
+                onClick={() => { abrirConfiguracion(); setPopupAbierto(false); cerrarDrawer(); }}
               >
                 <Settings size={14} />
                 <span>Configuración</span>
               </button>
-
               <div className={styles.userPopupDivider} />
-
               <form action={logout}>
-                <button
-                  type="submit"
-                  className={`${styles.userPopupItem} ${styles.userPopupItemDanger}`}
-                >
+                <button type="submit" className={`${styles.userPopupItem} ${styles.userPopupItemDanger}`}>
                   <LogOut size={14} />
                   <span>Cerrar sesión</span>
                 </button>
@@ -240,7 +202,6 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
             </div>
           )}
 
-          {/* Avatar + info en el footer */}
           {esAdmin ? (
             <button
               className={styles.userBtn}
@@ -269,7 +230,7 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
               </div>
               <form action={logout}>
                 <button className={styles.navItem} title="Cerrar sesión" onClick={cerrarDrawer}>
-                  <LogOut size={14} color="var(--color-primary)" className={styles.navIcon} />
+                  <LogOut size={14} className={styles.navIcon} />
                   <span>Cerrar Sesión</span>
                 </button>
               </form>

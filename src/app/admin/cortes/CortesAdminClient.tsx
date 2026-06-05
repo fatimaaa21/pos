@@ -307,7 +307,7 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
         ocultarRol
         ocultarEstado
         mostrarPeriodo
-        opcionesMetodo={OPCIONES_ESTADO_CORTE}
+        opcionesEstadoFiltro={OPCIONES_ESTADO_CORTE}
         empleados={empleadosUnicos}
         opcionesCategorias={OPCIONES_DIFERENCIA}
       />
