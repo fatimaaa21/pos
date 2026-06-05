@@ -14,7 +14,9 @@ import { toggleEstadoCategoria, eliminarCategoria } from "@/lib/actions/categori
 import { ModalCrearCategoria } from "./ModalCrearCategoria";
 import { ModalVerCategoria } from "./ModalVerCategoria";
 import { ModalEditarCategoria } from "./ModalEditarCategoria";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { IconoCategoria } from "@/components/ui/IconoCategoria";
+import toast from "react-hot-toast";
 
 interface Props {
   categorias: Categoria[];
@@ -95,6 +97,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
 
   // Acciones en curso
   const [toggleando,    setToggleando]   = useState<string | null>(null);
+  const [categoriaAEliminar, setCategoriaAEliminar] = useState<Categoria | null>(null);
   const [eliminando,    setEliminando]   = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
@@ -124,58 +127,67 @@ export function CatalogoClient({ categorias: inicial }: Props) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleCategoriaCreada(nuevo: Categoria) {
-    setCategorias((prev) => [{ ...nuevo, productos: [] }, ...prev]);
-    setModalCrear(false);
-  }
+  setCategorias((prev) => [{ ...nuevo, productos: [] }, ...prev]);
+  setModalCrear(false);
+  toast.success(`"${nuevo.tNameCategory}" creada`);
+}
 
   function handleCategoriaEditada(actualizado: Categoria) {
+  setCategorias((prev) =>
+    prev.map((c) =>
+      c.eCodCategory === actualizado.eCodCategory
+        ? { ...actualizado, productos: c.productos }
+        : c
+    )
+  );
+  setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodCategory]: Date.now() }));
+  setCategoriaEditar(null);
+  toast.success(`"${actualizado.tNameCategory}" actualizada`);
+}
+
+  async function handleToggleEstado(categoria: Categoria) {
+  setToggleando(categoria.eCodCategory);
+  const result = await toggleEstadoCategoria(
+    categoria.eCodCategory,
+    !categoria.bStateCategory
+  );
+  if (!result?.error) {
     setCategorias((prev) =>
       prev.map((c) =>
-        c.eCodCategory === actualizado.eCodCategory
-          ? { ...actualizado, productos: c.productos } // preservar productos del estado local
+        c.eCodCategory === categoria.eCodCategory
+          ? { ...c, bStateCategory: !c.bStateCategory }
           : c
       )
     );
-    setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodCategory]: Date.now() }));
-    setCategoriaEditar(null);
+    const nuevoEstado = !categoria.bStateCategory;
+    toast.success(`"${categoria.tNameCategory}" ${nuevoEstado ? "activada" : "desactivada"}`);
+  } else {
+    toast.error(`No se pudo cambiar el estado: ${result.error}`);
   }
+  setToggleando(null);
+}
 
-  async function handleToggleEstado(categoria: Categoria) {
-    setToggleando(categoria.eCodCategory);
-    const result = await toggleEstadoCategoria(
-      categoria.eCodCategory,
-      !categoria.bStateCategory
+  function handleEliminar(categoria: Categoria) {
+    setCategoriaAEliminar(categoria);
+  }
+  
+  async function confirmarEliminar() {
+  if (!categoriaAEliminar) return;
+  setEliminando(categoriaAEliminar.eCodCategory);
+  const result = await eliminarCategoria(categoriaAEliminar.eCodCategory);
+  setEliminando(null);
+  if (!result?.error) {
+    setCategorias((prev) =>
+      prev.filter((c) => c.eCodCategory !== categoriaAEliminar.eCodCategory)
     );
-    if (!result?.error) {
-      setCategorias((prev) =>
-        prev.map((c) =>
-          c.eCodCategory === categoria.eCodCategory
-            ? { ...c, bStateCategory: !c.bStateCategory }
-            : c
-        )
-      );
-    }
-    setToggleando(null);
+    toast.success(`"${categoriaAEliminar.tNameCategory}" eliminada`);
+    setCategoriaAEliminar(null);
+  } else {
+    // El servidor ya devuelve mensajes útiles (ej. "tiene productos asociados")
+    toast.error(result.error);
+    setCategoriaAEliminar(null);
   }
-
-  async function handleEliminar(categoria: Categoria) {
-    const confirmar = window.confirm(
-      `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
-    );
-    if (!confirmar) return;
-
-    setEliminando(categoria.eCodCategory);
-    const result = await eliminarCategoria(categoria.eCodCategory);
-
-    if (!result?.error) {
-      setCategorias((prev) =>
-        prev.filter((c) => c.eCodCategory !== categoria.eCodCategory)
-      );
-    } else {
-      alert(`Error al eliminar categoría: ${result.error}`);
-    }
-    setEliminando(null);
-  }
+}
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivas = categorias.filter((c) =>  c.bStateCategory).length;
@@ -268,8 +280,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="container">
-        <div className="header"/>
-
       <PageHeader
         titulo="Categorías"
         descripcion="Gestiona las categorías de productos"
@@ -332,6 +342,20 @@ export function CatalogoClient({ categorias: inicial }: Props) {
           categoria={categoriaEditar}
           onClose={() => setCategoriaEditar(null)}
           onEditado={handleCategoriaEditada}
+        />
+      )}
+      {categoriaAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="categoría"
+          nombre={categoriaAEliminar.tNameCategory}
+          advertencia={
+            (categoriaAEliminar.productos?.length ?? 0) > 0
+              ? `Tiene ${categoriaAEliminar.productos!.length} producto(s) asociado(s). Debes reasignarlos o desactivarlos antes de eliminar.`
+              : undefined
+          }
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setCategoriaAEliminar(null)}
+          cargando={eliminando === categoriaAEliminar.eCodCategory}
         />
       )}
     </div>

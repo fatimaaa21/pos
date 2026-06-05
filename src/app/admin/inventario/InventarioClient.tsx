@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import toast from "react-hot-toast";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Trash2, Pencil } from "lucide-react";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ModalAgregarStock } from "./ModalAgregarStock";
 import { ModalVerStock } from "./ModalVerStock";
 import { ModalEditarStock } from "./ModalEditarStock";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { eliminarInventario, toggleEstadoInventario } from "@/lib/actions/inventario";
 import { getEstadoStock } from "@/types";
 import styles from "./inventario.module.css";
@@ -49,6 +51,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
   const [stockVer,     setStockVer]     = useState<InventarioConProducto | null>(null);
   const [stockEditar,  setStockEditar]  = useState<InventarioConProducto | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
+  const [loteAEliminar, setLoteAEliminar] = useState<InventarioConProducto | null>(null);
   const [eliminando,  setEliminando]    = useState<string | null>(null);
   const [toggleando,  setToggleando]    = useState<string | null>(null);
 
@@ -94,43 +97,70 @@ export function InventarioClient({ inventario: inicial }: Props) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function handleStockAgregado(nuevo: InventarioConProducto) {
-    setInventario((prev) => [nuevo, ...prev]);
-    setModalAgregar(false);
-    router.refresh();
-  }
+  setInventario((prev) => [nuevo, ...prev]);
+  setModalAgregar(false);
+  router.refresh();
+  const nombre = (nuevo as any).productos?.tNameProduct ?? "Producto";
+  toast.success(`Stock de "${nombre}" agregado`);
+}
 
   function handleStockEditado(actualizado: InventarioConProducto) {
-    setInventario((prev) =>
-      prev.map((c) => c.eCodInventory === actualizado.eCodInventory ? actualizado : c)
-    );
-    setStockEditar(null);
-    router.refresh();
-  }
+  setInventario((prev) =>
+    prev.map((c) => c.eCodInventory === actualizado.eCodInventory ? actualizado : c)
+  );
+  setStockEditar(null);
+  router.refresh();
+  const nombre = actualizado.productos?.tNameProduct ?? "Producto";
+  toast.success(`Stock de "${nombre}" actualizado`);
+}
 
-  async function handleEliminar(item: InventarioConProducto) {
-    if (!confirm("¿Eliminar este registro de inventario? Esta acción no se puede deshacer.")) return;
-    setEliminando(item.eCodInventory);
-    const result = await eliminarInventario(item.eCodInventory);
-    if (!result?.error) {
-      setInventario((prev) => prev.filter((i) => i.eCodInventory !== item.eCodInventory));
-    }
-    setEliminando(null);
+  function handleEliminar(lote: InventarioConProducto) {
+    setLoteAEliminar(lote);
+  }
+  
+  async function confirmarEliminar() {
+  if (!loteAEliminar) return;
+  setEliminando(loteAEliminar.eCodInventory);
+  const result = await eliminarInventario(loteAEliminar.eCodInventory);
+  setEliminando(null);
+  if (!result?.error) {
+    setInventario((prev) =>
+      prev.filter((i) => i.eCodInventory !== loteAEliminar.eCodInventory)
+    );
+    const nombre = loteAEliminar.productos?.tNameProduct ?? "Lote";
+    toast.success(`Lote de "${nombre}" eliminado`);
+    setLoteAEliminar(null);
+  } else {
+    toast.error(result.error);
+    setLoteAEliminar(null);
+  }
+}
+
+  function getNombreLote(lote: InventarioConProducto): string {
+    const base = lote.productos?.tNameProduct ?? "Lote";
+    const pres = lote.presentaciones?.tNombre;
+    return pres ? `${base} – ${pres}` : base;
   }
 
   async function handleToggle(item: InventarioConProducto) {
-    setToggleando(item.eCodInventory);
-    const result = await toggleEstadoInventario(item.eCodInventory, !item.bStateInventory);
-    if (!result?.error) {
-      setInventario((prev) =>
-        prev.map((i) =>
-          i.eCodInventory === item.eCodInventory
-            ? { ...i, bStateInventory: !i.bStateInventory }
-            : i
-        )
-      );
-    }
-    setToggleando(null);
+  setToggleando(item.eCodInventory);
+  const result = await toggleEstadoInventario(item.eCodInventory, !item.bStateInventory);
+  if (!result?.error) {
+    setInventario((prev) =>
+      prev.map((i) =>
+        i.eCodInventory === item.eCodInventory
+          ? { ...i, bStateInventory: !i.bStateInventory }
+          : i
+      )
+    );
+    const nombre = item.productos?.tNameProduct ?? "Lote";
+    const nuevoEstado = !item.bStateInventory;
+    toast.success(`${nombre} ${nuevoEstado ? "activado" : "desactivado"}`);
+  } else {
+    toast.error(`No se pudo cambiar el estado: ${result.error}`);
   }
+  setToggleando(null);
+}
 
   async function recargar() {
     const supabase = createClient();
@@ -282,8 +312,6 @@ export function InventarioClient({ inventario: inicial }: Props) {
 
   return (
     <div className="container">
-      <div className="header" />
-
       <PageHeader
         titulo="Inventario"
         descripcion="Control de stock por turno"
@@ -335,6 +363,15 @@ export function InventarioClient({ inventario: inicial }: Props) {
           onEditado={handleStockEditado}
         />
       )}
+      {loteAEliminar && (
+      <ToastConfirmarEliminar
+        tipo="lote de inventario"
+        nombre={getNombreLote(loteAEliminar)}
+        onConfirmar={confirmarEliminar}
+        onCancelar={() => setLoteAEliminar(null)}
+        cargando={eliminando === loteAEliminar.eCodInventory}
+      />
+    )}
     </div>
   );
 }

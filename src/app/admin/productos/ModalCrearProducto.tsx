@@ -246,7 +246,7 @@ export function ModalCrearProducto({ onClose, onCreado }: Props) {
           >
             <ModalInput
               type="text"
-              placeholder="Nombre (ej. Chico)"
+              placeholder="Nombre"
               value={p.tNombre}
               onChange={(e) => actualizarPresentacion(idx, "tNombre", e.target.value)}
             />

@@ -13,7 +13,10 @@ import { createClient } from "@/lib/supabase/client";
 import { ModalCrearProducto } from "./ModalCrearProducto";
 import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { StatCards } from "@/components/ui/Statscards";
+import toast from "react-hot-toast";
+
 
 interface Props {
   productos: Producto[];
@@ -36,6 +39,7 @@ export function ProductClient({ productos: inicial }: Props) {
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [productoAEliminar, setProductoAEliminar] = useState<Producto | null>(null);
 
   useEffect(() => {
     async function cargarCategorias() {
@@ -89,6 +93,7 @@ export function ProductClient({ productos: inicial }: Props) {
   function handleProductoCreado(nuevo: Producto) {
     setProductos((prev) => [nuevo, ...prev]);
     setModalCrear(false);
+    toast.success(`"${nuevo.tNameProduct}" creado correctamente`);
   }
 
   function handleProductoEditado(actualizado: Producto) {
@@ -97,6 +102,7 @@ export function ProductClient({ productos: inicial }: Props) {
     );
     setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
     setProductoEditar(null);
+    toast.success(`"${actualizado.tNameProduct}" actualizado`);
   }
 
   async function handleToggleEstado(producto: Producto) {
@@ -105,28 +111,38 @@ export function ProductClient({ productos: inicial }: Props) {
     if (!result?.error) {
       setProductos((prev) =>
         prev.map((p) =>
-          p.eCodProduct === producto.eCodProduct ? { ...p, bStateProduct: !p.bStateProduct } : p
+          p.eCodProduct === producto.eCodProduct
+            ? { ...p, bStateProduct: !p.bStateProduct }
+            : p
         )
       );
+      const nuevoEstado = !producto.bStateProduct;
+      toast.success(`"${producto.tNameProduct}" ${nuevoEstado ? "activado" : "desactivado"}`);
+    } else {
+      toast.error(`No se pudo cambiar el estado: ${result.error}`);
     }
     setToggleando(null);
   }
 
-  async function handleEliminar(producto: Producto) {
-    const confirmar = window.confirm(
-      `¿Eliminar "${producto.tNameProduct}"? Esta acción no se puede deshacer.`
-    );
-    if (!confirmar) return;
-
-    setEliminando(producto.eCodProduct);
-    const result = await eliminarProducto(producto.eCodProduct);
-
-    if (!result?.error) {
-      setProductos((prev) => prev.filter((p) => p.eCodProduct !== producto.eCodProduct));
-    } else {
-      alert(`Error al eliminar producto: ${result.error}`);
-    }
+  function handleEliminar(producto: Producto) {
+  setProductoAEliminar(producto);
+}
+ 
+  async function confirmarEliminar() {
+    if (!productoAEliminar) return;
+    setEliminando(productoAEliminar.eCodProduct);
+    const result = await eliminarProducto(productoAEliminar.eCodProduct);
     setEliminando(null);
+    if (!result?.error) {
+      setProductos((prev) =>
+        prev.filter((p) => p.eCodProduct !== productoAEliminar.eCodProduct)
+      );
+      toast.success(`"${productoAEliminar.tNameProduct}" eliminado`);
+      setProductoAEliminar(null);
+    } else {
+      toast.error(result.error);
+      setProductoAEliminar(null);
+    }
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -216,8 +232,6 @@ export function ProductClient({ productos: inicial }: Props) {
 
   return (
     <div className="container">
-      <div className="header" />
-
       <PageHeader
         titulo="Productos"
         descripcion="Gestiona los productos"
@@ -270,6 +284,16 @@ export function ProductClient({ productos: inicial }: Props) {
           onEditado={handleProductoEditado}
         />
       )}
+
+      {productoAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="producto"
+          nombre={productoAEliminar.tNameProduct}
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setProductoAEliminar(null)}
+          cargando={eliminando === productoAEliminar.eCodProduct}
+        />
+      )}
     </div>
   );
 }
@@ -290,7 +314,7 @@ function ActionBtn({
       disabled={loading}
       className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""} ${loading ? styles.actionBtnLoading : ""}`}
     >
-      {loading ? "⏳" : children}
+      {loading ? "" : children}
     </button>
   );
 }

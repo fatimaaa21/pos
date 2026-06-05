@@ -11,9 +11,11 @@ import { ModalCrearUsuario } from "./ModalCrearUsuario";
 import { ModalVerUsuario } from "./ModalVerUsuario";
 import { ModalEditarUsuario } from "./ModalEditarUsuario";
 import { toggleEstadoUsuario, eliminarUsuario } from "@/lib/actions/usuarios";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import styles from "./usuarios.module.css";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { formatFechaHora } from "@/lib/utils/fecha";
+import { toast } from "react-hot-toast";
 
 
 interface Props {
@@ -30,6 +32,7 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   const [modalCrear, setModalCrear] = useState(false);
   const [usuarioVer, setUsuarioVer] = useState<Perfil | null>(null);
   const [usuarioEditar, setUsuarioEditar] = useState<Perfil | null>(null);
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState<Perfil | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
@@ -52,39 +55,56 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   });
 
   async function handleToggleEstado(usuario: Perfil) {
-    setToggleando(usuario.eCodUser);
-    const result = await toggleEstadoUsuario(usuario.eCodUser, !usuario.bStateUser);
-    if (!result?.error) {
-      setUsuarios((prev) =>
-        prev.map((u) =>
-          u.eCodUser === usuario.eCodUser ? { ...u, bStateUser: !u.bStateUser } : u
-        )
-      );
-    }
-    setToggleando(null);
+  setToggleando(usuario.eCodUser);
+  const result = await toggleEstadoUsuario(usuario.eCodUser, !usuario.bStateUser);
+  if (!result?.error) {
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.eCodUser === usuario.eCodUser ? { ...u, bStateUser: !u.bStateUser } : u
+      )
+    );
+    const nuevoEstado = !usuario.bStateUser;
+    toast.success(`${usuario.tNameUser} ${nuevoEstado ? "activado" : "desactivado"}`);
+  } else {
+    toast.error(`No se pudo cambiar el estado: ${result.error}`);
   }
+  setToggleando(null);
+}
 
-  async function handleEliminar(usuario: Perfil) {
-    if (!confirm(`¿Eliminar a ${usuario.tNameUser}? Esta acción no se puede deshacer.`)) return;
-    setEliminando(usuario.eCodUser);
-    const result = await eliminarUsuario(usuario.eCodUser);
-    if (!result?.error) {
-      setUsuarios((prev) => prev.filter((u) => u.eCodUser !== usuario.eCodUser));
-    }
-    setEliminando(null);
+  function handleEliminar(usuario: Perfil) {
+  setUsuarioAEliminar(usuario);
+}
+ 
+async function confirmarEliminar() {
+  if (!usuarioAEliminar) return;
+  setEliminando(usuarioAEliminar.eCodUser);
+  const result = await eliminarUsuario(usuarioAEliminar.eCodUser);
+  setEliminando(null);
+  if (!result?.error) {
+    setUsuarios((prev) =>
+      prev.filter((u) => u.eCodUser !== usuarioAEliminar.eCodUser)
+    );
+    toast.success(`${usuarioAEliminar.tNameUser} eliminado`);
+    setUsuarioAEliminar(null);
+  } else {
+    toast.error(result.error);
+    setUsuarioAEliminar(null);
   }
+}
 
   function handleUsuarioCreado(nuevo: Perfil) {
-    setUsuarios((prev) => [nuevo, ...prev]);
-    setModalCrear(false);
-  }
+  setUsuarios((prev) => [nuevo, ...prev]);
+  setModalCrear(false);
+  toast.success(`${nuevo.tNameUser} creado — código enviado por correo`);
+}
 
   function handleUsuarioEditado(actualizado: Perfil) {
-    setUsuarios((prev) =>
-      prev.map((u) => (u.eCodUser === actualizado.eCodUser ? actualizado : u))
-    );
-    setUsuarioEditar(null);
-  }
+  setUsuarios((prev) =>
+    prev.map((u) => (u.eCodUser === actualizado.eCodUser ? actualizado : u))
+  );
+  setUsuarioEditar(null);
+  toast.success(`${actualizado.tNameUser} actualizado`);
+}
 
   const columnas: ColumnaTabla<Perfil>[] = [
     {
@@ -160,10 +180,7 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
 
   return (
     <div className="container">
-
-      <div className="header" />
-
-      <PageHeader
+     <PageHeader
         titulo="Usuarios"
         descripcion="Gestiona el acceso de tu equipo"
         boton={{ label: "Nuevo usuario", onClick: () => setModalCrear(true) }}
@@ -212,6 +229,20 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
           usuario={usuarioEditar}
           onClose={() => setUsuarioEditar(null)}
           onEditado={handleUsuarioEditado}
+        />
+      )}
+      {usuarioAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="empleado"
+          nombre={usuarioAEliminar.tNameUser}
+          advertencia={
+            usuarioAEliminar.tRolUser === "admin"
+              ? "Este usuario tiene rol de administrador. Al eliminarlo perderá acceso inmediatamente."
+              : undefined
+          }
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setUsuarioAEliminar(null)}
+          cargando={eliminando === usuarioAEliminar.eCodUser}
         />
       )}
     </div>
