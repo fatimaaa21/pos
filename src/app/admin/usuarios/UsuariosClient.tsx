@@ -11,6 +11,7 @@ import { ModalCrearUsuario } from "./ModalCrearUsuario";
 import { ModalVerUsuario } from "./ModalVerUsuario";
 import { ModalEditarUsuario } from "./ModalEditarUsuario";
 import { toggleEstadoUsuario, eliminarUsuario } from "@/lib/actions/usuarios";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import styles from "./usuarios.module.css";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { formatFechaHora } from "@/lib/utils/fecha";
@@ -30,6 +31,7 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
   const [modalCrear, setModalCrear] = useState(false);
   const [usuarioVer, setUsuarioVer] = useState<Perfil | null>(null);
   const [usuarioEditar, setUsuarioEditar] = useState<Perfil | null>(null);
+  const [usuarioAEliminar, setUsuarioAEliminar] = useState<Perfil | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
@@ -64,15 +66,25 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
     setToggleando(null);
   }
 
-  async function handleEliminar(usuario: Perfil) {
-    if (!confirm(`¿Eliminar a ${usuario.tNameUser}? Esta acción no se puede deshacer.`)) return;
-    setEliminando(usuario.eCodUser);
-    const result = await eliminarUsuario(usuario.eCodUser);
-    if (!result?.error) {
-      setUsuarios((prev) => prev.filter((u) => u.eCodUser !== usuario.eCodUser));
-    }
-    setEliminando(null);
+  function handleEliminar(usuario: Perfil) {
+  setUsuarioAEliminar(usuario);
+}
+ 
+async function confirmarEliminar() {
+  if (!usuarioAEliminar) return;
+  setEliminando(usuarioAEliminar.eCodUser);
+  const result = await eliminarUsuario(usuarioAEliminar.eCodUser);
+  setEliminando(null);
+  if (!result?.error) {
+    setUsuarios((prev) =>
+      prev.filter((u) => u.eCodUser !== usuarioAEliminar.eCodUser)
+    );
+    setUsuarioAEliminar(null);
+  } else {
+    alert(`Error al eliminar: ${result.error}`);
+    setUsuarioAEliminar(null);
   }
+}
 
   function handleUsuarioCreado(nuevo: Perfil) {
     setUsuarios((prev) => [nuevo, ...prev]);
@@ -212,6 +224,20 @@ export function UsuariosClient({ usuarios: inicial }: Props) {
           usuario={usuarioEditar}
           onClose={() => setUsuarioEditar(null)}
           onEditado={handleUsuarioEditado}
+        />
+      )}
+      {usuarioAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="empleado"
+          nombre={usuarioAEliminar.tNameUser}
+          advertencia={
+            usuarioAEliminar.tRolUser === "admin"
+              ? "Este usuario tiene rol de administrador. Al eliminarlo perderá acceso inmediatamente."
+              : undefined
+          }
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setUsuarioAEliminar(null)}
+          cargando={eliminando === usuarioAEliminar.eCodUser}
         />
       )}
     </div>

@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ModalCrearProducto } from "./ModalCrearProducto";
 import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { StatCards } from "@/components/ui/Statscards";
 
 interface Props {
@@ -36,6 +37,7 @@ export function ProductClient({ productos: inicial }: Props) {
   const [toggleando, setToggleando] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [productoAEliminar, setProductoAEliminar] = useState<Producto | null>(null);
 
   useEffect(() => {
     async function cargarCategorias() {
@@ -112,23 +114,27 @@ export function ProductClient({ productos: inicial }: Props) {
     setToggleando(null);
   }
 
-  async function handleEliminar(producto: Producto) {
-    const confirmar = window.confirm(
-      `¿Eliminar "${producto.tNameProduct}"? Esta acción no se puede deshacer.`
+  function handleEliminar(producto: Producto) {
+  setProductoAEliminar(producto);
+}
+ 
+async function confirmarEliminar() {
+  if (!productoAEliminar) return;
+  setEliminando(productoAEliminar.eCodProduct);
+  const result = await eliminarProducto(productoAEliminar.eCodProduct);
+  setEliminando(null);
+  if (!result?.error) {
+    setProductos((prev) =>
+      prev.filter((p) => p.eCodProduct !== productoAEliminar.eCodProduct)
     );
-    if (!confirmar) return;
-
-    setEliminando(producto.eCodProduct);
-    const result = await eliminarProducto(producto.eCodProduct);
-
-    if (!result?.error) {
-      setProductos((prev) => prev.filter((p) => p.eCodProduct !== producto.eCodProduct));
-    } else {
-      alert(`Error al eliminar producto: ${result.error}`);
-    }
-    setEliminando(null);
+    setProductoAEliminar(null);
+  } else {
+    // El error se mostrará dentro del mismo modal vía el prop error del Modal.
+    // Si prefieres, puedes agregar un estado de error local aquí.
+    alert(`Error al eliminar: ${result.error}`);
+    setProductoAEliminar(null);
   }
-
+}
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivos = productos.filter((p) => p.bStateProduct).length;
 
@@ -270,6 +276,16 @@ export function ProductClient({ productos: inicial }: Props) {
           onEditado={handleProductoEditado}
         />
       )}
+
+      {productoAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="producto"
+          nombre={productoAEliminar.tNameProduct}
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setProductoAEliminar(null)}
+          cargando={eliminando === productoAEliminar.eCodProduct}
+        />
+      )}
     </div>
   );
 }
@@ -290,7 +306,7 @@ function ActionBtn({
       disabled={loading}
       className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""} ${loading ? styles.actionBtnLoading : ""}`}
     >
-      {loading ? "⏳" : children}
+      {loading ? "" : children}
     </button>
   );
 }

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/Badge";
 import { ModalAgregarStock } from "./ModalAgregarStock";
 import { ModalVerStock } from "./ModalVerStock";
 import { ModalEditarStock } from "./ModalEditarStock";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { eliminarInventario, toggleEstadoInventario } from "@/lib/actions/inventario";
 import { getEstadoStock } from "@/types";
 import styles from "./inventario.module.css";
@@ -49,6 +50,7 @@ export function InventarioClient({ inventario: inicial }: Props) {
   const [stockVer,     setStockVer]     = useState<InventarioConProducto | null>(null);
   const [stockEditar,  setStockEditar]  = useState<InventarioConProducto | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
+  const [loteAEliminar, setLoteAEliminar] = useState<InventarioConProducto | null>(null);
   const [eliminando,  setEliminando]    = useState<string | null>(null);
   const [toggleando,  setToggleando]    = useState<string | null>(null);
 
@@ -107,14 +109,33 @@ export function InventarioClient({ inventario: inicial }: Props) {
     router.refresh();
   }
 
-  async function handleEliminar(item: InventarioConProducto) {
-    if (!confirm("¿Eliminar este registro de inventario? Esta acción no se puede deshacer.")) return;
-    setEliminando(item.eCodInventory);
-    const result = await eliminarInventario(item.eCodInventory);
-    if (!result?.error) {
-      setInventario((prev) => prev.filter((i) => i.eCodInventory !== item.eCodInventory));
-    }
+  function handleEliminar(lote: InventarioConProducto) {
+    setLoteAEliminar(lote);
+  }
+  
+  async function confirmarEliminar() {
+    if (!loteAEliminar) return;
+    setEliminando(loteAEliminar.eCodInventory);
+  
+    // Ajusta al nombre real de tu server action de inventario:
+    const result = await eliminarInventario(loteAEliminar.eCodInventory);
+  
     setEliminando(null);
+    if (!result?.error) {
+      setInventario((prev) =>
+        prev.filter((i) => i.eCodInventory !== loteAEliminar.eCodInventory)
+      );
+      setLoteAEliminar(null);
+    } else {
+      alert(`Error al eliminar: ${result.error}`);
+      setLoteAEliminar(null);
+    }
+  }
+
+  function getNombreLote(lote: InventarioConProducto): string {
+    const base = lote.productos?.tNameProduct ?? "Lote";
+    const pres = lote.presentaciones?.tNombre;
+    return pres ? `${base} – ${pres}` : base;
   }
 
   async function handleToggle(item: InventarioConProducto) {
@@ -335,6 +356,15 @@ export function InventarioClient({ inventario: inicial }: Props) {
           onEditado={handleStockEditado}
         />
       )}
+      {loteAEliminar && (
+      <ToastConfirmarEliminar
+        tipo="lote de inventario"
+        nombre={getNombreLote(loteAEliminar)}
+        onConfirmar={confirmarEliminar}
+        onCancelar={() => setLoteAEliminar(null)}
+        cargando={eliminando === loteAEliminar.eCodInventory}
+      />
+    )}
     </div>
   );
 }

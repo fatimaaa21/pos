@@ -14,6 +14,7 @@ import { toggleEstadoCategoria, eliminarCategoria } from "@/lib/actions/categori
 import { ModalCrearCategoria } from "./ModalCrearCategoria";
 import { ModalVerCategoria } from "./ModalVerCategoria";
 import { ModalEditarCategoria } from "./ModalEditarCategoria";
+import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { IconoCategoria } from "@/components/ui/IconoCategoria";
 
 interface Props {
@@ -95,6 +96,7 @@ export function CatalogoClient({ categorias: inicial }: Props) {
 
   // Acciones en curso
   const [toggleando,    setToggleando]   = useState<string | null>(null);
+  const [categoriaAEliminar, setCategoriaAEliminar] = useState<Categoria | null>(null);
   const [eliminando,    setEliminando]   = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
 
@@ -158,23 +160,25 @@ export function CatalogoClient({ categorias: inicial }: Props) {
     setToggleando(null);
   }
 
-  async function handleEliminar(categoria: Categoria) {
-    const confirmar = window.confirm(
-      `¿Eliminar "${categoria.tNameCategory}"? Esta acción no se puede deshacer.`
-    );
-    if (!confirmar) return;
-
-    setEliminando(categoria.eCodCategory);
-    const result = await eliminarCategoria(categoria.eCodCategory);
-
+  function handleEliminar(categoria: Categoria) {
+    setCategoriaAEliminar(categoria);
+  }
+  
+  async function confirmarEliminar() {
+    if (!categoriaAEliminar) return;
+    setEliminando(categoriaAEliminar.eCodCategory);
+    const result = await eliminarCategoria(categoriaAEliminar.eCodCategory);
+    setEliminando(null);
     if (!result?.error) {
       setCategorias((prev) =>
-        prev.filter((c) => c.eCodCategory !== categoria.eCodCategory)
+        prev.filter((c) => c.eCodCategory !== categoriaAEliminar.eCodCategory)
       );
+      setCategoriaAEliminar(null);
     } else {
-      alert(`Error al eliminar categoría: ${result.error}`);
+      // eliminarCategoria ya devuelve un mensaje útil si tiene productos asociados
+      alert(result.error);
+      setCategoriaAEliminar(null);
     }
-    setEliminando(null);
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -332,6 +336,20 @@ export function CatalogoClient({ categorias: inicial }: Props) {
           categoria={categoriaEditar}
           onClose={() => setCategoriaEditar(null)}
           onEditado={handleCategoriaEditada}
+        />
+      )}
+      {categoriaAEliminar && (
+        <ToastConfirmarEliminar
+          tipo="categoría"
+          nombre={categoriaAEliminar.tNameCategory}
+          advertencia={
+            (categoriaAEliminar.productos?.length ?? 0) > 0
+              ? `Tiene ${categoriaAEliminar.productos!.length} producto(s) asociado(s). Debes reasignarlos o desactivarlos antes de eliminar.`
+              : undefined
+          }
+          onConfirmar={confirmarEliminar}
+          onCancelar={() => setCategoriaAEliminar(null)}
+          cargando={eliminando === categoriaAEliminar.eCodCategory}
         />
       )}
     </div>

@@ -82,16 +82,18 @@
 }
 
 .avatarEmpleado {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-primary-50);
+  width: 32px;
+  height: 32px;
+  background-color: var(--color-primary-50);
   color: var(--color-primary-dark);
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-family: var(--font-family);
+  font-size: 13px;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 /* ── Detalle modal ── */
