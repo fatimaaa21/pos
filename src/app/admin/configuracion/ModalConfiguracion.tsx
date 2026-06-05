@@ -7,6 +7,7 @@ import { guardarConfigNegocio, type ConfigNegocio } from "@/lib/actions/configur
 import { guardarMetodosNegocio, type MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 import styles from "./ModalConfiguracion.module.css";
+import { Spinner } from "@/components/ui/Spinner/Spinner";
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 
@@ -108,17 +109,17 @@ export function ModalConfiguracion({
   const [error,    setError]    = useState<string | null>(null);
   const [guardado, setGuardado] = useState(false);
 
-  // ── Estado tab General ────────────────────────────────────────────────────
-  const [form, setForm] = useState({
+  const [savedForm, setSavedForm] = useState({
     tNameCompany: config.tNameCompany,
     imgCompany:   config.imgCompany ?? "",
     moneda:       config.moneda      ?? "MXN",
     zona_horaria: config.zona_horaria ?? "America/Mexico_City",
     aplicarIva:   config.aplicarIva  ?? true,
   });
+  const [form, setForm] = useState(savedForm);
 
-  // ── Estado tab Métodos de pago ────────────────────────────────────────────
-  const [metodosPago, setMetodosPago] = useState<string[]>(activados ?? []);
+  const [savedMetodos, setSavedMetodos] = useState<string[]>(activados ?? []);
+  const [metodosPago, setMetodosPago]   = useState<string[]>(activados ?? []);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -168,22 +169,23 @@ export function ModalConfiguracion({
     if (err) { setError(err); return; }
 
     setGuardado(true);
+    setSavedForm(form);
+    setSavedMetodos(metodosPago);
     setTimeout(() => setGuardado(false), 2000);
     onGuardado?.();
   }
 
   // ── Detectar cambios ──────────────────────────────────────────────────────
   const hayChangesGeneral =
-    form.tNameCompany !== config.tNameCompany        ||
-    form.imgCompany   !== (config.imgCompany ?? "")  ||
-    form.moneda       !== (config.moneda ?? "MXN")   ||
-    form.zona_horaria !== (config.zona_horaria ?? "America/Mexico_City") ||
-    form.aplicarIva   !== (config.aplicarIva ?? true);
+    form.tNameCompany !== savedForm.tNameCompany ||
+    form.imgCompany   !== savedForm.imgCompany   ||
+    form.moneda       !== savedForm.moneda        ||
+    form.zona_horaria !== savedForm.zona_horaria  ||
+    form.aplicarIva   !== savedForm.aplicarIva;
 
-  const activadosBase = activados ?? [];
   const hayChangesPagos =
     JSON.stringify([...metodosPago].sort()) !==
-    JSON.stringify([...activadosBase].sort());
+    JSON.stringify([...savedMetodos].sort());
 
   const hayChanges = hayChangesGeneral || hayChangesPagos;
 
@@ -407,9 +409,10 @@ export function ModalConfiguracion({
             onClick={handleGuardar}
             disabled={loading || !hayChanges || !form.tNameCompany.trim()}
           >
-            {loading  ? "Guardando..." :
-             guardado ? "✓ Guardado"   :
-             "Guardar cambios"}
+            {loading  ? <Spinner /> :
+              guardado ? "Guardado"   :
+              "Guardar cambios"
+              }
           </button>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { Asterisk, ChevronDown, X } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner/Spinner";
 import styles from "./Modal.module.css";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -125,7 +126,7 @@ export function Modal({
                 onClick={onConfirmar}
                 disabled={cargando || deshabilitado}
               >
-                {cargando ? "Cargando..." : labelConfirmar}
+                {cargando ? <Spinner /> : labelConfirmar}
               </button>
             )}
           </div>
