@@ -31,7 +31,7 @@ export default async function VentasAdminPage() {
   // ── Ventas ────────────────────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser, bCancelada, tMotivoCancelacion, fhCancelacion")
     .eq("fkeCodCompany", fkeCodCompany)
     .order("fhCreateVenta", { ascending: false });
 

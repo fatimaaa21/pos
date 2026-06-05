@@ -205,3 +205,23 @@
   font-weight: 800;
   color: var(--dark);
 }
+
+/* Badge "Cancelada" en la tabla */
+.badgeCancelada {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border: 1px solid var(--color-error-border);
+  white-space: nowrap;
+}
+
+/* Botón de cancelar en la tabla */
+.actionBtnDanger {
+  color: var(--color-error);
+}
