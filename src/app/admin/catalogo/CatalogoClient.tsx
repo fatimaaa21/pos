@@ -348,11 +348,6 @@ export function CatalogoClient({ categorias: inicial }: Props) {
         <ToastConfirmarEliminar
           tipo="categoría"
           nombre={categoriaAEliminar.tNameCategory}
-          advertencia={
-            (categoriaAEliminar.productos?.length ?? 0) > 0
-              ? `Tiene ${categoriaAEliminar.productos!.length} producto(s) asociado(s). Debes reasignarlos o desactivarlos antes de eliminar.`
-              : undefined
-          }
           onConfirmar={confirmarEliminar}
           onCancelar={() => setCategoriaAEliminar(null)}
           cargando={eliminando === categoriaAEliminar.eCodCategory}
