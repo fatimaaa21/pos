@@ -38,9 +38,10 @@ export interface InventarioConProducto extends Inventario {
 
 interface Props {
   inventario: InventarioConProducto[];
+  tipoNegocio: "general" | "impresion"
 }
 
-export function InventarioClient({ inventario: inicial }: Props) {
+export function InventarioClient({ inventario: inicial, tipoNegocio }: Props) {
   const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
   const [busqueda, setBusqueda]     = useState("");
   const router                      = useRouter();

@@ -53,6 +53,7 @@ export default async function SistemasNegociosPage() {
   imgCompany:      n.imgCompany,
   moneda:          n.moneda,
   zona_horaria:    n.zona_horaria,
+  tipo_negocio:    n.tipo_negocio ?? "general",
   bStateCompany:   n.bStateCompany,
   fhCreateCompany: n.fhCreateCompany,
   admin:           adminsPorNegocio[n.eCodCompany] ?? null,

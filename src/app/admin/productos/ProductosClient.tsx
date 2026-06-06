@@ -20,9 +20,10 @@ import toast from "react-hot-toast";
 
 interface Props {
   productos: Producto[];
+  tipoNegocio: "general" | "impresion";
 }
 
-export function ProductClient({ productos: inicial }: Props) {
+export function ProductClient({ productos: inicial, tipoNegocio }: Props) {
   const [productos, setProductos] = useState<Producto[]>(inicial);
   const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
   const [categorias, setCategorias] = useState<Categoria[]>([]);

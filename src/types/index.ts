@@ -188,3 +188,18 @@ export interface CorteCaja {
   fhCreateCorte:         string;
   fhUpdateCorte:         string;
 }
+
+// ── Materiales (negocios tipo impresion) ──────────────────────────────────────
+
+export interface Material {
+  eCodMaterial:    string;
+  fkeCodCompany:   string;
+  tNombre:         string;
+  tipo_material:   "rollo" | "hoja";
+  eAnchoCm:        number | null;
+  eMetrosLineales: number;
+  eStockMinimo:     number;
+  bStateMaterial:   boolean;
+  fhCreateMaterial: string;
+  fhUpdateMaterial?: string;
+}
