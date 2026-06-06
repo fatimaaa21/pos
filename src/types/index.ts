@@ -42,14 +42,16 @@ export interface ProductoResumen {
 }
 
 export interface Producto {
-  fkeCodCompany: string;
-  eCodProduct: string;
-  tNameProduct: string;
+  fkeCodCompany:  string;
+  eCodProduct:    string;
+  tNameProduct:   string;
   fkeCodCategory?: string;
-  ePriceProduct: number;
-  eCostProduct: number;
-  ImgProduct?: string;
+  ePriceProduct:  number;
+  eCostProduct:   number;
+  ImgProduct?:    string;
   bStateProduct?: boolean;
+  tipo_producto:  "unidad" | "medida";
+  ePrecioM2?:     number | null;
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
 }

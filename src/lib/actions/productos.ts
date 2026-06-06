@@ -38,6 +38,8 @@ export async function crearProducto(formData: FormData) {
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
+        tipo_producto: (formData.get("tipo_producto") as string) || "unidad",
+        ePrecioM2:     formData.get("ePrecioM2") ? parseFloat(formData.get("ePrecioM2") as string) : null,
         bStateProduct:   true,
         fhCreateProduct: new Date().toISOString(),
       })
@@ -76,6 +78,8 @@ export async function editarProducto(formData: FormData) {
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
+        tipo_producto: (formData.get("tipo_producto") as string) || "unidad",
+        ePrecioM2:     formData.get("ePrecioM2") ? parseFloat(formData.get("ePrecioM2") as string) : null,
         fhUpdateProduct: new Date().toISOString(),
       })
       .eq("eCodProduct", eCodProduct)

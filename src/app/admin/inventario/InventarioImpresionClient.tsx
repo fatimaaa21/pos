@@ -181,7 +181,7 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
   return (
     <div className="container">
       <PageHeader
-        titulo="Materiales"
+        titulo="Inventario"
         descripcion="Control de insumos para trabajos por medida o unidad"
         boton={{ label: "Agregar material", onClick: () => setModalCrear(true) }}
       />

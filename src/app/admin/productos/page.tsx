@@ -1,7 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ProductClient } from "./ProductosClient";
-import type { Producto } from "@/types";
+import { ProductClient }             from "./ProductosClient";
+import { ProductosImpresionClient }  from "./ProductosImpresionClient";
+import type { Producto, Categoria } from "@/types";
 
 export default async function ProductsPage() {
   const supabase    = await createClient();
@@ -17,7 +18,6 @@ export default async function ProductsPage() {
 
   const fkeCodCompany = perfilActual?.fkeCodCompany;
 
-  // Leer tipo_negocio del negocio actual
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("tipo_negocio")
@@ -34,10 +34,32 @@ export default async function ProductsPage() {
 
   if (error) console.error("Error cargando productos:", error);
 
+  // Categorías filtradas por negocio — server side garantiza aislamiento
+  const { data: categorias } = await supabase
+    .from("categorias")
+    .select("eCodCategory, tNameCategory")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bStateCategory", true)
+    .order("tNameCategory");
+
+  const lista       = (productos  as Producto[])  ?? [];
+  const listaCats   = (categorias as Categoria[]) ?? [];
+
+  if (tipoNegocio === "impresion") {
+    return (
+      <ProductosImpresionClient
+        productos={lista}
+        categorias={listaCats}
+        tipoNegocio={tipoNegocio}
+      />
+    );
+  }
+
   return (
-    <ProductClient
-      productos={(productos as Producto[]) ?? []}
-      tipoNegocio={tipoNegocio}
-    />
-  );
+  <ProductClient
+    productos={lista}
+    categorias={listaCats}
+    tipoNegocio={tipoNegocio}
+  />
+);
 }
