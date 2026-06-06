@@ -236,8 +236,6 @@ export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }
 
   return (
     <div className="container">
-      <div className="header" />
-
       <PageHeader
         titulo="Ventas"
         descripcion="Historial de ventas del negocio"

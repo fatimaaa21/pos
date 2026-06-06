@@ -1,6 +1,4 @@
 "use server";
-// src/lib/actions/ventas.ts
-// Reemplaza todo el archivo con esta versión.
 
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";

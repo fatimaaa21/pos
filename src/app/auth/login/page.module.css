@@ -101,9 +101,8 @@
 
 /* Loading */
 .loading {
-  font-family: var(--font-family);
-  color: var(--color-primary);
-  font-size: 16px;
-  font-weight: 800;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 16px;
 }
