@@ -218,7 +218,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }
             onClick={() => setVentaVer(v)}
             title="Ver detalle"
           >
-            <Eye size={16} />
+            <Eye size={18} />
           </button>
           {!v.bCancelada && (
             <button
@@ -226,7 +226,7 @@ export function VentasAdminClient({ ventas, empleados, metodosPago, aplicarIva }
               onClick={() => setVentaCancelar(v)}
               title="Cancelar venta"
             >
-              <XCircle size={16} />
+              <XCircle size={18} />
             </button>
           )}
         </div>
