@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { login } from "@/lib/actions/auth";
 import styles from "./page.module.css";
 import modal from "@/components/ui/Modal.module.css";
+import { Spinner } from "@/components/ui/Spinner/Spinner";
 
 export default function LoginPage() {
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
@@ -144,7 +145,7 @@ export default function LoginPage() {
           {/* Loading */}
           {loading && (
             <p className={styles.loading}>
-              Verificando...
+              <Spinner size={24}/>
             </p>
           )}
         </div>

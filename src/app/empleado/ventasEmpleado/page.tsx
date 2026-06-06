@@ -13,7 +13,7 @@ export default async function VentasEmpleadoPage() {
   // ── Ventas del empleado ───────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, bCancelada, tMotivoCancelacion")
     .eq("fkeCodUser", user.id)
     .order("fhCreateVenta", { ascending: false });
 
@@ -101,11 +101,19 @@ export default async function VentasEmpleadoPage() {
     .filter((v) => new Date(v.fhCreateVenta) >= inicioDiaLocal)
     .reduce((acc, v) => acc + v.eTotal, 0);
 
+    const { data: corteAbierto } = await adminClient
+     .from("cortes_caja")
+     .select("fhInicioTurno")
+     .eq("fkeCodUser", user.id)
+     .eq("bStateCorte", "abierto")
+     .maybeSingle();
+
   return (
     <VentasEmpleadoClient
       ventas={ventasCompletas}
       totalHoy={totalHoy}
       metodosPago={metodosPago}
+      turnoInicioTurno={corteAbierto?.fhInicioTurno ?? null}
     />
   );
 }

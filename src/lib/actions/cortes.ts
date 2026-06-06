@@ -99,6 +99,7 @@ export async function cerrarTurno(formData: FormData) {
       .from("ventas")
       .select("eTotal, fkeMetodoPago")
       .eq("fkeCodUser", user.id)
+      .eq("bCancelada", false) 
       .gte("fhCreateVenta", corte.fhInicioTurno);
 
     if (ventasError) {

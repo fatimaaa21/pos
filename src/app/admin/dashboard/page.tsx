@@ -61,6 +61,7 @@ export default async function DashboardPage() {
       .from("ventas")
       .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser")
       .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bCancelada", false)
       .gte("fhCreateVenta", inicioDia),
 
     // Ventas de ayer (para comparación de tendencia)
@@ -68,6 +69,7 @@ export default async function DashboardPage() {
       .from("ventas")
       .select("eTotal, fkeMetodoPago")
       .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bCancelada", false)
       .gte("fhCreateVenta", inicioAyer)
       .lt("fhCreateVenta", inicioDia),
 
@@ -76,6 +78,7 @@ export default async function DashboardPage() {
       .from("ventas")
       .select("eTotal, fhCreateVenta")
       .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bCancelada", false)
       .gte("fhCreateVenta", hace6D)
       .order("fhCreateVenta", { ascending: true }),
 

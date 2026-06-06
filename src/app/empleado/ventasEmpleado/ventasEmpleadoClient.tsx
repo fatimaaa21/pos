@@ -1,28 +1,35 @@
 "use client";
+// src/app/empleado/ventasEmpleado/ventasEmpleadoClient.tsx
 
-import { useState, useMemo } from "react";
-import { ShoppingBag, TrendingUp } from "lucide-react";
-import { StatCards }    from "@/components/ui/Statscards";
+import { useState, useMemo }   from "react";
+import { ShoppingBag, TrendingUp, XCircle } from "lucide-react";
+import { StatCards }           from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
-import { formatFechaHora } from "@/lib/utils/fecha";
+import { ModalCancelarVenta }  from "@/components/ui/ModalCancelarVenta/ModalCancelarVenta";
+import { cancelarVenta }       from "@/lib/actions/ventas";
+import { formatFechaHora }     from "@/lib/utils/fecha";
 import type { DetalleVentaConProducto } from "@/types";
-import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import type { MetodoPagoGlobal }        from "@/lib/actions/metodos-pago";
 import styles from "./ventasEmpleado.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
 interface Venta {
-  eCodVenta:     string;
-  eTotal:        number;
-  fkeMetodoPago: string;
-  fhCreateVenta: string;
-  detalle_venta: DetalleVentaConProducto[];
+  eCodVenta:            string;
+  eTotal:               number;
+  fkeMetodoPago:        string;
+  fhCreateVenta:        string;
+  bCancelada?:          boolean;
+  tMotivoCancelacion?:  string | null;
+  detalle_venta:        DetalleVentaConProducto[];
 }
 
 interface Props {
-  ventas:      Venta[];
-  totalHoy:    number;
-  metodosPago: MetodoPagoGlobal[];
+  ventas:              Venta[];
+  totalHoy:            number;
+  metodosPago:         MetodoPagoGlobal[];
+  /** ISO string del inicio del turno activo, o null si no hay turno */
+  turnoInicioTurno:    string | null;
 }
 
 // ── Paleta de colores para badges ─────────────────────────────────────────────
@@ -70,12 +77,17 @@ function estaEnPeriodo(fechaISO: string, periodo: FiltroPeriodo): boolean {
 
 // ── Componente ────────────────────────────────────────────────────────────────
 
-export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
-  const [busqueda, setBusqueda] = useState("");
-  const [filtros, setFiltros]   = useState<FiltrosUsuario>({
+export function VentasEmpleadoClient({
+  ventas,
+  totalHoy,
+  metodosPago,
+  turnoInicioTurno,
+}: Props) {
+  const [filtros, setFiltros]             = useState<FiltrosUsuario>({
     busqueda: "", roles: [], estados: [], periodo: "hoy", metodo: "todos", empleado: "todos",
   });
   const [ventaExpandida, setVentaExpandida] = useState<string | null>(null);
+  const [ventaCancelar,  setVentaCancelar]  = useState<Venta | null>(null);
 
   const opcionesMetodo = useMemo(() => [
     { value: "todos", label: "Todos" },
@@ -97,10 +109,29 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
     return coincidePeriodo && coincideMetodo && coincideBusqueda;
   }), [ventas, filtros]);
 
-  const totalFiltrado = ventasFiltradas.reduce((acc, v) => acc + v.eTotal, 0);
-  const totalPiezas   = ventasFiltradas.reduce(
+  // Stats excluyen canceladas
+  const ventasActivas = ventasFiltradas.filter((v) => !v.bCancelada);
+  const totalFiltrado = ventasActivas.reduce((acc, v) => acc + v.eTotal, 0);
+  const totalPiezas   = ventasActivas.reduce(
     (acc, v) => acc + v.detalle_venta.reduce((s, d) => s + d.eCantidad, 0), 0
   );
+
+  // ── Cancelar ──────────────────────────────────────────────────────────────
+  function esCancelable(venta: Venta): boolean {
+    if (venta.bCancelada) return false;
+    if (!turnoInicioTurno) return false;
+    return new Date(venta.fhCreateVenta) >= new Date(turnoInicioTurno);
+  }
+
+  async function handleCancelar(motivo: string) {
+    if (!ventaCancelar) return;
+    const fd = new FormData();
+    fd.append("eCodVenta",          ventaCancelar.eCodVenta);
+    fd.append("tMotivoCancelacion", motivo);
+    const result = await cancelarVenta(fd);
+    if (!result.error) setVentaCancelar(null);
+    return result;
+  }
 
   return (
     <div className={styles.layout}>
@@ -120,18 +151,16 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
         </div>
       </div>
 
-      {/* Stats */}
       <StatCards stats={[
-        { label: "Ventas en periodo", value: ventasFiltradas.length, variante: "primary" },
-        { label: "Piezas vendidas",   value: totalPiezas,            variante: "success" },
+        { label: "Ventas en periodo", value: ventasActivas.length, variante: "primary" },
+        { label: "Piezas vendidas",   value: totalPiezas,          variante: "success" },
         {
-          label: "Total periodo",
-          value: totalFiltrado.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }),
+          label:    "Total periodo",
+          value:    totalFiltrado.toLocaleString("es-MX", { style: "currency", currency: "MXN", minimumFractionDigits: 0 }),
           variante: "accent",
         },
       ]} />
 
-      {/* Toolbar */}
       <TablaToolbar
         filtros={filtros}
         onChange={setFiltros}
@@ -154,62 +183,120 @@ export function VentasEmpleadoClient({ ventas, totalHoy, metodosPago }: Props) {
             const folio              = venta.eCodVenta.slice(-8).toUpperCase();
             const expandida          = ventaExpandida === venta.eCodVenta;
             const { nombre, estilo } = resolverMetodo(venta.fkeMetodoPago, metodosPago);
+            const cancelable         = esCancelable(venta);
 
             return (
               <div
                 key={venta.eCodVenta}
-                className={`${styles.card} ${expandida ? styles.cardExpandida : ""}`}
-                onClick={() => setVentaExpandida(expandida ? null : venta.eCodVenta)}
+                className={`${styles.card} ${expandida ? styles.cardExpandida : ""} ${venta.bCancelada ? styles.cardCancelada : ""}`}
+                onClick={() => !venta.bCancelada && setVentaExpandida(expandida ? null : venta.eCodVenta)}
               >
                 <div className={styles.cardHeader}>
-                  <span className={styles.cardFolio}>Venta #{folio}</span>
-                  <span
-                    className={styles.cardMetodo}
-                    style={{ background: estilo.bg, color: estilo.color, border: `1px solid ${estilo.border}` }}
-                  >
-                    {nombre}
+                  <span className={styles.cardFolio}>
+                    Venta #{folio}
                   </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    {venta.bCancelada ? (
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        padding: "3px 8px", borderRadius: "var(--radius-full)",
+                        background: "var(--color-error-bg)", color: "var(--color-error)",
+                        border: "1px solid var(--color-error-border)",
+                        fontSize: 10, fontWeight: 700,
+                      }}>
+                        <XCircle size={10} />
+                        Cancelada
+                      </span>
+                    ) : (
+                      <span
+                        className={styles.cardMetodo}
+                        style={{ background: estilo.bg, color: estilo.color, border: `1px solid ${estilo.border}` }}
+                      >
+                        {nombre}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className={styles.cardFecha}>{formatFechaHora(venta.fhCreateVenta)}</div>
 
-                <div className={styles.cardDetalle}>
-                  <div className={styles.cardDetalleHeader}>
-                    <span>Pzas</span>
-                    <span>Producto</span>
-                    <span>Precio</span>
+                {/* Motivo de cancelación */}
+                {venta.bCancelada && venta.tMotivoCancelacion && (
+                  <div style={{
+                    fontSize: 11, color: "var(--color-error)",
+                    fontStyle: "italic", padding: "var(--space-1) 0",
+                    borderTop: "1px solid var(--color-error-border)",
+                  }}>
+                    Motivo: {venta.tMotivoCancelacion}
                   </div>
+                )}
 
-                  {(expandida ? venta.detalle_venta : venta.detalle_venta.slice(0, 4)).map((d) => (
-                    <div key={d.eCodDetalle} className={styles.cardDetalleRow}>
-                      <span className={styles.cantidad}>{d.eCantidad}</span>
-                      <span className={styles.nombre}>
-                        {d.producto?.tNameProduct ?? "—"}
-                        {d.presentacion?.tNombre && (
-                          <span>
-                            {" " + d.presentacion.tNombre}
-                          </span>
-                        )}
-                      </span>
-                      <span className={styles.precio}>${d.ePrecioUnitario.toFixed(2)}</span>
+                {!venta.bCancelada && (
+                  <div className={styles.cardDetalle}>
+                    <div className={styles.cardDetalleHeader}>
+                      <span>Pzas</span>
+                      <span>Producto</span>
+                      <span>Precio</span>
                     </div>
-                  ))}
 
-                  {!expandida && venta.detalle_venta.length > 4 && (
-                    <div className={styles.masProductos}>
-                      +{venta.detalle_venta.length - 4} más...
-                    </div>
-                  )}
-                </div>
+                    {(expandida ? venta.detalle_venta : venta.detalle_venta.slice(0, 4)).map((d) => (
+                      <div key={d.eCodDetalle} className={styles.cardDetalleRow}>
+                        <span className={styles.cantidad}>{d.eCantidad}</span>
+                        <span className={styles.nombre}>
+                          {d.producto?.tNameProduct ?? "—"}
+                          {d.presentacion?.tNombre && (
+                            <span>{" " + d.presentacion.tNombre}</span>
+                          )}
+                        </span>
+                        <span className={styles.precio}>${d.ePrecioUnitario.toFixed(2)}</span>
+                      </div>
+                    ))}
+
+                    {!expandida && venta.detalle_venta.length > 4 && (
+                      <div className={styles.masProductos}>
+                        +{venta.detalle_venta.length - 4} más...
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className={styles.cardTotal}>
                   <span className={styles.cardTotalLabel}>Monto Total</span>
-                  <span className={styles.cardTotalValor}>${venta.eTotal.toFixed(2)}</span>
+                  <span
+                    className={styles.cardTotalValor}
+                    style={{
+                      textDecoration: venta.bCancelada ? "line-through" : "none",
+                      color:          venta.bCancelada ? "var(--color-error)" : "inherit",
+                    }}
+                  >
+                    ${venta.eTotal.toFixed(2)}
+                  </span>
                 </div>
+
+                {/* Botón cancelar — solo ventas del turno activo */}
+                {cancelable && (
+                  <button
+                    className={styles.btnCancelarVenta}
+                    onClick={(e) => { e.stopPropagation(); setVentaCancelar(venta); }}
+                    title="Cancelar esta venta"
+                  >
+                    <XCircle size={13} />
+                    Cancelar venta
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
+      )}
+
+      {ventaCancelar && (
+        <ModalCancelarVenta
+          folio={ventaCancelar.eCodVenta.slice(-8).toUpperCase()}
+          total={ventaCancelar.eTotal}
+          onConfirmar={handleCancelar}
+          onCerrar={() => setVentaCancelar(null)}
+        />
       )}
     </div>
   );
