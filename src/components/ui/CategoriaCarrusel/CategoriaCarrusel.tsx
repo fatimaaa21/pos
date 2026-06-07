@@ -36,6 +36,7 @@ const TODOS: Categoria = {
   eCodCategory: "todas",
   tNameCategory: "Todos",
   bStateCategory: true,
+  fkeCodCompany: "",
 };
 
 export function CategoriaCarrusel({
