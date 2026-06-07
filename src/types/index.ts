@@ -42,14 +42,16 @@ export interface ProductoResumen {
 }
 
 export interface Producto {
-  fkeCodCompany: string;
-  eCodProduct: string;
-  tNameProduct: string;
+  fkeCodCompany:  string;
+  eCodProduct:    string;
+  tNameProduct:   string;
   fkeCodCategory?: string;
-  ePriceProduct: number;
-  eCostProduct: number;
-  ImgProduct?: string;
+  ePriceProduct:  number;
+  eCostProduct:   number;
+  ImgProduct?:    string;
   bStateProduct?: boolean;
+  tipo_producto:  "unidad" | "medida";
+  ePrecioM2?:     number | null;
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
 }
@@ -113,6 +115,8 @@ export interface ProductoConStock {
   stockDisponible:  number;
   bInfinito?:       boolean;
   presentaciones?:  PresentacionConStock[];
+  tipo_producto?:   "unidad" | "medida";   // ← NUEVA
+  ePrecioM2?:       number | null;
 }
 
 // Carrito empleado
@@ -122,9 +126,18 @@ export interface ProductoConStock {
  * pueda importarlo sin depender de MenuClient.
  */
 export interface ItemCarritoMenu {
-  producto:      ProductoConStock;
-  cantidad:      number;
-  presentacion?: PresentacionConStock;
+  key?:            string;
+  producto:        ProductoConStock;
+  cantidad:        number;
+  presentacion?:   PresentacionConStock;
+  // Campos para productos por medida
+  tipo_producto?:  "unidad" | "medida";
+  anchoCm?:        number;
+  largoCm?:        number;
+  materialNombre?: string;
+  eCodMaterial?:   string;
+  metrosConsumidos?: number;
+  precioCalculado?:  number;
 }
 
 declare const __metodoPagoBrand: unique symbol;
@@ -150,6 +163,9 @@ export interface DetalleVenta {
   eCantidad: number;
   ePrecioUnitario: number;
   eSubtotal: number;
+  eAnchoCm?:          number | null;
+  eLargoCm?:          number | null;
+  fkeCodMaterial?:    string | null;
 }
 
 export interface DetalleVentaConProducto extends DetalleVenta {
@@ -187,4 +203,37 @@ export interface CorteCaja {
   fhCierreTurno?:        string | null;
   fhCreateCorte:         string;
   fhUpdateCorte:         string;
+}
+
+// ── Materiales (negocios tipo impresion) ──────────────────────────────────────
+
+export interface Material {
+  eCodMaterial:    string;
+  fkeCodCompany:   string;
+  tNombre:         string;
+  tipo_material:   "rollo" | "hoja";
+  eAnchoCm:        number | null;
+  eMetrosLineales: number;
+  eStockMinimo:     number;
+  bStateMaterial:   boolean;
+  fhCreateMaterial: string;
+  fhUpdateMaterial?: string;
+}
+
+// ── Carrito impresión ─────────────────────────────────────────────────────────
+
+export interface ItemCarritoImpresion {
+  producto:        Producto;
+  tipo_producto:   "medida" | "unidad";
+  // Para productos por medida
+  anchoCm?:        number;
+  largoCm?:        number;
+  materialNombre?: string;
+  eCodMaterial?:   string;
+  metrosConsumidos?: number;
+  precioCalculado?: number;
+  // Para productos por unidad
+  cantidad?:       number;
+  presentacion?:   PresentacionConStock;
+  precioUnitario?: number;
 }

@@ -21,16 +21,16 @@ export default async function MenuPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
 
-  // ── Configuración del negocio (métodos + IVA) ─────────────────────────────
+  // ── Configuración del negocio ─────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("metodosPago, aplicarIva")
+    .select("metodosPago, aplicarIva, tipo_negocio")   // ← incluye tipo_negocio
     .eq("eCodCompany", fkeCodCompany)
     .single();
 
   const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
-  // Si la columna aún no existe en DB, `aplicarIva` vendrá null → default true
-  const aplicarIva: boolean = negocio?.aplicarIva ?? true;
+  const aplicarIva: boolean        = negocio?.aplicarIva   ?? true;
+  const tipoNegocio                = negocio?.tipo_negocio  ?? "general";
 
   let metodosPago: MetodoPagoGlobal[] = [];
 
@@ -94,10 +94,44 @@ export default async function MenuPage() {
   const { data: categorias } = await supabase
     .from("categorias")
     .select("eCodCategory, tNameCategory, ImgCategory")
+    .eq("fkeCodCompany", fkeCodCompany)
     .eq("bStateCategory", true)
     .order("tNameCategory");
 
-  // ── Lotes activos ─────────────────────────────────────────────────────────
+  // ── Rama impresion ────────────────────────────────────────────────────────
+  if (tipoNegocio === "impresion") {
+    const { data: productosImpresion } = await adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct, tipo_producto, ePrecioM2")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bStateProduct", true);
+
+    const productosConStock: ProductoConStock[] = (productosImpresion ?? []).map((p: any) => ({
+      eCodProduct:     p.eCodProduct,
+      tNameProduct:    p.tNameProduct,
+      fkeCodCategory:  p.fkeCodCategory,
+      ePriceProduct:   p.ePriceProduct,
+      ImgProduct:      p.ImgProduct,
+      stockDisponible: Number.MAX_SAFE_INTEGER,
+      bInfinito:       true,
+      tipo_producto:   p.tipo_producto ?? "unidad",
+      ePrecioM2:       p.ePrecioM2 ?? null,
+    }));
+
+    return (
+      <MenuClient
+        categorias={(categorias as Categoria[]) ?? []}
+        productos={productosConStock}
+        metodosPago={metodosPago}
+        tieneTurno={tieneTurno}
+        corte={(corteAbierto as CorteCaja | null) ?? null}
+        ventasDelTurno={ventasDelTurno}
+        aplicarIva={aplicarIva}
+      />
+    );
+  }
+
+  // ── Rama general (lógica original intacta) ────────────────────────────────
   const { data: lotes, error } = await adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
@@ -121,7 +155,6 @@ export default async function MenuPage() {
     );
   }
 
-  // ── Separar lotes con y sin presentación ─────────────────────────────────
   const lotesSinPres = lotes.filter((l: any) => !l.fkeCodPresentacion);
   const lotesConPres = lotes.filter((l: any) =>  l.fkeCodPresentacion);
 

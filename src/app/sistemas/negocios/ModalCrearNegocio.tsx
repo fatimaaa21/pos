@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Modal, ModalField, ModalInput, ModalInfo } from "@/components/ui/Modal";
+import { Modal, ModalField, ModalInput, ModalSelect, ModalInfo } from "@/components/ui/Modal";
 import { crearNegocio } from "@/lib/actions/sistemas";
 import { Building2 } from "lucide-react";
 import type { Perfil } from "@/types";
@@ -19,6 +19,7 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
     nombreNegocio: "",
     nombreAdmin:   "",
     emailAdmin:    "",
+    tipo_negocio:  "general" as "general" | "impresion",
   });
 
   async function handleConfirmar() {
@@ -29,6 +30,7 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
     formData.append("nombreNegocio", form.nombreNegocio);
     formData.append("nombreAdmin",   form.nombreAdmin);
     formData.append("emailAdmin",    form.emailAdmin);
+    formData.append("tipo_negocio",  form.tipo_negocio);
 
     const result = await crearNegocio(formData);
 
@@ -81,6 +83,18 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
           value={form.emailAdmin}
           onChange={(e) => setForm({ ...form, emailAdmin: e.target.value })}
         />
+      </ModalField>
+
+      <ModalField label="Tipo de negocio" required>
+        <ModalSelect
+          value={form.tipo_negocio}
+          onChange={(e) =>
+            setForm({ ...form, tipo_negocio: e.target.value as "general" | "impresion" })
+          }
+        >
+          <option value="general">General (panadería, café, fonda...)</option>
+          <option value="impresion">Impresión y diseño (lonas, material gráfico...)</option>
+        </ModalSelect>
       </ModalField>
 
       <ModalInfo>

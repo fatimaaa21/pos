@@ -22,6 +22,7 @@ export interface NegocioConAdmin {
   imgCompany?:    string | null;
   moneda:         string;
   zona_horaria:   string;
+  tipo_negocio:   "general" | "impresion";
   bStateCompany:  string;
   fhCreateCompany: string;
   admin?: {

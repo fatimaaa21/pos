@@ -21,11 +21,9 @@ interface Props {
   categorias: Categoria[];
 }
 
-export function ModalCrearProducto({ onClose, onCreado }: Props) {
+export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [cargandoCategorias, setCargandoCategorias] = useState(true);
   const [form, setForm] = useState({
     tNameProduct:   "",
     ImgProduct:     "",
@@ -57,23 +55,6 @@ export function ModalCrearProducto({ onClose, onCreado }: Props) {
   const presentacionesValidas = presentacionesList.every(
     (p) => p.tNombre.trim() && p.ePricePresentacion && parseFloat(p.ePricePresentacion) >= 0
   );
-
-  // ── Categorías ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    async function cargarCategorias() {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("categorias")
-        .select("eCodCategory, tNameCategory")
-        .eq("bStateCategory", true)
-        .order("tNameCategory");
-
-      if (data) setCategorias(data as Categoria[]);
-      setCargandoCategorias(false);
-      if (error) console.error("Error cargando categorías activas:", error.message);
-    }
-    cargarCategorias();
-  }, []);
 
   // ── Confirmar ─────────────────────────────────────────────────────────────
   async function handleConfirmar() {
@@ -163,9 +144,7 @@ export function ModalCrearProducto({ onClose, onCreado }: Props) {
           onChange={(e) => setForm({ ...form, fkeCodCategory: e.target.value })}
         >
           <option value="">Seleccionar categoría</option>
-          {cargandoCategorias ? (
-            <option disabled>Cargando...</option>
-          ) : categorias.length === 0 ? (
+          {categorias.length === 0 ? (
             <option disabled>No hay categorías activas</option>
           ) : (
             categorias.map((c) => (

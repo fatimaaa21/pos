@@ -1,7 +1,9 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { InventarioClient }  from "./InventarioClient";
+import { InventarioImpresionClient } from "./InventarioImpresionClient";
 import type { InventarioConProducto } from "./InventarioClient";
+import type { Material } from "@/types";
 
 export default async function InventarioPage() {
   const supabase    = await createClient();
@@ -17,6 +19,31 @@ export default async function InventarioPage() {
 
   const fkeCodCompany = perfilActual?.fkeCodCompany;
 
+  // ── Tipo de negocio ───────────────────────────────────────────────────────
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("tipo_negocio")
+    .eq("eCodCompany", fkeCodCompany)
+    .single();
+
+  const tipoNegocio = negocio?.tipo_negocio ?? "general";
+
+  // ── Rama impresion ────────────────────────────────────────────────────────
+  if (tipoNegocio === "impresion") {
+    const { data: materiales } = await adminClient
+      .from("materiales")
+      .select("*")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .order("fhCreateMaterial", { ascending: false });
+
+    return (
+      <InventarioImpresionClient
+        materiales={(materiales as Material[]) ?? []}
+      />
+    );
+  }
+
+  // ── Rama general (lógica original intacta) ────────────────────────────────
   const { data: productosDelNegocio } = await supabase
     .from("productos")
     .select("eCodProduct")
@@ -25,10 +52,9 @@ export default async function InventarioPage() {
   const idsProductos = (productosDelNegocio ?? []).map((p) => p.eCodProduct);
 
   if (idsProductos.length === 0) {
-    return <InventarioClient inventario={[]} />;
+    return <InventarioClient inventario={[]} tipoNegocio={tipoNegocio} />;
   }
 
-  // 1. Inventario desde la vista (sin join a presentaciones — las vistas no tienen FK en PostgREST)
   const { data: inventarioRaw, error } = await supabase
     .from("vista_inventario")
     .select(`
@@ -50,7 +76,6 @@ export default async function InventarioPage() {
 
   const lotes = inventarioRaw ?? [];
 
-  // 2. Recoger IDs de presentaciones que existen en estos lotes
   const idsPresentacion = [
     ...new Set(
       lotes
@@ -59,7 +84,6 @@ export default async function InventarioPage() {
     ),
   ];
 
-  // 3. Buscar nombres y precios de esas presentaciones (admin client para bypassear RLS)
   const presMap = new Map<string, { tNombre: string; ePricePresentacion: number }>();
 
   if (idsPresentacion.length > 0) {
@@ -76,7 +100,6 @@ export default async function InventarioPage() {
     }
   }
 
-  // 4. Combinar: inyectar `presentaciones` en cada lote
   const inventario: InventarioConProducto[] = lotes.map((l: any) => ({
     ...l,
     presentaciones: l.fkeCodPresentacion
@@ -84,5 +107,5 @@ export default async function InventarioPage() {
       : null,
   }));
 
-  return <InventarioClient inventario={inventario} />;
+  return <InventarioClient inventario={inventario} tipoNegocio={tipoNegocio} />;
 }

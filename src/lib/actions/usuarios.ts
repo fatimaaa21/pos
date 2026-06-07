@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { Resend } from "resend";
 import type { Perfil } from "@/types";
 import { revalidatePath } from "next/cache";
+import { createClient } from "../supabase/server";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -76,6 +77,16 @@ export async function crearUsuario(formData: FormData) {
     }
 
     const ahora = new Date().toISOString();
+
+    const supabase = await createClient(); // ya debes tener esto importado
+    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    const { data: perfilAdmin } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", adminUser!.id)
+      .single();
+
+    const fkeCodCompany = perfilAdmin?.fkeCodCompany;
     const { data: perfil, error: perfilError } = await adminClient
       .from("perfiles")
       .insert({
@@ -85,6 +96,7 @@ export async function crearUsuario(formData: FormData) {
         tRolUser,
         eCodeUser,
         bStateUser: true,
+        fkeCodCompany,
         fhCreateUser: ahora,
         fhUpdateUser: ahora,
       })

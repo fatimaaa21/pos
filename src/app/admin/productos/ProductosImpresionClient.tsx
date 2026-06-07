@@ -3,20 +3,20 @@
 import { useEffect, useState } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import type { Producto, Categoria } from "@/types";
-import { PageHeader } from "@/components/ui/PageHeader";
-import styles from "./productos.module.css";
-import { toggleEstadoProducto, eliminarProducto } from "@/lib/actions/productos";
+import { PageHeader }  from "@/components/ui/PageHeader";
+import { StatCards }   from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
-import { ColumnaTabla, DataTable } from "@/components/ui/DataTable";
-import { Badge } from "@/components/ui/Badge";
+import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
+import { Badge }       from "@/components/ui/Badge";
 import { createClient } from "@/lib/supabase/client";
-import { ModalCrearProducto } from "./ModalCrearProducto";
-import { ModalVerProducto } from "./ModalVerProducto";
-import { ModalEditarProducto } from "./ModalEditarProducto";
+import { toggleEstadoProducto, eliminarProducto } from "@/lib/actions/productos";
 import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
-import { StatCards } from "@/components/ui/Statscards";
+import { ModalCrearProductoImpresion }  from "./ModalCrearProductoImpresion";
+import { ModalEditarProductoImpresion } from "./ModalEditarProductoImpresion";
+import { ModalVerProducto } from "./ModalVerProducto";
+import { StatCards as _StatCards } from "@/components/ui/Statscards";
 import toast from "react-hot-toast";
-
+import styles from "./productos.module.css";
 
 interface Props {
   productos:   Producto[];
@@ -24,28 +24,22 @@ interface Props {
   tipoNegocio: "general" | "impresion";
 }
 
-export function ProductClient({ productos: inicial, tipoNegocio, categorias }: Props) {
-  const [productos, setProductos] = useState<Producto[]>(inicial);
-  const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
-  const [busqueda, setBusqueda] = useState("");
-  const [filtros, setFiltros] = useState<FiltrosUsuario>({
-    busqueda: "",
-    roles: [],
-    estados: [],
-    categorias: [],
+export function ProductosImpresionClient({ productos: inicial, categorias }: Props) {
+  const [productos,       setProductos]       = useState<Producto[]>(inicial);
+  const [imgTimestamps,   setImgTimestamps]    = useState<Record<string, number>>({});
+  const [filtros,         setFiltros]          = useState<FiltrosUsuario>({
+    busqueda: "", roles: [], estados: [], categorias: [],
   });
-  const [modalCrear, setModalCrear] = useState(false);
-  const [productoVer, setProductoVer] = useState<Producto | null>(null);
-  const [productoEditar, setProductoEditar] = useState<Producto | null>(null);
-  const [toggleando, setToggleando] = useState<string | null>(null);
-  const [seleccionados, setSeleccionados] = useState<string[]>([]);
-  const [eliminando, setEliminando] = useState<string | null>(null);
+  const [modalCrear,        setModalCrear]        = useState(false);
+  const [productoVer,       setProductoVer]       = useState<Producto | null>(null);
+  const [productoEditar,    setProductoEditar]    = useState<Producto | null>(null);
   const [productoAEliminar, setProductoAEliminar] = useState<Producto | null>(null);
+  const [toggleando,        setToggleando]        = useState<string | null>(null);
+  const [eliminando,        setEliminando]        = useState<string | null>(null);
+  const [seleccionados,     setSeleccionados]     = useState<string[]>([]);
 
-  // ── Mapa de categorías para labels ───────────────────────────────────────
   const categoriasMap = new Map(categorias.map((c) => [c.eCodCategory, c.tNameCategory]));
 
-  // ── Opciones de categoría: solo las que realmente tienen productos ────────
   const opcionesCategorias = Array.from(
     new Map(
       productos
@@ -61,18 +55,14 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
   ).sort((a, b) => a.label.localeCompare(b.label));
 
   // ── Filtrado ──────────────────────────────────────────────────────────────
-  const filtradas = productos.filter((p) => {
+  const filtrados = productos.filter((p) => {
     const texto = filtros.busqueda.toLowerCase();
-    const coincideTexto = !texto || p.tNameProduct.toLowerCase().includes(texto);
-
-    const estadoValor = p.bStateProduct ? "activo" : "inactivo";
-    const coincideEstado =
-      filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
-
+    const coincideTexto  = !texto || p.tNameProduct.toLowerCase().includes(texto);
+    const estadoValor    = p.bStateProduct ? "activo" : "inactivo";
+    const coincideEstado = filtros.estados.length === 0 || filtros.estados.includes(estadoValor);
     const coincideCategoria =
       !filtros.categorias?.length ||
       (p.fkeCodCategory != null && filtros.categorias.includes(p.fkeCodCategory));
-
     return coincideTexto && coincideEstado && coincideCategoria;
   });
 
@@ -80,19 +70,19 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
   function handleProductoCreado(nuevo: Producto) {
     setProductos((prev) => [nuevo, ...prev]);
     setModalCrear(false);
-    toast.success(`"${nuevo.tNameProduct}" creado correctamente`);
+    toast.success(`"${nuevo.tNameProduct}" creado`);
   }
 
   function handleProductoEditado(actualizado: Producto) {
     setProductos((prev) =>
-      prev.map((p) => (p.eCodProduct === actualizado.eCodProduct ? actualizado : p))
+      prev.map((p) => p.eCodProduct === actualizado.eCodProduct ? actualizado : p)
     );
     setImgTimestamps((prev) => ({ ...prev, [actualizado.eCodProduct]: Date.now() }));
     setProductoEditar(null);
     toast.success(`"${actualizado.tNameProduct}" actualizado`);
   }
 
-  async function handleToggleEstado(producto: Producto) {
+  async function handleToggle(producto: Producto) {
     setToggleando(producto.eCodProduct);
     const result = await toggleEstadoProducto(producto.eCodProduct, !producto.bStateProduct);
     if (!result?.error) {
@@ -103,18 +93,13 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
             : p
         )
       );
-      const nuevoEstado = !producto.bStateProduct;
-      toast.success(`"${producto.tNameProduct}" ${nuevoEstado ? "activado" : "desactivado"}`);
+      toast.success(`"${producto.tNameProduct}" ${!producto.bStateProduct ? "activado" : "desactivado"}`);
     } else {
       toast.error(`No se pudo cambiar el estado: ${result.error}`);
     }
     setToggleando(null);
   }
 
-  function handleEliminar(producto: Producto) {
-  setProductoAEliminar(producto);
-}
- 
   async function confirmarEliminar() {
     if (!productoAEliminar) return;
     setEliminando(productoAEliminar.eCodProduct);
@@ -134,67 +119,92 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalActivos = productos.filter((p) => p.bStateProduct).length;
+  const porMedida    = productos.filter((p) => p.tipo_producto === "medida").length;
+  const porUnidad    = productos.filter((p) => p.tipo_producto === "unidad").length;
 
   // ── Columnas ──────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Producto>[] = [
     {
-      key: "tNameProduct",
+      key:   "tNameProduct",
       label: "Producto",
       render: (p) => {
         const ts = imgTimestamps[p.eCodProduct] ?? Date.now();
         return (
           <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            {p.ImgProduct ? (
-              <img
-                src={`${p.ImgProduct.split("?")[0]}?t=${ts}`}
-                alt={p.tNameProduct}
-              />
-            ) : null}
+            {p.ImgProduct && (
+              <img src={`${p.ImgProduct.split("?")[0]}?t=${ts}`} alt={p.tNameProduct} />
+            )}
             <span>{p.tNameProduct}</span>
           </div>
         );
       },
     },
     {
-      key: "fkeCodCategory",
+      key:   "fkeCodCategory",
       label: "Categoría",
       render: (p) => (
-        <span>
-          {p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) ?? "—" : "—"}
-        </span>
+        <span>{p.fkeCodCategory ? categoriasMap.get(p.fkeCodCategory) ?? "—" : "—"}</span>
       ),
     },
     {
-      key: "ePriceProduct",
-      label: "Precio al público",
+      key:   "tipo_producto",
+      label: "Tipo",
+      render: (p) => (
+        <Badge variante={p.tipo_producto === "medida" ? "sistemas" : "empleado"} dot={false}>
+          {p.tipo_producto === "medida" ? "Por medida" : "Por unidad"}
+        </Badge>
+      ),
+    },
+    {
+      key:   "ePrecioM2",
+      label: "Precio",
+      render: (p) => {
+        if (p.tipo_producto === "medida") {
+          return (
+            <span>
+              {(p.ePrecioM2 ?? 0).toLocaleString("es-MX", {
+                style: "currency", currency: "MXN",
+              })}{" "}
+              <span style={{ fontSize: 11, color: "var(--gray)" }}>/m²</span>
+            </span>
+          );
+        }
+        return (
+          <span>
+            {p.ePriceProduct.toLocaleString("es-MX", {
+              style: "currency", currency: "MXN",
+            })}
+          </span>
+        );
+      },
+    },
+    {
+      key:   "eCostProduct",
+      label: "Costo",
       render: (p) => (
         <span>
-          {p.ePriceProduct.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
+          {p.eCostProduct.toLocaleString("es-MX", {
+            style: "currency", currency: "MXN",
+          })}
+          {p.tipo_producto === "medida" && (
+            <span style={{ fontSize: 11, color: "var(--gray)" }}> /m²</span>
+          )}
         </span>
       ),
     },
     {
-      key: "eCostProduct",
-      label: "Costo de producción",
-      render: (p) => (
-        <span>
-          {p.eCostProduct.toLocaleString("es-MX", { style: "currency", currency: "MXN" })}
-        </span>
-      ),
-    },
-    {
-      key: "bStateProduct",
+      key:   "bStateProduct",
       label: "Estado",
       render: (p) => (
         <Badge
           activo={p.bStateProduct}
-          onToggle={() => handleToggleEstado(p)}
+          onToggle={() => handleToggle(p)}
           toggling={toggleando === p.eCodProduct}
         />
       ),
     },
     {
-      key: "acciones",
+      key:   "acciones",
       label: "Acciones",
       render: (p) => (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -206,9 +216,9 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
           </ActionBtn>
           <ActionBtn
             title="Eliminar"
-            onClick={() => handleEliminar(p)}
-            loading={eliminando === p.eCodProduct}
             danger
+            loading={eliminando === p.eCodProduct}
+            onClick={() => setProductoAEliminar(p)}
           >
             <Trash2 size={18} />
           </ActionBtn>
@@ -221,28 +231,29 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
     <div className="container">
       <PageHeader
         titulo="Productos"
-        descripcion="Gestiona los productos"
+        descripcion="Gestiona los productos del negocio"
         boton={{ label: "Nuevo producto", onClick: () => setModalCrear(true) }}
       />
 
       <StatCards stats={[
-        { label: "Total productos", value: productos.length,                   variante: "primary" },
-        { label: "Activos",         value: totalActivos,                        variante: "success" },
-        { label: "Inactivos",       value: productos.length - totalActivos,     variante: "accent"  },
+        { label: "Total productos", value: productos.length, variante: "primary" },
+        { label: "Activos",         value: totalActivos,      variante: "success" },
+        { label: "Por medida",      value: porMedida,         variante: "accent"  },
+        { label: "Por unidad",      value: porUnidad,         variante: "neutral" },
       ]} />
 
       <TablaToolbar
         filtros={filtros}
         onChange={setFiltros}
-        total={filtradas.length}
+        total={filtrados.length}
         ocultarRol
         opcionesCategorias={opcionesCategorias}
       />
 
       <DataTable
         columnas={columnas}
-        datos={filtradas}
-        keyExtractor={(p) => String(p.eCodProduct)}
+        datos={filtrados}
+        keyExtractor={(p) => p.eCodProduct}
         seleccionable
         seleccionados={seleccionados}
         onSeleccionar={setSeleccionados}
@@ -250,7 +261,7 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
       />
 
       {modalCrear && (
-        <ModalCrearProducto
+        <ModalCrearProductoImpresion
           onClose={() => setModalCrear(false)}
           onCreado={handleProductoCreado}
           categorias={categorias}
@@ -264,14 +275,13 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
         />
       )}
       {productoEditar && (
-        <ModalEditarProducto
+        <ModalEditarProductoImpresion
           producto={productoEditar}
           categorias={categorias}
           onClose={() => setProductoEditar(null)}
           onEditado={handleProductoEditado}
         />
       )}
-
       {productoAEliminar && (
         <ToastConfirmarEliminar
           tipo="producto"
@@ -289,9 +299,9 @@ function ActionBtn({
   children, title, onClick, danger, loading,
 }: {
   children: React.ReactNode;
-  title: string;
-  onClick: () => void;
-  danger?: boolean;
+  title:    string;
+  onClick:  () => void;
+  danger?:  boolean;
   loading?: boolean;
 }) {
   return (
@@ -299,9 +309,9 @@ function ActionBtn({
       title={title}
       onClick={onClick}
       disabled={loading}
-      className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""} ${loading ? styles.actionBtnLoading : ""}`}
+      className={`${styles.actionBtn} ${danger ? styles.actionBtnDanger : ""}`}
     >
-      {loading ? "" : children}
+      {loading ? "⏳" : children}
     </button>
   );
 }

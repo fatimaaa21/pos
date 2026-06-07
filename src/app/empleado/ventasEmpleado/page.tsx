@@ -40,7 +40,7 @@ export default async function VentasEmpleadoPage() {
   if (ids.length > 0) {
     const { data: det } = await adminClient
       .from("detalle_venta")
-      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal")
+      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal, eAnchoCm, eLargoCm, fkeCodMaterial")
       .in("fkeCodVenta", ids);
     detalles = det ?? [];
   }

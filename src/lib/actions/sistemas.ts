@@ -39,11 +39,14 @@ export async function crearNegocio(formData: FormData) {
 
     const slug = generarSlug(nombreNegocio);
 
+    const tipo_negocio = (formData.get("tipo_negocio") as string) || "general";
+
     const { data: negocio, error: negocioError } = await adminClient
       .from("negocios")
       .insert({
         tNameCompany:    nombreNegocio,
         tSlugCompany:    slug,
+        tipo_negocio, 
         bStateCompany:   "activo",
         fhCreateCompany: new Date().toISOString(),
       })
@@ -111,6 +114,7 @@ export async function crearNegocio(formData: FormData) {
         imgCompany:      negocio.imgCompany ?? null,
         moneda:          negocio.moneda ?? "MXN",
         zona_horaria:    negocio.zona_horaria ?? "America/Mexico_City",
+        tipo_negocio:    negocio.tipo_negocio ?? "general",
         bStateCompany:   negocio.bStateCompany,
         fhCreateCompany: negocio.fhCreateCompany,
         admin:           null,

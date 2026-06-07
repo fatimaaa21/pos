@@ -18,6 +18,9 @@ import { ModalVentaExitosa }      from "@/components/ui/ModalVentaExitosa/Modalv
 import { ModalCerrarCaja }        from "./ModalCerrarCaja";
 import type { CorteCaja, VentasDelTurno } from "@/types";
 import { crearVenta }             from "@/lib/actions/ventas";
+import { ModalDimensiones } from "@/components/ui/ModalDimensiones/ModalDimensiones";
+import { getMateriales }    from "@/lib/actions/materiales";
+import type { Material }    from "@/types";
 import styles from "./menu.module.css";
 
 const VENTAS_VACIO: VentasDelTurno = {
@@ -25,7 +28,8 @@ const VENTAS_VACIO: VentasDelTurno = {
   eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
 };
 
-function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): string {
+function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion">): string {
+  if (item.key) return item.key;
   return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
 }
 
@@ -50,6 +54,9 @@ export function MenuClient({
   const [errorVenta, setErrorVenta]           = useState<string | null>(null);
   const [ventaExitosa, setVentaExitosa]       = useState<string | null>(null);
   const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
+  const [modalDimensiones,    setModalDimensiones]    = useState<ProductoConStock | null>(null);
+  const [materiales,          setMateriales]          = useState<Material[]>([]);
+  const [cargandoMateriales,  setCargandoMateriales]  = useState(false);
 
   const productosFiltrados = productos.filter((p) => {
     const coincideCategoria =
@@ -88,12 +95,50 @@ export function MenuClient({
     });
   }
 
+  function handleConfirmarDimensiones(datos: {
+  anchoCm:          number;
+  largoCm:          number;
+  material:         Material;
+  metrosConsumidos: number;
+  precioCalculado:  number;
+}) {
+  if (!modalDimensiones) return;
+  setErrorVenta(null);
+
+  const key = `${modalDimensiones.eCodProduct}_${datos.material.eCodMaterial}`;
+
+  setCarrito((prev) => {
+    const existe = prev.find((i) => i.key === key);
+    if (existe) return prev;
+    return [
+      ...prev,
+      {
+        key,
+        producto:        modalDimensiones,
+        tipo_producto:   "medida" as const,
+        anchoCm:         datos.anchoCm,
+        largoCm:         datos.largoCm,
+        materialNombre:  datos.material.tNombre,
+        eCodMaterial:    datos.material.eCodMaterial,
+        metrosConsumidos: datos.metrosConsumidos,
+        precioCalculado: datos.precioCalculado,
+        cantidad:        1,
+      },
+    ];
+  });
+  setModalDimensiones(null);
+}
+
   function cambiarCantidad(key: string, delta: number) {
     setErrorVenta(null);
     setCarrito((prev) =>
       prev
         .map((i) => {
           if (carritoKey(i) !== key) return i;
+          // Productos por medida: no se modifican, se eliminan con -1
+          if (i.tipo_producto === "medida") {
+            return delta < 0 ? { ...i, cantidad: 0 } : i;
+          }
           const stock = i.presentacion?.stockDisponible ?? i.producto.stockDisponible;
           const bInf  = i.presentacion?.bInfinito       ?? i.producto.bInfinito;
           const nueva = i.cantidad + delta;
@@ -118,10 +163,17 @@ export function MenuClient({
         eCodProduct:       i.producto.eCodProduct,
         eCodPresentacion:  i.presentacion?.eCodPresentacion,
         cantidad:          i.cantidad,
-        precioUnitario:    i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct,
+        precioUnitario:    i.tipo_producto === "medida"
+          ? (i.precioCalculado ?? 0)
+          : (i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct),
+        // Datos de medida para descontar material
+        eCodMaterial:      i.eCodMaterial,
+        metrosConsumidos:  i.metrosConsumidos,
+        eAnchoCm:          i.anchoCm,
+        eLargoCm:          i.largoCm,
       })),
       metodoPago,
-      aplicarIva,   // ← se pasa al server action
+      aplicarIva,
     );
 
     if (result.error) { setErrorVenta(result.error); return; }
@@ -150,6 +202,15 @@ export function MenuClient({
     setLoadingTurno(false);
     if (result.error) setErrorTurno(result.error);
     else { setModalTurno(false); router.refresh(); }
+  }
+
+  async function handleAgregarPorMedida(producto: ProductoConStock) {
+    if (!tieneTurno) return;
+    setCargandoMateriales(true);
+    const lista = await getMateriales();
+    setMateriales(lista);
+    setCargandoMateriales(false);
+    setModalDimensiones(producto);
   }
 
   return (
@@ -191,6 +252,7 @@ export function MenuClient({
         <ProductoGrid
           productos={productosFiltrados}
           onAgregar={tieneTurno ? agregarProducto : () => {}}
+          onAgregarPorMedida={tieneTurno ? handleAgregarPorMedida : undefined}
         />
       </div>
 
@@ -204,6 +266,15 @@ export function MenuClient({
         bloqueado={!tieneTurno}
         aplicarIva={aplicarIva}
       />
+
+      {modalDimensiones && (
+        <ModalDimensiones
+          producto={modalDimensiones}
+          materiales={materiales}
+          onConfirmar={handleConfirmarDimensiones}
+          onCerrar={() => setModalDimensiones(null)}
+        />
+      )}
 
       {ventaExitosa && (
         <ModalVentaExitosa

@@ -10,13 +10,12 @@ interface ItemVenta {
   eCodPresentacion?: string;
   cantidad:          number;
   precioUnitario:    number;
+  eCodMaterial?:     string;
+  metrosConsumidos?: number;
+  eAnchoCm?:         number;
+  eLargoCm?:         number;
 }
 
-// ─────────────────────────────────────────────────────────────
-// CREAR VENTA
-// Incluye optimistic locking para prevenir race conditions
-// cuando dos empleados venden el mismo producto simultáneamente.
-// ─────────────────────────────────────────────────────────────
 export async function crearVenta(
   items: ItemVenta[],
   fkeMetodoPago: MetodoPago,
@@ -41,12 +40,6 @@ export async function crearVenta(
 
     const fkeCodCompany = perfil.fkeCodCompany;
 
-    // ── Fase 1: validar stock + capturar versiones ────────────────────────────
-    //
-    // Leemos el stock disponible (vista_inventario) y la versión actual
-    // del lote (tabla inventario). Guardamos ambos para usarlos en la
-    // Fase 2 sin tener que volver a leer, garantizando consistencia.
-
     type LoteCapturado = {
       eCodInventory:       string;
       eCantRestante:       number;
@@ -56,8 +49,42 @@ export async function crearVenta(
 
     const lotesPorItem: LoteCapturado[] = [];
 
+    // ── Fase 1: validar stock ─────────────────────────────────────────────────
     for (const item of items) {
-      // Stock desde la vista (incluye eCantRestante calculado)
+
+      // Productos por medida — el stock es el material, no inventario
+      if (item.eCodMaterial) {
+        const { data: material, error: materialError } = await adminClient
+          .from("materiales")
+          .select("eCodMaterial, eMetrosLineales, bStateMaterial")
+          .eq("eCodMaterial", item.eCodMaterial)
+          .single();
+
+        if (!material) {
+          return { error: `Material no encontrado (id: ${item.eCodMaterial}) error: ${materialError?.message}` };
+        }
+
+        if (!material.bStateMaterial) {
+          return { error: "El material está desactivado" };
+        }
+
+        if ((material.eMetrosLineales ?? 0) < (item.metrosConsumidos ?? 0)) {
+          return {
+            error: `Metros insuficientes en el material. Solo quedan ${material.eMetrosLineales}m disponibles`,
+          };
+        }
+
+        // Marcar como ilimitado para saltarse Fase 2
+        lotesPorItem.push({
+          eCodInventory:       "",
+          eCantRestante:       0,
+          bUnlimitedInventory: true,
+          version:             0,
+        });
+        continue;
+      }
+
+      // Productos por unidad — validación normal de inventario
       let q = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
@@ -80,7 +107,6 @@ export async function crearVenta(
         };
       }
 
-      // Versión desde la tabla base (no está en la vista)
       let version = 0;
       if (!lote.bUnlimitedInventory) {
         const { data: base } = await adminClient
@@ -127,6 +153,9 @@ export async function crearVenta(
       eCantidad:          i.cantidad,
       ePrecioUnitario:    i.precioUnitario,
       eSubtotal:          i.precioUnitario * i.cantidad,
+      eAnchoCm:           i.eAnchoCm    ?? null,
+      eLargoCm:           i.eLargoCm    ?? null,
+      fkeCodMaterial:     i.eCodMaterial ?? null,
     }));
 
     const { error: detalleError } = await adminClient
@@ -134,20 +163,17 @@ export async function crearVenta(
       .insert(detalle);
 
     if (detalleError) {
-      // Limpiar la venta huérfana antes de salir
       await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
       return { error: `Error al guardar detalle: ${detalleError.message}` };
     }
 
-    // ── Fase 2: actualizar inventario con optimistic lock ─────────────────────
-    //
-    // UPDATE solo se aplica si `version` sigue siendo la que leímos en Fase 1.
-    // Si otro empleado actualizó el mismo lote entre Fase 1 y aquí,
-    // el UPDATE no afecta ninguna fila (0 rows) y detectamos el conflicto.
-
+    // ── Fase 2: actualizar inventario (solo productos por unidad) ─────────────
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       const lote = lotesPorItem[idx];
+
+      // Productos por medida — se manejan en Fase 3
+      if (!lote.eCodInventory) continue;
 
       // Lotes ilimitados: solo actualizar timestamp
       if (lote.bUnlimitedInventory) {
@@ -163,18 +189,15 @@ export async function crearVenta(
       const { data: updated } = await adminClient
         .from("inventario")
         .update({
-          version:           lote.version + 1,         // ← incrementar versión
+          version:           lote.version + 1,
           bStateInventory:   restanteTrasVenta > 0,
           fhUpdateInventory: new Date().toISOString(),
         })
         .eq("eCodInventory", lote.eCodInventory)
-        .eq("version",       lote.version)             // ← guard: solo si nadie más lo tocó
+        .eq("version",       lote.version)
         .select("eCodInventory");
 
       if (!updated || updated.length === 0) {
-        // ── Conflicto de stock ─────────────────────────────────────────────
-        // Otro empleado vendió el mismo producto entre nuestra lectura y
-        // nuestro intento de actualización. Revertimos esta venta completa.
         await adminClient.from("detalle_venta").delete().eq("fkeCodVenta", venta.eCodVenta);
         await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
         return {
@@ -183,6 +206,32 @@ export async function crearVenta(
             "al mismo tiempo. Verifica el stock disponible e intenta de nuevo.",
         };
       }
+    }
+
+    // ── Fase 3: descontar metros del material ─────────────────────────────────
+    for (const item of items) {
+      if (!item.eCodMaterial || !item.metrosConsumidos) continue;
+
+      const { data: material } = await adminClient
+        .from("materiales")
+        .select("eCodMaterial, eMetrosLineales")
+        .eq("eCodMaterial", item.eCodMaterial)
+        .single();
+
+      if (!material) continue;
+
+      const nuevosMetros = Math.max(
+        0,
+        (material.eMetrosLineales ?? 0) - item.metrosConsumidos
+      );
+
+      await adminClient
+        .from("materiales")
+        .update({
+          eMetrosLineales:  nuevosMetros,
+          fhUpdateMaterial: new Date().toISOString(),
+        })
+        .eq("eCodMaterial", item.eCodMaterial);
     }
 
     revalidatePath("/empleado/menu");
@@ -194,16 +243,6 @@ export async function crearVenta(
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// CANCELAR VENTA
-// Admin  → puede cancelar cualquier venta del negocio
-// Empleado → solo sus propias ventas del turno activo
-//
-// Al restaurar inventario, consulta la tabla base directamente
-// (no la vista) para obtener eCantIngresada + version sin
-// depender de columnas calculadas. Esto también maneja lotes
-// que quedaron con bStateInventory = false por venta total.
-// ─────────────────────────────────────────────────────────────
 export async function cancelarVenta(formData: FormData) {
   try {
     const supabase    = await createClient();
@@ -225,7 +264,6 @@ export async function cancelarVenta(formData: FormData) {
 
     if (!tMotivoCancelacion) return { error: "El motivo de cancelación es requerido" };
 
-    // ── Leer la venta ─────────────────────────────────────────────────────────
     const { data: venta } = await adminClient
       .from("ventas")
       .select("eCodVenta, fkeCodUser, fkeCodCompany, bCancelada, fhCreateVenta")
@@ -239,7 +277,6 @@ export async function cancelarVenta(formData: FormData) {
       return { error: "No tienes acceso a esta venta" };
     }
 
-    // ── Reglas por rol ────────────────────────────────────────────────────────
     const esAdmin    = perfil.tRolUser === "admin";
     const esEmpleado = perfil.tRolUser === "empleado";
 
@@ -266,13 +303,11 @@ export async function cancelarVenta(formData: FormData) {
       }
     }
 
-    // ── Obtener detalles para restaurar inventario ────────────────────────────
     const { data: detalles } = await adminClient
       .from("detalle_venta")
       .select("fkeCodProduct, fkeCodPresentacion, eCantidad")
       .eq("fkeCodVenta", eCodVenta);
 
-    // ── Marcar venta como cancelada ───────────────────────────────────────────
     const { error: cancelError } = await adminClient
       .from("ventas")
       .update({
@@ -285,12 +320,7 @@ export async function cancelarVenta(formData: FormData) {
 
     if (cancelError) return { error: `Error al cancelar: ${cancelError.message}` };
 
-    // ── Restaurar inventario ──────────────────────────────────────────────────
-    //
-    // Consultamos la tabla base directamente para obtener eCantIngresada y
-    // version. No usamos vista_inventario ni filtramos por bStateInventory
-    // porque el lote puede estar inactivo (se agotó con esta venta).
-
+    // Restaurar inventario (solo productos por unidad)
     for (const detalle of detalles ?? []) {
       let q = adminClient
         .from("inventario")

@@ -58,7 +58,7 @@ export default async function VentasAdminPage() {
   if (ids.length > 0) {
     const { data: det, error: detError } = await adminClient
       .from("detalle_venta")
-      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal")
+      .select("eCodDetalle, fkeCodVenta, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario, eSubtotal, eAnchoCm, eLargoCm, fkeCodMaterial")
       .in("fkeCodVenta", ids);
 
     if (detError) console.error("Error detalles:", detError.message);
