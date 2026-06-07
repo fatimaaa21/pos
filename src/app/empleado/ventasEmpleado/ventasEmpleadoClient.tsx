@@ -247,6 +247,11 @@ export function VentasEmpleadoClient({
                           {d.presentacion?.tNombre && (
                             <span>{" " + d.presentacion.tNombre}</span>
                           )}
+                          {d.eAnchoCm && d.eLargoCm && (
+                            <span style={{ color: "var(--gray)", fontSize: 10, display: "block", marginTop: 2 }}>
+                              {d.eAnchoCm}m × {d.eLargoCm}m
+                            </span>
+                          )}
                         </span>
                         <span className={styles.precio}>${d.ePrecioUnitario.toFixed(2)}</span>
                       </div>

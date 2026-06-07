@@ -163,6 +163,9 @@ export interface DetalleVenta {
   eCantidad: number;
   ePrecioUnitario: number;
   eSubtotal: number;
+  eAnchoCm?:          number | null;
+  eLargoCm?:          number | null;
+  fkeCodMaterial?:    string | null;
 }
 
 export interface DetalleVentaConProducto extends DetalleVenta {

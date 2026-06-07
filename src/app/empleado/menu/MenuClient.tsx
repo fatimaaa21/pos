@@ -169,6 +169,8 @@ export function MenuClient({
         // Datos de medida para descontar material
         eCodMaterial:      i.eCodMaterial,
         metrosConsumidos:  i.metrosConsumidos,
+        eAnchoCm:          i.anchoCm,
+        eLargoCm:          i.largoCm,
       })),
       metodoPago,
       aplicarIva,

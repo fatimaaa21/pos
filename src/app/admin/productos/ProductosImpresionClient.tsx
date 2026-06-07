@@ -207,7 +207,7 @@ export function ProductosImpresionClient({ productos: inicial, categorias }: Pro
       key:   "acciones",
       label: "Acciones",
       render: (p) => (
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
           <ActionBtn title="Ver detalles" onClick={() => setProductoVer(p)}>
             <Eye size={18} />
           </ActionBtn>

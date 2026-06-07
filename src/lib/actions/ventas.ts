@@ -12,6 +12,8 @@ interface ItemVenta {
   precioUnitario:    number;
   eCodMaterial?:     string;
   metrosConsumidos?: number;
+  eAnchoCm?:         number;
+  eLargoCm?:         number;
 }
 
 export async function crearVenta(
@@ -151,6 +153,9 @@ export async function crearVenta(
       eCantidad:          i.cantidad,
       ePrecioUnitario:    i.precioUnitario,
       eSubtotal:          i.precioUnitario * i.cantidad,
+      eAnchoCm:           i.eAnchoCm    ?? null,
+      eLargoCm:           i.eLargoCm    ?? null,
+      fkeCodMaterial:     i.eCodMaterial ?? null,
     }));
 
     const { error: detalleError } = await adminClient

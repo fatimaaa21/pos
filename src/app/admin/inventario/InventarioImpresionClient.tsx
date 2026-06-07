@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2 } from "lucide-react";
 import { PageHeader }    from "@/components/ui/PageHeader";
 import { StatCards }     from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
@@ -9,7 +9,8 @@ import { Badge }         from "@/components/ui/Badge";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { ModalCrearMaterial }  from "./ModalCrearMaterial";
-import { ModalEditarMaterial } from "./ModalEditarMaterial";
+import { ModalVerMaterial }             from "./ModalVerMaterial";
+import { ModalAgregarUnidadesMaterial } from "./ModalAgregarUnidadesMaterial";
 import { toggleEstadoMaterial, eliminarMaterial } from "@/lib/actions/materiales";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import type { Material } from "@/types";
@@ -25,6 +26,8 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
   const [modalCrear,      setModalCrear]      = useState(false);
   const [materialEditar,  setMaterialEditar]  = useState<Material | null>(null);
   const [materialEliminar,setMaterialEliminar]= useState<Material | null>(null);
+  const [materialVer,    setMaterialVer]    = useState<Material | null>(null);
+  const [materialAgregar, setMaterialAgregar] = useState<Material | null>(null);
   const [eliminando,      setEliminando]      = useState<string | null>(null);
   const [toggleando,      setToggleando]      = useState<string | null>(null);
   const [seleccionados,   setSeleccionados]   = useState<string[]>([]);
@@ -57,6 +60,7 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
       prev.map((m) => m.eCodMaterial === actualizado.eCodMaterial ? actualizado : m)
     );
     setMaterialEditar(null);
+    setMaterialAgregar(null);
     toast.success(`"${actualizado.tNombre}" actualizado`);
   }
 
@@ -160,8 +164,11 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
       key:   "acciones",
       label: "Acciones",
       render: (m) => (
-        <div style={{ display: "flex", gap: 4 }}>
-          <ActionBtn title="Editar" onClick={() => setMaterialEditar(m)}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <ActionBtn title="Ver detalles" onClick={() => setMaterialVer(m)}>
+            <Eye size={18} />
+          </ActionBtn>
+          <ActionBtn title="Agregar unidades" onClick={() => setMaterialAgregar(m)}>
             <Pencil size={18} />
           </ActionBtn>
           <ActionBtn
@@ -216,13 +223,6 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
           onCreado={handleCreado}
         />
       )}
-      {materialEditar && (
-        <ModalEditarMaterial
-          material={materialEditar}
-          onClose={() => setMaterialEditar(null)}
-          onEditado={handleEditado}
-        />
-      )}
       {materialEliminar && (
         <ToastConfirmarEliminar
           tipo="material"
@@ -230,6 +230,20 @@ export function InventarioImpresionClient({ materiales: inicial }: Props) {
           onConfirmar={confirmarEliminar}
           onCancelar={() => setMaterialEliminar(null)}
           cargando={eliminando === materialEliminar.eCodMaterial}
+        />
+      )}
+
+      {materialVer && (
+        <ModalVerMaterial
+          material={materialVer}
+          onClose={() => setMaterialVer(null)}
+        />
+      )}
+      {materialAgregar && (
+        <ModalAgregarUnidadesMaterial
+          material={materialAgregar}
+          onClose={() => setMaterialAgregar(null)}
+          onEditado={handleEditado}
         />
       )}
     </div>
