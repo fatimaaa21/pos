@@ -6,8 +6,9 @@ import type { ProductoConStock, PresentacionConStock } from "@/types";
 import styles from "./ProductoGrid.module.css";
 
 interface Props {
-  productos: ProductoConStock[];
-  onAgregar: (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  productos:   ProductoConStock[];
+  onAgregar:   (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  onAgregarPorMedida?: (producto: ProductoConStock) => void;
 }
 
 function IconoPlaceholder() {
@@ -23,9 +24,11 @@ function IconoPlaceholder() {
 function ProductoCard({
   producto,
   onAgregar,
+  onAgregarPorMedida,
 }: {
-  producto: ProductoConStock;
-  onAgregar: (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  producto:             ProductoConStock;
+  onAgregar:            (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  onAgregarPorMedida?:  (producto: ProductoConStock) => void;
 }) {
   const tienePres = (producto.presentaciones?.length ?? 0) > 0;
   const [presSeleccionada, setPresSeleccionada] = useState<PresentacionConStock | null>(null);
@@ -56,9 +59,12 @@ function ProductoCard({
     producto.stockDisponible <= 5;
 
   function handleAgregar() {
+    if (producto.tipo_producto === "medida") {
+      onAgregarPorMedida?.(producto);
+      return;
+    }
     if (!puedeAgregar) return;
     onAgregar(producto, presSeleccionada ?? undefined);
-    // No resetear selección — el empleado puede querer agregar más de la misma
   }
 
   return (
@@ -120,12 +126,20 @@ function ProductoCard({
             ${precioMostrado.toFixed(2)}
           </span>
           <button
-            className={`${styles.btnAgregar} ${!puedeAgregar ? styles.btnAgregarDisabled : ""}`}
+            className={`${styles.btnAgregar} ${
+              producto.tipo_producto !== "medida" && !puedeAgregar
+                ? styles.btnAgregarDisabled
+                : ""
+            }`}
             onClick={handleAgregar}
-            disabled={!puedeAgregar}
+            disabled={producto.tipo_producto !== "medida" && !puedeAgregar}
             aria-label={`Agregar ${producto.tNameProduct}`}
+            style={producto.tipo_producto === "medida" ? { width: "auto", padding: "0 10px", fontSize: 11, fontWeight: 700 } : {}}
           >
-            <Plus size={16} strokeWidth={2.5} />
+            {producto.tipo_producto === "medida"
+              ? "Medidas"
+              : <Plus size={16} strokeWidth={2.5} />
+            }
           </button>
         </div>
       </div>
@@ -134,7 +148,7 @@ function ProductoCard({
 }
 
 // ── Grid principal
-export function ProductoGrid({ productos, onAgregar }: Props) {
+export function ProductoGrid({ productos, onAgregar, onAgregarPorMedida }: Props) {
   if (productos.length === 0) {
     return (
       <div className={styles.vacio}>
@@ -150,6 +164,7 @@ export function ProductoGrid({ productos, onAgregar }: Props) {
           key={producto.eCodProduct}
           producto={producto}
           onAgregar={onAgregar}
+          onAgregarPorMedida={onAgregarPorMedida}
         />
       ))}
     </div>

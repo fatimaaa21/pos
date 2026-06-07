@@ -21,7 +21,8 @@ interface Props {
 
 const IVA_RATE = 0.16;
 
-function carritoKey(item: ItemCarritoMenu): string {
+function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion">): string {
+  if (item.key) return item.key;
   return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
 }
 
@@ -51,7 +52,9 @@ export function PedidoPanel({
   const [mobileExpandido, setMobileExpandido] = useState(false);
 
   const precioItem = (item: ItemCarritoMenu) =>
-    item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct;
+  item.tipo_producto === "medida"
+    ? (item.precioCalculado ?? 0)
+    : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct);
 
   const total      = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
   const subtotal   = aplicarIva ? total / (1 + IVA_RATE) : total;
@@ -146,11 +149,14 @@ export function PedidoPanel({
               </div>
             ) : (
               items.map((item) => {
-                const key    = carritoKey(item);
-                const precio = precioItem(item);
-                const stock  = item.presentacion?.stockDisponible ?? item.producto.stockDisponible;
-                const bInf   = item.presentacion?.bInfinito       ?? item.producto.bInfinito;
-                const maxAlcanzado = !bInf && item.cantidad >= stock;
+                const key      = carritoKey(item);
+                const precio   = item.tipo_producto === "medida"
+                  ? (item.precioCalculado ?? 0)
+                  : precioItem(item);
+                const esMedida = item.tipo_producto === "medida";
+                const stock    = item.presentacion?.stockDisponible ?? item.producto.stockDisponible;
+                const bInf     = item.presentacion?.bInfinito       ?? item.producto.bInfinito;
+                const maxAlcanzado = !esMedida && !bInf && item.cantidad >= stock;
 
                 return (
                   <div key={key} className={styles.item}>
@@ -168,6 +174,11 @@ export function PedidoPanel({
                           <span className={styles.itemPresentacion}> ({item.presentacion.tNombre})</span>
                         )}
                       </p>
+                      {esMedida ? (
+                        <span className={styles.itemPresentacion} style={{ color: "var(--gray)", fontSize: 11 }}>
+                          {item.anchoCm}m × {item.largoCm}m · {item.materialNombre}
+                        </span>
+                      ) : null}
                       <span className={styles.itemPrecioUnit}>${precio.toFixed(2)}</span>
                     </div>
                     <div className={styles.itemControles}>
@@ -175,13 +186,18 @@ export function PedidoPanel({
                         <Minus size={11} strokeWidth={2.5} />
                       </button>
                       <span className={styles.cantidad}>{item.cantidad}</span>
-                      <button
-                        className={`${styles.btnCantidad} ${maxAlcanzado ? styles.btnCantidadMax : ""}`}
-                        onClick={() => !maxAlcanzado && onCambiarCantidad(key, 1)}
-                        disabled={maxAlcanzado}
-                      >
-                        <Plus size={11} strokeWidth={2.5} />
-                      </button>
+                      {!esMedida && (
+                        <button
+                          className={`${styles.btnCantidad} ${maxAlcanzado ? styles.btnCantidadMax : ""}`}
+                          onClick={() => !maxAlcanzado && onCambiarCantidad(key, 1)}
+                          disabled={maxAlcanzado}
+                        >
+                          <Plus size={11} strokeWidth={2.5} />
+                        </button>
+                      )}
+                      {esMedida && (
+                        <div style={{ width: 22 }} /> 
+                      )}
                     </div>
                   </div>
                 );
