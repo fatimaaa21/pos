@@ -23,8 +23,8 @@ async function generarCodigoUnico(adminClient: ReturnType<typeof createAdminClie
 
 async function enviarEmailBienvenida(nombre: string, email: string, codigo: string) {
   await resend.emails.send({
-    from: "onboarding@resend.dev",
-    to: "enifca21@gmail.com",
+    from: "Kivi <no-reply@kivi.mx>",
+    to: email,
     subject: "Tu código de acceso 🥐",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px; background: #f8f7f4;">
