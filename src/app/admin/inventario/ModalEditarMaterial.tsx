@@ -18,6 +18,7 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
     tNombre:         material.tNombre,
     tipo_material:   material.tipo_material,
     eAnchoCm:        material.eAnchoCm?.toString() ?? "",
+    eAltoCm:         material.eAltoCm?.toString()  ?? "",
     eMetrosLineales: material.eMetrosLineales.toString(),
     eStockMinimo: (material.eStockMinimo ?? 0).toString(),
   });
@@ -33,7 +34,8 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
     fd.append("tNombre",         form.tNombre);
     fd.append("tipo_material",   form.tipo_material);
     fd.append("eMetrosLineales", form.eMetrosLineales);
-    if (esRollo) fd.append("eAnchoCm", form.eAnchoCm);
+    fd.append("eAnchoCm",        form.eAnchoCm);
+    if (!esRollo) fd.append("eAltoCm", form.eAltoCm);
     fd.append("eStockMinimo", form.eStockMinimo || "0");
 
     const result = await editarMaterial(fd);
@@ -48,7 +50,8 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
 
   const deshabilitado =
     !form.tNombre.trim() ||
-    (esRollo && !form.eAnchoCm.trim());
+    (esRollo  && !form.eAnchoCm.trim()) ||
+    (!esRollo && (!form.eAnchoCm.trim() || !form.eAltoCm.trim()));
 
   return (
     <Modal
@@ -78,6 +81,7 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
               ...form,
               tipo_material: e.target.value as "rollo" | "hoja",
               eAnchoCm: "",
+              eAltoCm:  "",
             })
           }
         >
@@ -86,7 +90,7 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
         </ModalSelect>
       </ModalField>
 
-      {esRollo && (
+      {esRollo ? (
         <ModalField label="Ancho del rollo (cm)" required>
           <ModalInput
             type="number"
@@ -96,6 +100,29 @@ export function ModalEditarMaterial({ material, onClose, onEditado }: Props) {
             onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
           />
         </ModalField>
+      ) : (
+        <>
+          <ModalField label="Ancho de la hoja (cm)" required>
+            <ModalInput
+              type="number"
+              min={1}
+              step={0.01}
+              placeholder="Ej. 28"
+              value={form.eAnchoCm}
+              onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
+            />
+          </ModalField>
+          <ModalField label="Alto de la hoja (cm)" required>
+            <ModalInput
+              type="number"
+              min={1}
+              step={0.01}
+              placeholder="Ej. 21"
+              value={form.eAltoCm}
+              onChange={(e) => setForm({ ...form, eAltoCm: e.target.value })}
+            />
+          </ModalField>
+        </>
       )}
 
       <ModalField

@@ -53,6 +53,8 @@ export async function crearMaterial(formData: FormData) {
     const eMetrosLineales = parseFloat(formData.get("eMetrosLineales") as string);
     const eAnchoCmRaw     = formData.get("eAnchoCm") as string;
     const eAnchoCm        = eAnchoCmRaw ? parseFloat(eAnchoCmRaw) : null;
+    const eAltoCmRaw      = formData.get("eAltoCm") as string;
+    const eAltoCm         = eAltoCmRaw ? parseFloat(eAltoCmRaw) : null;
     const eStockMinimo = parseFloat(formData.get("eStockMinimo") as string) || 0;
 
     if (!tNombre)
@@ -65,6 +67,10 @@ export async function crearMaterial(formData: FormData) {
         : "La cantidad de hojas debe ser mayor a 0" };
     if (tipo_material === "rollo" && (!eAnchoCm || isNaN(eAnchoCm) || eAnchoCm <= 0))
       return { error: "El ancho del rollo es requerido y debe ser mayor a 0" };
+    if (tipo_material === "hoja" && (!eAnchoCm || isNaN(eAnchoCm) || eAnchoCm <= 0))
+      return { error: "El ancho de la hoja es requerido y debe ser mayor a 0" };
+    if (tipo_material === "hoja" && (!eAltoCm || isNaN(eAltoCm) || eAltoCm <= 0))
+      return { error: "El alto de la hoja es requerido y debe ser mayor a 0" };
 
     const ahora = new Date().toISOString();
     const { data, error } = await adminClient
@@ -73,7 +79,8 @@ export async function crearMaterial(formData: FormData) {
         fkeCodCompany:    perfil.fkeCodCompany,
         tNombre,
         tipo_material,
-        eAnchoCm:         tipo_material === "rollo" ? eAnchoCm : null,
+        eAnchoCm,
+        eAltoCm:          tipo_material === "hoja" ? eAltoCm : null,
         eMetrosLineales,
         eStockMinimo,
         bStateMaterial:    true,
@@ -102,6 +109,8 @@ export async function editarMaterial(formData: FormData) {
     const eMetrosLineales = parseFloat(formData.get("eMetrosLineales") as string);
     const eAnchoCmRaw     = formData.get("eAnchoCm")        as string;
     const eAnchoCm        = eAnchoCmRaw ? parseFloat(eAnchoCmRaw) : null;
+    const eAltoCmRaw      = formData.get("eAltoCm")         as string;
+    const eAltoCm         = eAltoCmRaw ? parseFloat(eAltoCmRaw) : null;
     const eStockMinimo = parseFloat(formData.get("eStockMinimo") as string) || 0;
 
     if (!tNombre)
@@ -110,13 +119,18 @@ export async function editarMaterial(formData: FormData) {
       return { error: "Cantidad inválida" };
     if (tipo_material === "rollo" && (!eAnchoCm || isNaN(eAnchoCm) || eAnchoCm <= 0))
       return { error: "El ancho del rollo es requerido" };
+    if (tipo_material === "hoja" && (!eAnchoCm || isNaN(eAnchoCm) || eAnchoCm <= 0))
+      return { error: "El ancho de la hoja es requerido" };
+    if (tipo_material === "hoja" && (!eAltoCm || isNaN(eAltoCm) || eAltoCm <= 0))
+      return { error: "El alto de la hoja es requerido" };
 
     const { data, error } = await adminClient
       .from("materiales")
       .update({
         tNombre,
         tipo_material,
-        eAnchoCm:         tipo_material === "rollo" ? eAnchoCm : null,
+        eAnchoCm,
+        eAltoCm:          tipo_material === "hoja" ? eAltoCm : null,
         eMetrosLineales,
         eStockMinimo,
         fhUpdateMaterial: new Date().toISOString(),

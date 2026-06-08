@@ -18,6 +18,7 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
     tNombre:         "",
     tipo_material:   "rollo" as "rollo" | "hoja",
     eAnchoCm:        "",
+    eAltoCm:         "",
     eMetrosLineales: "",
     eStockMinimo:    "",
   });
@@ -32,7 +33,8 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
     fd.append("tNombre",         form.tNombre);
     fd.append("tipo_material",   form.tipo_material);
     fd.append("eMetrosLineales", form.eMetrosLineales);
-    if (esRollo) fd.append("eAnchoCm", form.eAnchoCm);
+    fd.append("eAnchoCm",        form.eAnchoCm);
+    if (!esRollo) fd.append("eAltoCm", form.eAltoCm);
     fd.append("eStockMinimo", form.eStockMinimo || "0");
 
     const result = await crearMaterial(fd);
@@ -48,7 +50,8 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
   const deshabilitado =
     !form.tNombre.trim()          ||
     !form.eMetrosLineales.trim()  ||
-    (esRollo && !form.eAnchoCm.trim());
+    (esRollo  && !form.eAnchoCm.trim()) ||
+    (!esRollo && (!form.eAnchoCm.trim() || !form.eAltoCm.trim()));
 
   return (
     <Modal
@@ -79,6 +82,7 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
               ...form,
               tipo_material: e.target.value as "rollo" | "hoja",
               eAnchoCm: "",
+              eAltoCm:  "",
             })
           }
         >
@@ -87,7 +91,7 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
         </ModalSelect>
       </ModalField>
 
-      {esRollo && (
+      {esRollo ? (
         <ModalField label="Ancho del rollo (cm)" required>
           <ModalInput
             type="number"
@@ -98,6 +102,29 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
             onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
           />
         </ModalField>
+      ) : (
+        <>
+          <ModalField label="Ancho de la hoja (cm)" required>
+            <ModalInput
+              type="number"
+              min={1}
+              step={0.01}
+              placeholder="Ej. 28"
+              value={form.eAnchoCm}
+              onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
+            />
+          </ModalField>
+          <ModalField label="Alto de la hoja (cm)" required>
+            <ModalInput
+              type="number"
+              min={1}
+              step={0.01}
+              placeholder="Ej. 21"
+              value={form.eAltoCm}
+              onChange={(e) => setForm({ ...form, eAltoCm: e.target.value })}
+            />
+          </ModalField>
+        </>
       )}
 
       <ModalField
@@ -129,7 +156,7 @@ export function ModalCrearMaterial({ onClose, onCreado }: Props) {
         <Ruler size={16} />
         {esRollo
           ? "Los metros lineales se descontarán automáticamente con cada venta."
-          : "Las hojas disponibles se descontarán con cada trabajo realizado."}
+          : "Las hojas disponibles se descontarán según cuántas piezas del producto caben en cada hoja."}
       </ModalInfo>
     </Modal>
   );

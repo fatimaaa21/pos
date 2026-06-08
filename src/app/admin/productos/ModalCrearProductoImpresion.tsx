@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
+import { useEffect, useState } from "react";
+import { Plus, Trash2, Ruler } from "lucide-react";
+import { Modal, ModalField, ModalInput, ModalSelect, ModalInfo } from "@/components/ui/Modal";
 import { crearProducto } from "@/lib/actions/productos";
 import { crearPresentacion } from "@/lib/actions/presentaciones";
-import { createClient } from "@/lib/supabase/client";
-import type { Categoria, Producto } from "@/types";
+import { getMateriales } from "@/lib/actions/materiales";
+import type { Categoria, Material, Producto } from "@/types";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 
 interface PresentacionForm {
   tNombre:            string;
   ePricePresentacion: string;
   eCostPresentacion:  string;
+  eCantidadUnidades:  string;
 }
 
 interface Props {
@@ -22,9 +23,8 @@ interface Props {
 }
 
 export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: Props) {
-      const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [cargandoCategorias, setCargandoCategorias] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState<string | null>(null);
 
   const [form, setForm] = useState({
     tNameProduct:   "",
@@ -34,16 +34,27 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
     fkeCodCategory: "",
     tipo_producto:  "medida" as "medida" | "unidad",
     ePrecioM2:      "",
+    // Dimensiones para unidad con consumo de hojas
+    eAnchoCm:       "",
+    eAltoCm:        "",
+    fkeCodMaterial: "",
   });
 
   const [presentacionesList, setPresentacionesList] = useState<PresentacionForm[]>([]);
+  const [materiales, setMateriales] = useState<Material[]>([]);
 
   const esMedida = form.tipo_producto === "medida";
+  const hojasDisponibles = materiales.filter((m) => m.tipo_material === "hoja");
+
+  // Cargar materiales tipo hoja al abrir
+  useEffect(() => {
+    getMateriales().then((data) => setMateriales(data));
+  }, []);
 
   function agregarFilaPresentacion() {
     setPresentacionesList((prev) => [
       ...prev,
-      { tNombre: "", ePricePresentacion: "", eCostPresentacion: "" },
+      { tNombre: "", ePricePresentacion: "", eCostPresentacion: "", eCantidadUnidades: "1" },
     ]);
   }
 
@@ -73,6 +84,9 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
     fd.append("fkeCodCategory", form.fkeCodCategory);
     fd.append("tipo_producto",  form.tipo_producto);
     if (esMedida) fd.append("ePrecioM2", form.ePrecioM2);
+    if (!esMedida && form.eAnchoCm)       fd.append("eAnchoCm",       form.eAnchoCm);
+    if (!esMedida && form.eAltoCm)        fd.append("eAltoCm",        form.eAltoCm);
+    if (!esMedida && form.fkeCodMaterial) fd.append("fkeCodMaterial", form.fkeCodMaterial);
 
     const result = await crearProducto(fd);
 
@@ -90,7 +104,8 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
         pfd.append("fkeCodProduct",      producto.eCodProduct);
         pfd.append("tNombre",            p.tNombre.trim());
         pfd.append("ePricePresentacion", p.ePricePresentacion);
-        pfd.append("eCostPresentacion",  p.eCostPresentacion || "0");
+        pfd.append("eCostPresentacion",  p.eCostPresentacion  || "0");
+        pfd.append("eCantidadUnidades",  p.eCantidadUnidades  || "1");
         const resP = await crearPresentacion(pfd);
         if (resP?.error) {
           setError(`Producto creado, pero falló una presentación: ${resP.error}`);
@@ -171,6 +186,9 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
               tipo_producto:  e.target.value as "medida" | "unidad",
               ePrecioM2:      "",
               ePriceProduct:  "",
+              eAnchoCm:       "",
+              eAltoCm:        "",
+              fkeCodMaterial: "",
             })
           }
         >
@@ -225,6 +243,55 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
             />
           </ModalField>
 
+          {/* ── Dimensiones del producto y material a consumir ── */}
+          <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
+            <p style={{ margin: "0 0 var(--space-1)", fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
+              Dimensiones del producto
+            </p>
+            <p style={{ margin: "0 0 var(--space-3)", fontSize: 11, color: "var(--gray)" }}>
+              Opcional — llena estos campos si el producto se imprime en hoja y quieres que el sistema descuente automáticamente las hojas utilizadas.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <ModalField label="Ancho (cm)">
+                <ModalInput
+                  type="number" min={0.1} step={0.01} placeholder="Ej. 9"
+                  value={form.eAnchoCm}
+                  onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
+                />
+              </ModalField>
+              <ModalField label="Alto (cm)">
+                <ModalInput
+                  type="number" min={0.1} step={0.01} placeholder="Ej. 7"
+                  value={form.eAltoCm}
+                  onChange={(e) => setForm({ ...form, eAltoCm: e.target.value })}
+                />
+              </ModalField>
+            </div>
+            <div style={{ paddingTop: "var(--space-3)" }}>
+              <ModalField label="Material a consumir">
+                <ModalSelect
+                  value={form.fkeCodMaterial}
+                  onChange={(e) => setForm({ ...form, fkeCodMaterial: e.target.value })}
+                >
+                  <option value="">Sin material vinculado</option>
+                  {hojasDisponibles.map((m) => (
+                    <option key={m.eCodMaterial} value={m.eCodMaterial}>
+                      {m.tNombre} ({m.eAnchoCm}×{m.eAltoCm} cm · {m.eMetrosLineales} hojas)
+                    </option>
+                  ))}
+                </ModalSelect>
+              </ModalField>
+            </div>
+            <div style={{ paddingTop: "var(--space-3)" }}>
+              {(form.eAnchoCm || form.eAltoCm || form.fkeCodMaterial) && (
+                <ModalInfo>
+                  <Ruler size={16} />
+                  El sistema calculará cuántas hojas se necesitan por venta según las dimensiones del producto, y las descontará automáticamente.
+                </ModalInfo>
+              )}
+            </div>
+          </div>
+
           {/* Presentaciones — solo para productos por unidad */}
           <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
@@ -262,7 +329,7 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
                 key={idx}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 90px 90px 28px",
+                  gridTemplateColumns: "1fr 76px 76px 60px 28px",
                   gap: "var(--space-2)",
                   marginBottom: "var(--space-2)",
                   alignItems: "center",
@@ -286,6 +353,15 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
                   value={p.eCostPresentacion}
                   onChange={(e) => actualizarPresentacion(idx, "eCostPresentacion", e.target.value)}
                 />
+                <ModalInput
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="Pzs"
+                  title="Unidades físicas por presentación (ej. 12 para docena)"
+                  value={p.eCantidadUnidades}
+                  onChange={(e) => actualizarPresentacion(idx, "eCantidadUnidades", e.target.value)}
+                />
                 <button
                   type="button"
                   onClick={() => eliminarFilaPresentacion(idx)}
@@ -304,13 +380,14 @@ export function ModalCrearProductoImpresion({ onClose, onCreado, categorias }: P
             {presentacionesList.length > 0 && (
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 90px 90px 28px",
+                gridTemplateColumns: "1fr 76px 76px 60px 28px",
                 gap: "var(--space-2)",
                 paddingTop: "var(--space-1)",
               }}>
                 <span style={{ fontSize: 11, color: "var(--gray)", fontWeight: 600 }}>Nombre</span>
                 <span style={{ fontSize: 11, color: "var(--gray)", fontWeight: 600 }}>Precio</span>
                 <span style={{ fontSize: 11, color: "var(--gray)", fontWeight: 600 }}>Costo</span>
+                <span style={{ fontSize: 11, color: "var(--gray)", fontWeight: 600 }}>Pzas</span>
                 <span />
               </div>
             )}

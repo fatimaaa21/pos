@@ -33,10 +33,14 @@ export async function crearPresentacion(formData: FormData) {
     const fkeCodProduct      = formData.get("fkeCodProduct") as string;
     const tNombre            = (formData.get("tNombre") as string)?.trim();
     const ePricePresentacion = parseFloat(formData.get("ePricePresentacion") as string);
-    const eCostPresentacion  = parseFloat(formData.get("eCostPresentacion") as string) || 0;
+    const eCostPresentacion  = parseFloat(formData.get("eCostPresentacion")  as string) || 0;
+    const eCantidadUnidades  = parseInt(formData.get("eCantidadUnidades")    as string) || 1;
 
     if (!fkeCodProduct || !tNombre || isNaN(ePricePresentacion) || ePricePresentacion < 0) {
       return { error: "Nombre y precio son obligatorios" };
+    }
+    if (eCantidadUnidades < 1) {
+      return { error: "La cantidad de unidades debe ser al menos 1" };
     }
 
     const ahora = new Date().toISOString();
@@ -47,6 +51,7 @@ export async function crearPresentacion(formData: FormData) {
         tNombre,
         ePricePresentacion,
         eCostPresentacion,
+        eCantidadUnidades,
         bStatePresentacion: true,
         fhCreate: ahora,
         fhUpdate: ahora,
@@ -72,7 +77,8 @@ export async function editarPresentacion(formData: FormData) {
     const eCodPresentacion   = formData.get("eCodPresentacion") as string;
     const tNombre            = (formData.get("tNombre") as string)?.trim();
     const ePricePresentacion = parseFloat(formData.get("ePricePresentacion") as string);
-    const eCostPresentacion  = parseFloat(formData.get("eCostPresentacion") as string) || 0;
+    const eCostPresentacion  = parseFloat(formData.get("eCostPresentacion")  as string) || 0;
+    const eCantidadUnidades  = parseInt(formData.get("eCantidadUnidades")    as string) || 1;
 
     if (!eCodPresentacion || !tNombre || isNaN(ePricePresentacion)) {
       return { error: "Datos inválidos" };
@@ -84,6 +90,7 @@ export async function editarPresentacion(formData: FormData) {
         tNombre,
         ePricePresentacion,
         eCostPresentacion,
+        eCantidadUnidades,
         fhUpdate: new Date().toISOString(),
       })
       .eq("eCodPresentacion", eCodPresentacion)

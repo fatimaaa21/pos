@@ -52,6 +52,10 @@ export interface Producto {
   bStateProduct?: boolean;
   tipo_producto:  "unidad" | "medida";
   ePrecioM2?:     number | null;
+  // Dimensiones para productos tipo "unidad" en negocios de impresión
+  eAnchoCm?:      number | null;
+  eAltoCm?:       number | null;
+  fkeCodMaterial?: string | null;
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
 }
@@ -64,6 +68,7 @@ export interface Presentacion {
   tNombre:             string;
   ePricePresentacion:  number;
   eCostPresentacion:   number;
+  eCantidadUnidades:   number;   // cuántas piezas físicas representa (ej. 12 para "docena")
   bStatePresentacion:  boolean;
   fhCreate?:           string;
   fhUpdate?:           string;
@@ -74,6 +79,7 @@ export interface PresentacionConStock {
   tNombre:            string;
   ePricePresentacion: number;
   eCostPresentacion:  number;
+  eCantidadUnidades:  number;    // cuántas piezas físicas representa
   stockDisponible:    number;
   bInfinito:          boolean;
 }
@@ -115,8 +121,12 @@ export interface ProductoConStock {
   stockDisponible:  number;
   bInfinito?:       boolean;
   presentaciones?:  PresentacionConStock[];
-  tipo_producto?:   "unidad" | "medida";   // ← NUEVA
+  tipo_producto?:   "unidad" | "medida";
   ePrecioM2?:       number | null;
+  // Dimensiones para productos tipo "unidad" con consumo de hojas
+  eAnchoCm?:        number | null;
+  eAltoCm?:         number | null;
+  fkeCodMaterial?:  string | null;
 }
 
 // Carrito empleado
@@ -212,10 +222,11 @@ export interface Material {
   fkeCodCompany:   string;
   tNombre:         string;
   tipo_material:   "rollo" | "hoja";
-  eAnchoCm:        number | null;
-  eMetrosLineales: number;
-  eStockMinimo:     number;
-  bStateMaterial:   boolean;
+  eAnchoCm:        number | null;  // ancho del rollo (cm) o ancho de la hoja (cm)
+  eAltoCm:         number | null;  // alto de la hoja (cm); null para rollos
+  eMetrosLineales: number;         // metros para rollos; cantidad de hojas para hojas
+  eStockMinimo:    number;
+  bStateMaterial:  boolean;
   fhCreateMaterial: string;
   fhUpdateMaterial?: string;
 }
