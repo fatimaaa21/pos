@@ -40,6 +40,10 @@ export async function crearProducto(formData: FormData) {
         fkeCodCategory,
         tipo_producto: (formData.get("tipo_producto") as string) || "unidad",
         ePrecioM2:     formData.get("ePrecioM2") ? parseFloat(formData.get("ePrecioM2") as string) : null,
+        // Dimensiones para productos unidad en negocios de impresión
+        eAnchoCm:      formData.get("eAnchoCm") ? parseFloat(formData.get("eAnchoCm") as string) : null,
+        eAltoCm:       formData.get("eAltoCm")  ? parseFloat(formData.get("eAltoCm")  as string) : null,
+        fkeCodMaterial: formData.get("fkeCodMaterial") || null,
         bStateProduct:   true,
         fhCreateProduct: new Date().toISOString(),
       })
@@ -74,12 +78,16 @@ export async function editarProducto(formData: FormData) {
       .from("productos")
       .update({
         tNameProduct,
-        ImgProduct: ImgProduct || null,   // null si viene vacío
+        ImgProduct: ImgProduct || null,
         ePriceProduct,
         eCostProduct,
         fkeCodCategory,
         tipo_producto: (formData.get("tipo_producto") as string) || "unidad",
         ePrecioM2:     formData.get("ePrecioM2") ? parseFloat(formData.get("ePrecioM2") as string) : null,
+        // Dimensiones para productos unidad en negocios de impresión
+        eAnchoCm:      formData.get("eAnchoCm") ? parseFloat(formData.get("eAnchoCm") as string) : null,
+        eAltoCm:       formData.get("eAltoCm")  ? parseFloat(formData.get("eAltoCm")  as string) : null,
+        fkeCodMaterial: formData.get("fkeCodMaterial") || null,
         fhUpdateProduct: new Date().toISOString(),
       })
       .eq("eCodProduct", eCodProduct)

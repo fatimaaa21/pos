@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
-import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
+import { Plus, Trash2, Pencil, Check, X, Ruler } from "lucide-react";
+import { Modal, ModalField, ModalInput, ModalSelect, ModalInfo } from "@/components/ui/Modal";
 import { editarProducto } from "@/lib/actions/productos";
+import { getMateriales } from "@/lib/actions/materiales";
 import {
   obtenerPresentaciones,
   crearPresentacion,
   editarPresentacion,
   eliminarPresentacion,
 } from "@/lib/actions/presentaciones";
-import type { Categoria, Producto, Presentacion } from "@/types";
+import type { Categoria, Material, Producto, Presentacion } from "@/types";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 
 interface Props {
@@ -21,11 +22,12 @@ interface Props {
 }
 
 interface FilaEditable extends Presentacion {
-  editando:      boolean;
-  nombreEdit:    string;
-  precioEdit:    string;
-  costoEdit:     string;
-  guardandoFila: boolean;
+  editando:        boolean;
+  nombreEdit:      string;
+  precioEdit:      string;
+  costoEdit:       string;
+  cantidadEdit:    string;
+  guardandoFila:   boolean;
 }
 
 function toFila(p: Presentacion): FilaEditable {
@@ -35,6 +37,7 @@ function toFila(p: Presentacion): FilaEditable {
     nombreEdit:    p.tNombre,
     precioEdit:    p.ePricePresentacion.toString(),
     costoEdit:     p.eCostPresentacion.toString(),
+    cantidadEdit:  (p.eCantidadUnidades ?? 1).toString(),
     guardandoFila: false,
   };
 }
@@ -53,15 +56,27 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
       : (producto.fkeCodCategory ?? ""),
     tipo_producto:  (producto.tipo_producto ?? "unidad") as "medida" | "unidad",
     ePrecioM2:      producto.ePrecioM2?.toString() ?? "",
+    // Dimensiones para unidad con consumo de hojas
+    eAnchoCm:       producto.eAnchoCm?.toString() ?? "",
+    eAltoCm:        producto.eAltoCm?.toString()  ?? "",
+    fkeCodMaterial: producto.fkeCodMaterial        ?? "",
   });
 
   const esMedida = form.tipo_producto === "medida";
+
+  const [materiales, setMateriales] = useState<Material[]>([]);
+  const hojasDisponibles = materiales.filter((m) => m.tipo_material === "hoja");
+
+  // Cargar materiales tipo hoja
+  useEffect(() => {
+    getMateriales().then((data) => setMateriales(data));
+  }, []);
 
   const [presentaciones,  setPresentaciones]  = useState<FilaEditable[]>([]);
   const [cargandoPres,    setCargandoPres]     = useState(true);
   const [errorPres,       setErrorPres]        = useState<string | null>(null);
   const [nuevaPres, setNuevaPres] = useState({
-    tNombre: "", ePricePresentacion: "", eCostPresentacion: "",
+    tNombre: "", ePricePresentacion: "", eCostPresentacion: "", eCantidadUnidades: "1",
   });
   const [guardandoNueva, setGuardandoNueva] = useState(false);
 
@@ -83,7 +98,7 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
     setPresentaciones((prev) =>
       prev.map((p) =>
         p.eCodPresentacion === id
-          ? { ...p, editando: true, nombreEdit: p.tNombre, precioEdit: p.ePricePresentacion.toString(), costoEdit: p.eCostPresentacion.toString() }
+          ? { ...p, editando: true, nombreEdit: p.tNombre, precioEdit: p.ePricePresentacion.toString(), costoEdit: p.eCostPresentacion.toString(), cantidadEdit: (p.eCantidadUnidades ?? 1).toString() }
           : p
       )
     );
@@ -106,6 +121,7 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
     fd.append("tNombre",            fila.nombreEdit.trim());
     fd.append("ePricePresentacion", fila.precioEdit);
     fd.append("eCostPresentacion",  fila.costoEdit || "0");
+    fd.append("eCantidadUnidades",  fila.cantidadEdit || "1");
     const result = await editarPresentacion(fd);
     if (result?.error) {
       setErrorPres(result.error);
@@ -127,12 +143,13 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
     fd.append("fkeCodProduct",      producto.eCodProduct);
     fd.append("tNombre",            nuevaPres.tNombre.trim());
     fd.append("ePricePresentacion", nuevaPres.ePricePresentacion);
-    fd.append("eCostPresentacion",  nuevaPres.eCostPresentacion || "0");
+    fd.append("eCostPresentacion",  nuevaPres.eCostPresentacion  || "0");
+    fd.append("eCantidadUnidades",  nuevaPres.eCantidadUnidades  || "1");
     const result = await crearPresentacion(fd);
     if (result?.error) setErrorPres(result.error);
     else if (result?.presentacion) {
       setPresentaciones((prev) => [...prev, toFila(result.presentacion!)]);
-      setNuevaPres({ tNombre: "", ePricePresentacion: "", eCostPresentacion: "" });
+      setNuevaPres({ tNombre: "", ePricePresentacion: "", eCostPresentacion: "", eCantidadUnidades: "1" });
     }
     setGuardandoNueva(false);
   }
@@ -157,6 +174,9 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
     fd.append("fkeCodCategory", form.fkeCodCategory);
     fd.append("tipo_producto",  form.tipo_producto);
     if (esMedida) fd.append("ePrecioM2", form.ePrecioM2);
+    if (!esMedida && form.eAnchoCm)       fd.append("eAnchoCm",       form.eAnchoCm);
+    if (!esMedida && form.eAltoCm)        fd.append("eAltoCm",        form.eAltoCm);
+    if (!esMedida && form.fkeCodMaterial) fd.append("fkeCodMaterial", form.fkeCodMaterial);
 
     const result = await editarProducto(fd);
 
@@ -294,6 +314,55 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
             />
           </ModalField>
 
+          {/* ── Dimensiones del producto y material a consumir ── */}
+          <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
+            <p style={{ margin: "0 0 var(--space-1)", fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
+              Dimensiones del producto
+            </p>
+            <p style={{ margin: "0 0 var(--space-3)", fontSize: 11, color: "var(--gray)" }}>
+              Opcional — llena estos campos si el producto se imprime en hoja y quieres que el sistema descuente automáticamente las hojas utilizadas.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+              <ModalField label="Ancho (cm)">
+                <ModalInput
+                  type="number" min={0.1} step={0.01} placeholder="Ej. 9"
+                  value={form.eAnchoCm}
+                  onChange={(e) => setForm({ ...form, eAnchoCm: e.target.value })}
+                />
+              </ModalField>
+              <ModalField label="Alto (cm)">
+                <ModalInput
+                  type="number" min={0.1} step={0.01} placeholder="Ej. 7"
+                  value={form.eAltoCm}
+                  onChange={(e) => setForm({ ...form, eAltoCm: e.target.value })}
+                />
+              </ModalField>
+            </div>
+              <div style={{ paddingTop: "var(--space-3)" }}>
+              <ModalField label="Material a consumir">
+                <ModalSelect
+                  value={form.fkeCodMaterial}
+                  onChange={(e) => setForm({ ...form, fkeCodMaterial: e.target.value })}
+                >
+                  <option value="">Sin material vinculado</option>
+                  {hojasDisponibles.map((m) => (
+                    <option key={m.eCodMaterial} value={m.eCodMaterial}>
+                      {m.tNombre} ({m.eAnchoCm}×{m.eAltoCm} cm · {m.eMetrosLineales} hojas)
+                    </option>
+                  ))}
+                </ModalSelect>
+              </ModalField>
+            </div>
+            <div style={{ paddingTop: "var(--space-3)" }}>
+              {(form.eAnchoCm || form.eAltoCm || form.fkeCodMaterial) && (
+                <ModalInfo>
+                  <Ruler size={16} />
+                  El sistema calculará cuántas hojas se necesitan por venta y las descontará automáticamente.
+                </ModalInfo>
+              )}
+            </div>
+          </div>
+
           {/* Presentaciones */}
           <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
             <p style={{ margin: "0 0 var(--space-3)", fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
@@ -312,10 +381,10 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                     marginBottom: "var(--space-3)",
                   }}>
                     <div style={{
-                      display: "grid", gridTemplateColumns: "1fr 90px 90px 60px",
+                      display: "grid", gridTemplateColumns: "1fr 76px 76px 58px 60px",
                       background: "var(--background)", borderBottom: "1px solid var(--border-light)",
                     }}>
-                      {["Nombre", "Precio", "Costo", ""].map((h) => (
+                      {["Nombre", "Precio", "Costo", "Pzas", ""].map((h) => (
                         <span key={h} style={headerCellStyle}>{h}</span>
                       ))}
                     </div>
@@ -323,7 +392,7 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                       <div
                         key={p.eCodPresentacion}
                         style={{
-                          display: "grid", gridTemplateColumns: "1fr 90px 90px 60px",
+                          display: "grid", gridTemplateColumns: "1fr 76px 76px 58px 60px",
                           alignItems: "center",
                           borderBottom: idx < presentaciones.length - 1 ? "1px solid var(--border-light)" : "none",
                           background: p.editando ? "var(--color-primary-50)" : "white",
@@ -349,6 +418,13 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                                   x.eCodPresentacion === p.eCodPresentacion ? { ...x, costoEdit: e.target.value } : x
                                 ))} />
                             </div>
+                            <div style={{ padding: "4px 4px" }}>
+                              <input type="number" min={1} step={1} value={p.cantidadEdit} style={inputStyle}
+                                title="Unidades físicas por presentación"
+                                onChange={(e) => setPresentaciones((prev) => prev.map((x) =>
+                                  x.eCodPresentacion === p.eCodPresentacion ? { ...x, cantidadEdit: e.target.value } : x
+                                ))} />
+                            </div>
                             <div style={{ display: "flex", gap: 2, padding: "4px 6px", justifyContent: "center" }}>
                               <button onClick={() => guardarEdicion(p.eCodPresentacion)} disabled={p.guardandoFila}
                                 style={{ width: 22, height: 22, border: "none", background: "var(--color-primary)", color: "white", borderRadius: "var(--radius-sm)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -365,6 +441,7 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                             <span style={cellStyle}>{p.tNombre}</span>
                             <span style={cellStyle}>${p.ePricePresentacion.toFixed(2)}</span>
                             <span style={{ ...cellStyle, color: "var(--gray)" }}>${p.eCostPresentacion.toFixed(2)}</span>
+                            <span style={{ ...cellStyle, color: "var(--gray)" }}>{p.eCantidadUnidades ?? 1} pz</span>
                             <div style={{ display: "flex", gap: 2, padding: "4px 6px", justifyContent: "center" }}>
                               <button onClick={() => activarEdicion(p.eCodPresentacion)} title="Editar"
                                 style={{ width: 22, height: 22, border: "none", background: "transparent", cursor: "pointer", color: "var(--gray)", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "var(--radius-sm)" }}>
@@ -382,7 +459,7 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                   </div>
                 )}
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px 36px", gap: "var(--space-2)", alignItems: "center" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 76px 76px 58px 36px", gap: "var(--space-2)", alignItems: "center" }}>
                   <ModalInput type="text" placeholder="Nombre (ej. Docena)"
                     value={nuevaPres.tNombre}
                     onChange={(e) => setNuevaPres((p) => ({ ...p, tNombre: e.target.value }))} />
@@ -392,6 +469,10 @@ export function ModalEditarProductoImpresion({ producto, categorias, onClose, on
                   <ModalInput type="number" placeholder="Costo"
                     value={nuevaPres.eCostPresentacion}
                     onChange={(e) => setNuevaPres((p) => ({ ...p, eCostPresentacion: e.target.value }))} />
+                  <ModalInput type="number" min={1} step={1} placeholder="Pzs"
+                    title="Unidades físicas por presentación (ej. 12 para docena)"
+                    value={nuevaPres.eCantidadUnidades}
+                    onChange={(e) => setNuevaPres((p) => ({ ...p, eCantidadUnidades: e.target.value }))} />
                   <button type="button" onClick={handleAgregarPresentacion}
                     disabled={!nuevaPres.tNombre.trim() || !nuevaPres.ePricePresentacion || guardandoNueva}
                     style={{

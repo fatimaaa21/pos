@@ -128,11 +128,11 @@ export function ProductosImpresionClient({ productos: inicial, categorias }: Pro
       key:   "tNameProduct",
       label: "Producto",
       render: (p) => {
-        const ts = imgTimestamps[p.eCodProduct] ?? Date.now();
+        const ts = imgTimestamps[p.eCodProduct];
         return (
           <div className={styles.avatar} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {p.ImgProduct && (
-              <img src={`${p.ImgProduct.split("?")[0]}?t=${ts}`} alt={p.tNameProduct} />
+              <img src={ts ? `${p.ImgProduct.split("?")[0]}?t=${ts}` : p.ImgProduct.split("?")[0]} alt={p.tNameProduct} />
             )}
             <span>{p.tNameProduct}</span>
           </div>

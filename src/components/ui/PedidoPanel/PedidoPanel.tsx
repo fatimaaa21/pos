@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Trash2, Minus, Plus, NotebookPen, ShoppingCart } from "lucide-react";
 import * as Icons from "lucide-react";
 import type { ItemCarritoMenu, MetodoPago } from "@/types";
@@ -36,6 +36,68 @@ function esMetodoEfectivo(metodo: MetodoPagoGlobal): boolean {
   return metodo.tNamePay.toLowerCase().includes("efectivo");
 }
 
+// ── Input de cantidad editable ──────────────────────────────────────────────
+interface ItemCantidadInputProps {
+  cantidad:  number;
+  maxStock:  number;
+  bInfinito: boolean | undefined;
+  onConfirm: (nuevaCantidad: number) => void;
+}
+
+function ItemCantidadInput({ cantidad, maxStock, bInfinito, onConfirm }: ItemCantidadInputProps) {
+  const [editando, setEditando] = useState(false);
+  const [valor, setValor]       = useState(String(cantidad));
+  const inputRef                = useRef<HTMLInputElement>(null);
+
+  // Sincroniza si el valor cambia externamente (ej. botones + / -)
+  useEffect(() => {
+    if (!editando) setValor(String(cantidad));
+  }, [cantidad, editando]);
+
+  function handleFocus() {
+    setEditando(true);
+    setValor(String(cantidad));
+    // Selecciona todo al enfocar para facilitar reemplazo inmediato
+    setTimeout(() => inputRef.current?.select(), 0);
+  }
+
+  function confirmar() {
+    const parsed = parseInt(valor, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      // Valor inválido → revertir
+      setValor(String(cantidad));
+      setEditando(false);
+      return;
+    }
+    const nueva = bInfinito ? parsed : Math.min(parsed, maxStock);
+    onConfirm(nueva);
+    setValor(String(nueva));
+    setEditando(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter")  { e.preventDefault(); confirmar(); }
+    if (e.key === "Escape") { setValor(String(cantidad)); setEditando(false); }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={bInfinito ? undefined : maxStock}
+      value={valor}
+      className={styles.cantidadInput}
+      onChange={(e) => setValor(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={confirmar}
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export function PedidoPanel({
   items,
   metodosPago,
@@ -52,9 +114,9 @@ export function PedidoPanel({
   const [mobileExpandido, setMobileExpandido] = useState(false);
 
   const precioItem = (item: ItemCarritoMenu) =>
-  item.tipo_producto === "medida"
-    ? (item.precioCalculado ?? 0)
-    : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct);
+    item.tipo_producto === "medida"
+      ? (item.precioCalculado ?? 0)
+      : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct);
 
   const total      = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
   const subtotal   = aplicarIva ? total / (1 + IVA_RATE) : total;
@@ -117,7 +179,7 @@ export function PedidoPanel({
           </button>
         </div>
 
-        {/* ── CONTENIDO COMPLETO (siempre en DOM, CSS lo oculta en mobile colapsado) ── */}
+        {/* ── CONTENIDO COMPLETO ── */}
         <div className={styles.panelContent}>
 
           {/* Header */}
@@ -185,8 +247,20 @@ export function PedidoPanel({
                       <button className={styles.btnCantidad} onClick={() => onCambiarCantidad(key, -1)}>
                         <Minus size={11} strokeWidth={2.5} />
                       </button>
-                      <span className={styles.cantidad}>{item.cantidad}</span>
-                      {!esMedida && (
+
+                      {esMedida ? (
+                        // Medida: cantidad siempre 1, no editable
+                        <span className={styles.cantidad}>{item.cantidad}</span>
+                      ) : (
+                        <ItemCantidadInput
+                          cantidad={item.cantidad}
+                          maxStock={stock}
+                          bInfinito={bInf}
+                          onConfirm={(nueva) => onCambiarCantidad(key, nueva - item.cantidad)}
+                        />
+                      )}
+
+                      {!esMedida ? (
                         <button
                           className={`${styles.btnCantidad} ${maxAlcanzado ? styles.btnCantidadMax : ""}`}
                           onClick={() => !maxAlcanzado && onCambiarCantidad(key, 1)}
@@ -194,11 +268,18 @@ export function PedidoPanel({
                         >
                           <Plus size={11} strokeWidth={2.5} />
                         </button>
-                      )}
-                      {esMedida && (
-                        <div style={{ width: 22 }} /> 
+                      ) : (
+                        <div style={{ width: 22 }} />
                       )}
                     </div>
+                    {/* ── Botón eliminar individual ── */}
+                    <button
+                      className={styles.btnEliminarItem}
+                      onClick={() => onCambiarCantidad(key, -item.cantidad)}
+                      title="Eliminar producto"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 );
               })

@@ -100,23 +100,159 @@ export default async function MenuPage() {
 
   // ── Rama impresion ────────────────────────────────────────────────────────
   if (tipoNegocio === "impresion") {
+    // Cargar todos los productos activos incluyendo dimensiones y material vinculado
     const { data: productosImpresion } = await adminClient
       .from("productos")
-      .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct, tipo_producto, ePrecioM2")
+      .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct, tipo_producto, ePrecioM2, eAnchoCm, eAltoCm, fkeCodMaterial")
       .eq("fkeCodCompany", fkeCodCompany)
       .eq("bStateProduct", true);
 
-    const productosConStock: ProductoConStock[] = (productosImpresion ?? []).map((p: any) => ({
-      eCodProduct:     p.eCodProduct,
-      tNameProduct:    p.tNameProduct,
-      fkeCodCategory:  p.fkeCodCategory,
-      ePriceProduct:   p.ePriceProduct,
-      ImgProduct:      p.ImgProduct,
-      stockDisponible: Number.MAX_SAFE_INTEGER,
-      bInfinito:       true,
-      tipo_producto:   p.tipo_producto ?? "unidad",
-      ePrecioM2:       p.ePrecioM2 ?? null,
-    }));
+    const impresionTodos = productosImpresion ?? [];
+
+    // Separar los que necesitan inventario real (unidad SIN material vinculado)
+    const idsConInventario = impresionTodos
+      .filter((p: any) => p.tipo_producto !== "medida" && !p.fkeCodMaterial)
+      .map((p: any) => p.eCodProduct as string);
+
+    // Separar los que solo necesitan presentaciones infinitas (unidad CON material)
+    const idsConMaterial = impresionTodos
+      .filter((p: any) => p.tipo_producto !== "medida" && p.fkeCodMaterial)
+      .map((p: any) => p.eCodProduct as string);
+
+    const stockProducto    = new Map<string, number>();
+    const infinitoProducto = new Map<string, boolean>();
+    const presByProducto   = new Map<string, PresentacionConStock[]>();
+
+    // ── Inventario real (unidad sin material) ────────────────────────────────
+    if (idsConInventario.length > 0) {
+      const { data: lotes } = await adminClient
+        .from("vista_inventario")
+        .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
+        .in("fkeCodProduct", idsConInventario)
+        .eq("fkeCodCompany", fkeCodCompany)
+        .eq("bStateInventory", true)
+        .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+
+      const lotesSinPres = (lotes ?? []).filter((l: any) => !l.fkeCodPresentacion);
+      const lotesConPres = (lotes ?? []).filter((l: any) =>  l.fkeCodPresentacion);
+
+      for (const l of lotesSinPres) {
+        if (l.bUnlimitedInventory) infinitoProducto.set(l.fkeCodProduct, true);
+        else stockProducto.set(l.fkeCodProduct, (stockProducto.get(l.fkeCodProduct) ?? 0) + (l.eCantRestante ?? 0));
+      }
+
+      const stockPorPres    = new Map<string, number>();
+      const infinitoPorPres = new Map<string, boolean>();
+      for (const l of lotesConPres) {
+        const pid = l.fkeCodPresentacion as string;
+        if (l.bUnlimitedInventory) infinitoPorPres.set(pid, true);
+        else stockPorPres.set(pid, (stockPorPres.get(pid) ?? 0) + (l.eCantRestante ?? 0));
+      }
+
+      const presIds = [...new Set(lotesConPres.map((l: any) => l.fkeCodPresentacion as string))];
+      if (presIds.length > 0) {
+        const { data: pres } = await adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
+          .in("eCodPresentacion", presIds)
+          .eq("bStatePresentacion", true);
+
+        for (const p of (pres ?? [])) {
+          const bInf  = infinitoPorPres.get(p.eCodPresentacion) ?? false;
+          const stock = bInf ? Number.MAX_SAFE_INTEGER : (stockPorPres.get(p.eCodPresentacion) ?? 0);
+          const lista = presByProducto.get(p.fkeCodProduct) ?? [];
+          lista.push({
+            eCodPresentacion:   p.eCodPresentacion,
+            tNombre:            p.tNombre,
+            ePricePresentacion: p.ePricePresentacion,
+            eCostPresentacion:  p.eCostPresentacion,
+            eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
+            stockDisponible:    stock,
+            bInfinito:          bInf,
+          } as PresentacionConStock);
+          presByProducto.set(p.fkeCodProduct, lista);
+        }
+      }
+    }
+
+    // ── Presentaciones infinitas (unidad CON material — stock = hojas) ───────
+    if (idsConMaterial.length > 0) {
+      const { data: presMat } = await adminClient
+        .from("presentaciones")
+        .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
+        .in("fkeCodProduct", idsConMaterial)
+        .eq("bStatePresentacion", true);
+
+      for (const p of (presMat ?? [])) {
+        const lista = presByProducto.get(p.fkeCodProduct) ?? [];
+        lista.push({
+          eCodPresentacion:   p.eCodPresentacion,
+          tNombre:            p.tNombre,
+          ePricePresentacion: p.ePricePresentacion,
+          eCostPresentacion:  p.eCostPresentacion,
+          eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
+          stockDisponible:    Number.MAX_SAFE_INTEGER,
+          bInfinito:          true,
+        } as PresentacionConStock);
+        presByProducto.set(p.fkeCodProduct, lista);
+      }
+    }
+
+    // ── Construir ProductoConStock ───────────────────────────────────────────
+    const productosConStock: ProductoConStock[] = impresionTodos.map((p: any) => {
+      if (p.tipo_producto === "medida") {
+        return {
+          eCodProduct:     p.eCodProduct,
+          tNameProduct:    p.tNameProduct,
+          fkeCodCategory:  p.fkeCodCategory,
+          ePriceProduct:   p.ePriceProduct,
+          ImgProduct:      p.ImgProduct,
+          stockDisponible: Number.MAX_SAFE_INTEGER,
+          bInfinito:       true,
+          tipo_producto:   "medida" as const,
+          ePrecioM2:       p.ePrecioM2 ?? null,
+        };
+      }
+
+      const pres   = presByProducto.get(p.eCodProduct);
+      const tieneM = !!p.fkeCodMaterial;
+
+      if (pres && pres.length > 0) {
+        const anyInfinito = pres.some((pr) => pr.bInfinito);
+        const totalStock  = anyInfinito
+          ? Number.MAX_SAFE_INTEGER
+          : pres.reduce((acc, pr) => acc + pr.stockDisponible, 0);
+        return {
+          eCodProduct:     p.eCodProduct,
+          tNameProduct:    p.tNameProduct,
+          fkeCodCategory:  p.fkeCodCategory,
+          ePriceProduct:   p.ePriceProduct,
+          ImgProduct:      p.ImgProduct,
+          stockDisponible: totalStock,
+          bInfinito:       anyInfinito,
+          presentaciones:  pres,
+          tipo_producto:   "unidad" as const,
+          eAnchoCm:        p.eAnchoCm       ?? null,
+          eAltoCm:         p.eAltoCm        ?? null,
+          fkeCodMaterial:  p.fkeCodMaterial  ?? null,
+        };
+      }
+
+      const bInf = tieneM || (infinitoProducto.get(p.eCodProduct) ?? false);
+      return {
+        eCodProduct:     p.eCodProduct,
+        tNameProduct:    p.tNameProduct,
+        fkeCodCategory:  p.fkeCodCategory,
+        ePriceProduct:   p.ePriceProduct,
+        ImgProduct:      p.ImgProduct,
+        stockDisponible: bInf ? Number.MAX_SAFE_INTEGER : (stockProducto.get(p.eCodProduct) ?? 0),
+        bInfinito:       bInf,
+        tipo_producto:   "unidad" as const,
+        eAnchoCm:        p.eAnchoCm       ?? null,
+        eAltoCm:         p.eAltoCm        ?? null,
+        fkeCodMaterial:  p.fkeCodMaterial  ?? null,
+      };
+    });
 
     return (
       <MenuClient
@@ -200,7 +336,7 @@ export default async function MenuPage() {
   if (presentacionIds.length > 0) {
     const { data: pres } = await adminClient
       .from("presentaciones")
-      .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion")
+      .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
       .in("eCodPresentacion", presentacionIds)
       .eq("bStatePresentacion", true);
     presentacionesDetalle = pres ?? [];
@@ -217,6 +353,7 @@ export default async function MenuPage() {
       tNombre:            p.tNombre,
       ePricePresentacion: p.ePricePresentacion,
       eCostPresentacion:  p.eCostPresentacion,
+      eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
       stockDisponible:    stock,
       bInfinito:          bInf,
     };

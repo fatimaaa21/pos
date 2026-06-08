@@ -47,7 +47,8 @@ export async function crearVenta(
       version:             number;
     };
 
-    const lotesPorItem: LoteCapturado[] = [];
+    const lotesPorItem:   LoteCapturado[] = [];
+    const hojasPorItem:   (number | null)[] = []; // hojas a descontar por item (null = no aplica)
 
     // ── Fase 1: validar stock ─────────────────────────────────────────────────
     for (const item of items) {
@@ -75,6 +76,7 @@ export async function crearVenta(
         }
 
         // Marcar como ilimitado para saltarse Fase 2
+        hojasPorItem.push(null); // productos por medida no consumen hojas
         lotesPorItem.push({
           eCodInventory:       "",
           eCantRestante:       0,
@@ -84,7 +86,73 @@ export async function crearVenta(
         continue;
       }
 
-      // Productos por unidad — validación normal de inventario
+      // ── Primero verificar si el producto tiene material vinculado ─────────
+      // Para productos de impresión por unidad, el stock lo controla el material,
+      // no un registro de inventario. Se salta vista_inventario en ese caso.
+      const { data: prodDims } = await adminClient
+        .from("productos")
+        .select("eAnchoCm, eAltoCm, fkeCodMaterial")
+        .eq("eCodProduct", item.eCodProduct)
+        .single();
+
+      if (prodDims?.fkeCodMaterial && prodDims.eAnchoCm && prodDims.eAltoCm) {
+        // Producto unidad vinculado a hoja — validar solo el material
+        const { data: mat } = await adminClient
+          .from("materiales")
+          .select("eCodMaterial, eAnchoCm, eAltoCm, eMetrosLineales, bStateMaterial")
+          .eq("eCodMaterial", prodDims.fkeCodMaterial)
+          .single();
+
+        if (!mat) {
+          return { error: "Material vinculado al producto no encontrado" };
+        }
+        if (!mat.bStateMaterial) {
+          return { error: "El material vinculado está desactivado" };
+        }
+        if (!mat.eAnchoCm || !mat.eAltoCm) {
+          return { error: "El material no tiene dimensiones configuradas" };
+        }
+
+        // Orientación óptima de corte (guillotina)
+        const orientA = Math.floor(mat.eAnchoCm / prodDims.eAnchoCm) * Math.floor(mat.eAltoCm / prodDims.eAltoCm);
+        const orientB = Math.floor(mat.eAnchoCm / prodDims.eAltoCm)  * Math.floor(mat.eAltoCm / prodDims.eAnchoCm);
+        const piezasPorHoja = Math.max(orientA, orientB);
+
+        if (piezasPorHoja < 1) {
+          return { error: `El producto (${prodDims.eAnchoCm}×${prodDims.eAltoCm} cm) no cabe en la hoja del material (${mat.eAnchoCm}×${mat.eAltoCm} cm)` };
+        }
+
+        // Si el item tiene presentación, multiplicar por las unidades físicas que representa
+        let piezasTotales = item.cantidad;
+        if (item.eCodPresentacion) {
+          const { data: pres } = await adminClient
+            .from("presentaciones")
+            .select("eCantidadUnidades")
+            .eq("eCodPresentacion", item.eCodPresentacion)
+            .single();
+          piezasTotales = item.cantidad * (pres?.eCantidadUnidades ?? 1);
+        }
+
+        const hojasNecesarias = Math.ceil(piezasTotales / piezasPorHoja);
+
+        if ((mat.eMetrosLineales ?? 0) < hojasNecesarias) {
+          return {
+            error: `Hojas insuficientes. Se necesitan ${hojasNecesarias} hoja${hojasNecesarias !== 1 ? "s" : ""} pero solo quedan ${mat.eMetrosLineales}`,
+          };
+        }
+
+        // Marcar como ilimitado para saltarse Fase 2 (no hay registro de inventario)
+        hojasPorItem.push(hojasNecesarias);
+        lotesPorItem.push({
+          eCodInventory:       "",
+          eCantRestante:       0,
+          bUnlimitedInventory: true,
+          version:             0,
+        });
+        continue;
+      }
+
+      // ── Productos por unidad sin material — validación normal de inventario ─
       let q = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
@@ -117,6 +185,7 @@ export async function crearVenta(
         version = base?.version ?? 0;
       }
 
+      hojasPorItem.push(null);
       lotesPorItem.push({
         eCodInventory:       lote.eCodInventory,
         eCantRestante:       lote.eCantRestante ?? 0,
@@ -146,7 +215,7 @@ export async function crearVenta(
     }
 
     // ── Detalle de venta ──────────────────────────────────────────────────────
-    const detalle = items.map((i) => ({
+    const detalle = items.map((i, idx) => ({
       fkeCodVenta:        venta.eCodVenta,
       fkeCodProduct:      i.eCodProduct,
       fkeCodPresentacion: i.eCodPresentacion ?? null,
@@ -156,6 +225,7 @@ export async function crearVenta(
       eAnchoCm:           i.eAnchoCm    ?? null,
       eLargoCm:           i.eLargoCm    ?? null,
       fkeCodMaterial:     i.eCodMaterial ?? null,
+      eHojasConsumidas:   hojasPorItem[idx] ?? null,
     }));
 
     const { error: detalleError } = await adminClient
@@ -208,7 +278,7 @@ export async function crearVenta(
       }
     }
 
-    // ── Fase 3: descontar metros del material ─────────────────────────────────
+    // ── Fase 3: descontar metros del material (productos por medida / rollo) ───
     for (const item of items) {
       if (!item.eCodMaterial || !item.metrosConsumidos) continue;
 
@@ -232,6 +302,37 @@ export async function crearVenta(
           fhUpdateMaterial: new Date().toISOString(),
         })
         .eq("eCodMaterial", item.eCodMaterial);
+    }
+
+    // ── Fase 4: descontar hojas del material (productos por unidad con material) ─
+    for (let idx = 0; idx < items.length; idx++) {
+      const hojas = hojasPorItem[idx];
+      if (!hojas) continue;
+
+      // Obtener el fkeCodMaterial del producto (ya validado en Fase 1)
+      const { data: prodDims } = await adminClient
+        .from("productos")
+        .select("fkeCodMaterial")
+        .eq("eCodProduct", items[idx].eCodProduct)
+        .single();
+
+      if (!prodDims?.fkeCodMaterial) continue;
+
+      const { data: mat } = await adminClient
+        .from("materiales")
+        .select("eMetrosLineales")
+        .eq("eCodMaterial", prodDims.fkeCodMaterial)
+        .single();
+
+      if (!mat) continue;
+
+      await adminClient
+        .from("materiales")
+        .update({
+          eMetrosLineales:  Math.max(0, (mat.eMetrosLineales ?? 0) - hojas),
+          fhUpdateMaterial: new Date().toISOString(),
+        })
+        .eq("eCodMaterial", prodDims.fkeCodMaterial);
     }
 
     revalidatePath("/empleado/menu");
