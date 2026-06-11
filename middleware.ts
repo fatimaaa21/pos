@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const RUTAS_PUBLICAS = ["/auth", "/conoce-kivi"];
+
+function esRutaPublica(pathname: string) {
+  return RUTAS_PUBLICAS.some(
+    (ruta) => pathname === ruta || pathname.startsWith(`${ruta}/`)
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -25,7 +33,7 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user && !pathname.startsWith("/auth")) {
+  if (!user && !esRutaPublica(pathname)) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 
