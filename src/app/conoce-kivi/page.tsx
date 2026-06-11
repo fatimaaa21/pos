@@ -267,7 +267,7 @@ export default function ConoceKiviPage() {
                     <Check size={12} />
                   </span>
                   Inventario actualizado en tiempo real
-                </li>
+                </li> 
                 <li className={styles.compareItem}>
                   <span className={`${styles.compareIcon} ${styles.compareIconGood}`}>
                     <Check size={12} />
