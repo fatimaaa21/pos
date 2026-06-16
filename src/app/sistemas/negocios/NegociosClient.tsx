@@ -13,6 +13,8 @@ import { ModalVerNegocio } from "./ModalVerNegocio";
 import { ModalEditarNegocio } from "./ModalEditarNegocio";
 import { toggleEstadoNegocio, eliminarNegocio } from "@/lib/actions/sistemas";
 import { formatFechaHora } from "@/lib/utils/fecha";
+import { ModalModulosNegocio } from "./ModalModulosNegocio";
+import { LayoutGrid } from "lucide-react";
 import styles from "./negocios.module.css";
 
 export interface NegocioConAdmin {
@@ -48,6 +50,7 @@ export function NegociosClient({ negocios: inicial }: Props) {
     estados: [],
   });
   const [modalCrear, setModalCrear] = useState(false);
+  const [negocioModulos, setNegocioModulos] = useState<NegocioConAdmin | null>(null);
   const [negocioVer, setNegocioVer] = useState<NegocioConAdmin | null>(null);
   const [negocioEditar, setNegocioEditar] = useState<NegocioConAdmin | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
@@ -198,6 +201,9 @@ export function NegociosClient({ negocios: inicial }: Props) {
           <ActionBtn title="Editar" onClick={() => setNegocioEditar(n)}>
             <Pencil size={18} />
           </ActionBtn>
+          <ActionBtn title="Módulos" onClick={() => setNegocioModulos(n)}>
+            <LayoutGrid size={18} />
+          </ActionBtn>
           <ActionBtn
             title="Eliminar"
             onClick={() => handleEliminar(n)}
@@ -268,6 +274,12 @@ export function NegociosClient({ negocios: inicial }: Props) {
           negocio={negocioEditar}
           onClose={() => setNegocioEditar(null)}
           onEditado={handleEditado}
+        />
+      )}
+      {negocioModulos && (
+        <ModalModulosNegocio
+          negocio={negocioModulos}
+          onClose={() => setNegocioModulos(null)}
         />
       )}
 

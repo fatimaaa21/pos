@@ -1,0 +1,169 @@
+/* ── Page ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.titulo {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--dark);
+  margin: 0;
+}
+
+.avisoTurno {
+  font-size: 12px;
+  color: var(--color-warning);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ── Grid de mesas ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+
+.mesaCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-4);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.15s, opacity 0.15s;
+  font-family: var(--font-family);
+  min-height: 110px;
+}
+
+.mesaCard:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
+
+.mesaCard:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mesaLibre {
+  background: var(--white);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mesaOcupada {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--white);
+}
+
+.mesaNombre {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.mesaEstado {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+}
+
+.estadoLibre {
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+}
+
+.estadoOcupada {
+  background: rgba(255,255,255,0.25);
+  color: var(--white);
+}
+
+/* ── Estado vacío ── */
+.vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--gray-light);
+  padding: var(--space-10) 0;
+  font-size: 14px;
+}
+
+/* ── Vista orden ── */
+.ordenLayout {
+  display: flex;
+  gap: var(--space-4);
+  min-height: 100%;
+  padding-right: calc(300px + var(--space-4));
+}
+
+.catalogo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.ordenHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.btnVolver {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btnVolver:hover { opacity: 0.75; }
+
+.mesaNombreHeader {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dark);
+  margin: 0;
+}
+
+.ordenLayout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-right: calc(300px + var(--space-4));
+  min-height: 100%;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .ordenLayout { padding-right: calc(260px + var(--space-3)); }
+}
+
+@media (max-width: 768px) {
+  .ordenLayout {
+    padding-right: 0;
+    padding-bottom: 80px;
+  }
+}
