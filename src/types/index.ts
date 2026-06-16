@@ -248,3 +248,63 @@ export interface ItemCarritoImpresion {
   presentacion?:   PresentacionConStock;
   precioUnitario?: number;
 }
+
+// ── Módulo: Mesas ─────────────────────────────────────────────────────────────
+
+export interface ModuloTenant {
+  eCodModulo:    string;
+  fkeCodCompany: string;
+  tModulo:       string;
+  bStateModulo:  boolean;
+  fhActivado?:   string | null;
+  fhCreateModulo: string;
+}
+
+export interface Mesa {
+  eCodMesa:      string;
+  fkeCodCompany: string;
+  tNombre:       string;
+  bStateMesa:    boolean;
+  fhCreateMesa:  string;
+}
+
+export type EstadoOrdenMesa = "abierta" | "cerrada" | "cancelada";
+
+export interface OrdenMesa {
+  eCodOrden:     string;
+  fkeCodMesa:    string;
+  fkeCodCompany: string;
+  fkeCodUser:    string;
+  tEstado:       EstadoOrdenMesa;
+  fhAbierta:     string;
+  fhCerrada?:    string | null;
+  fkeCodVenta?:  string | null;
+}
+
+export interface OrdenMesaDetalle {
+  eCodDetalle:        string;
+  fkeCodOrden:        string;
+  fkeCodProduct:      string;
+  fkeCodPresentacion?: string | null;
+  eCantidad:          number;
+  ePrecio:            number;
+  fhAgregado:         string;
+}
+
+// Vista enriquecida para el layout de mesas
+export interface MesaConEstado extends Mesa {
+  ordenAbierta?: OrdenMesa | null;
+}
+
+// Vista enriquecida para el detalle de una orden
+export interface OrdenMesaDetalleConProducto extends OrdenMesaDetalle {
+  producto?:     { tNameProduct: string; ImgProduct?: string } | null;
+  presentacion?: { tNombre: string } | null;
+}
+
+export interface OrdenMesaConDetalle extends OrdenMesa {
+  mesa?:     Mesa | null;
+  empleado?: Pick<Perfil, "eCodUser" | "tNameUser"> | null;
+  detalle:   OrdenMesaDetalleConProducto[];
+  eTotal:    number; // suma calculada del detalle
+}

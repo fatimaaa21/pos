@@ -244,3 +244,52 @@ export async function eliminarNegocio(eCodCompany: string) {
     return { error: `Error inesperado: ${e?.message}` };
   }
 }
+
+// ── Módulos por negocio ───────────────────────────────────────────────────────
+
+const MODULOS_DISPONIBLES = ["mesas"] as const;
+export type ModuloDisponible = typeof MODULOS_DISPONIBLES[number];
+
+export async function obtenerModulosNegocio(
+  fkeCodCompany: string
+): Promise<{ tModulo: string; bStateModulo: boolean }[]> {
+  const adminClient = createAdminClient();
+
+  const { data } = await adminClient
+    .from("modulos_tenant")
+    .select("tModulo, bStateModulo")
+    .eq("fkeCodCompany", fkeCodCompany);
+
+  // Devuelve todos los módulos disponibles, activos o no
+  return MODULOS_DISPONIBLES.map((modulo) => ({
+    tModulo:      modulo,
+    bStateModulo: (data ?? []).find((m) => m.tModulo === modulo)?.bStateModulo ?? false,
+  }));
+}
+
+export async function toggleModuloNegocio(
+  fkeCodCompany: string,
+  tModulo: string,
+  bStateModulo: boolean
+): Promise<{ ok: true } | { error: string }> {
+  const adminClient = createAdminClient();
+
+  // Upsert: si no existe el registro lo crea, si existe lo actualiza
+  const { error } = await adminClient
+    .from("modulos_tenant")
+    .upsert(
+      {
+        fkeCodCompany,
+        tModulo,
+        bStateModulo,
+        fhActivado:    bStateModulo ? new Date().toISOString() : null,
+        fhCreateModulo: new Date().toISOString(),
+      },
+      { onConflict: "fkeCodCompany,tModulo" }
+    );
+
+  if (error) return { error: `Error al actualizar módulo: ${error.message}` };
+
+  revalidatePath("/sistemas/negocios");
+  return { ok: true };
+}

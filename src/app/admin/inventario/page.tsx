@@ -52,7 +52,7 @@ export default async function InventarioPage() {
   const idsProductos = (productosDelNegocio ?? []).map((p) => p.eCodProduct);
 
   if (idsProductos.length === 0) {
-    return <InventarioClient inventario={[]} tipoNegocio={tipoNegocio} />;
+    return <InventarioClient inventario={[]} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} />;
   }
 
   const { data: inventarioRaw, error } = await supabase
@@ -107,5 +107,5 @@ export default async function InventarioPage() {
       : null,
   }));
 
-  return <InventarioClient inventario={inventario} tipoNegocio={tipoNegocio} />;
+  return <InventarioClient inventario={inventario} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} />;
 }

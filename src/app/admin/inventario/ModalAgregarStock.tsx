@@ -11,9 +11,10 @@ import type { Inventario, Presentacion, Producto } from "@/types";
 interface Props {
   onClose:    () => void;
   onAgregado: (inventario: Inventario) => void;
+  fkeCodCompany: string;
 }
 
-export function ModalAgregarStock({ onClose, onAgregado }: Props) {
+export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany }: Props) {
   const [loading, setLoading]                     = useState(false);
   const [error, setError]                         = useState<string | null>(null);
   const [productos, setProductos]                 = useState<Producto[]>([]);
@@ -36,6 +37,7 @@ export function ModalAgregarStock({ onClose, onAgregado }: Props) {
       const { data, error } = await supabase
         .from("productos")
         .select("eCodProduct, tNameProduct, ImgProduct, ePriceProduct")
+        .eq("fkeCodCompany", fkeCodCompany)
         .eq("bStateProduct", true)
         .order("tNameProduct");
 

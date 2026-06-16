@@ -39,9 +39,10 @@ export interface InventarioConProducto extends Inventario {
 interface Props {
   inventario: InventarioConProducto[];
   tipoNegocio: "general" | "impresion"
+  fkeCodCompany:  string;
 }
 
-export function InventarioClient({ inventario: inicial, tipoNegocio }: Props) {
+export function InventarioClient({ inventario: inicial, tipoNegocio, fkeCodCompany }: Props) {
   const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
   const [busqueda, setBusqueda]     = useState("");
   const router                      = useRouter();
@@ -349,6 +350,7 @@ export function InventarioClient({ inventario: inicial, tipoNegocio }: Props) {
         <ModalAgregarStock
           onClose={() => setModalAgregar(false)}
           onAgregado={handleStockAgregado}
+          fkeCodCompany={fkeCodCompany}
         />
       )}
       {stockVer && (

@@ -12,24 +12,40 @@ import {
   LayoutDashboard, Package, ReceiptText, BookOpenText,
   Users, LogOut, ClipboardList, ClipboardPenLine,
   Building2, Settings, ChevronUp, CircleDollarSign,
-  Calculator, Menu, X,
+  Calculator, Menu, X, LayoutGrid,
 } from "lucide-react";
 
-const navAdmin = [
-  { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"   },
-  { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
-  { icon: Package,          label: "Productos",       href: "/admin/productos"   },
-  { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
-  { icon: ReceiptText,        label: "Ventas",          href: "/admin/ventasAdmin" },
-  { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
-  { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
-];
+function buildNavAdmin(modulosActivos: string[]) {
+  const nav = [
+    { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"   },
+    { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
+    { icon: Package,          label: "Productos",       href: "/admin/productos"   },
+    { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
+    { icon: ReceiptText,      label: "Ventas",          href: "/admin/ventasAdmin" },
+    { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
+    { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
+  ];
 
-const navEmpleado = [
-  { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
-  { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
-  { icon: ReceiptText,            label: "Mis ventas", href: "/empleado/ventasEmpleado" },
-];
+  if (modulosActivos.includes("mesas")) {
+    nav.push({ icon: LayoutGrid, label: "Mesas", href: "/admin/mesas" });
+  }
+
+  return nav;
+}
+
+function buildNavEmpleado(modulosActivos: string[]) {
+  const nav = [
+    { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
+    { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
+    { icon: ReceiptText,      label: "Mis ventas", href: "/empleado/ventasEmpleado" },
+  ];
+
+  if (modulosActivos.includes("mesas")) {
+    nav.splice(1, 0, { icon: LayoutGrid, label: "Mesas", href: "/empleado/mesas" });
+  }
+
+  return nav;
+}
 
 const navSistemas = [
   { icon: LayoutDashboard,  label: "Dashboard", href: "/sistemas/dashboard"   },
@@ -45,9 +61,10 @@ interface NegocioInfo {
 interface SidebarProps {
   perfil:   Perfil;
   negocio?: NegocioInfo | null;
+  modulosActivos?: string[];
 }
 
-export function Sidebar({ perfil, negocio }: SidebarProps) {
+export function Sidebar({ perfil, negocio, modulosActivos = [] }: SidebarProps) {
   const pathname = usePathname();
   const [popupAbierto,  setPopupAbierto]  = useState(false);
   const [drawerAbierto, setDrawerAbierto] = useState(false);
@@ -56,9 +73,9 @@ export function Sidebar({ perfil, negocio }: SidebarProps) {
   const abrirConfiguracion = useConfiguracionStore((s) => s.abrir);
 
   const nav =
-    perfil.tRolUser === "admin"    ? navAdmin    :
-    perfil.tRolUser === "sistemas" ? navSistemas :
-    navEmpleado;
+    perfil.tRolUser === "admin"    ? buildNavAdmin(modulosActivos)    :
+    perfil.tRolUser === "sistemas" ? navSistemas                      :
+    buildNavEmpleado(modulosActivos);
 
   const esAdmin    = perfil.tRolUser === "admin";
   const esSistemas = perfil.tRolUser === "sistemas";
