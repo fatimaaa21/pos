@@ -4,6 +4,9 @@ import { InventarioClient }  from "./InventarioClient";
 import { InventarioImpresionClient } from "./InventarioImpresionClient";
 import type { InventarioConProducto } from "./InventarioClient";
 import type { Material } from "@/types";
+import { getSucursalContext }  from "@/lib/utils/sucursal";
+import { obtenerSucursales }   from "@/lib/actions/sucursales";
+import type { Sucursal }       from "@/types";
 
 export default async function InventarioPage() {
   const supabase    = await createClient();
@@ -18,6 +21,17 @@ export default async function InventarioPage() {
     .single();
 
   const fkeCodCompany = perfilActual?.fkeCodCompany;
+
+  const [ctx, sucursalesData] = await Promise.all([
+    getSucursalContext(),
+    obtenerSucursales(),
+  ]);
+
+  const fkeCodSucursal = ctx.fkeCodSucursal;
+  const sucursales     = sucursalesData.map((s: Sucursal) => ({
+    eCodSucursal: s.eCodSucursal,
+    tNombre:      s.tNombre,
+  }));
 
   // ── Tipo de negocio ───────────────────────────────────────────────────────
   const { data: negocio } = await adminClient
@@ -52,10 +66,11 @@ export default async function InventarioPage() {
   const idsProductos = (productosDelNegocio ?? []).map((p) => p.eCodProduct);
 
   if (idsProductos.length === 0) {
-    return <InventarioClient inventario={[]} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} />;
+    return <InventarioClient inventario={[]} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} fkeCodSucursal={fkeCodSucursal} 
+    sucursales={sucursales} />;
   }
 
-  const { data: inventarioRaw, error } = await supabase
+  let inventarioQuery = adminClient
     .from("vista_inventario")
     .select(`
       *,
@@ -71,6 +86,12 @@ export default async function InventarioPage() {
     `)
     .in("fkeCodProduct", idsProductos)
     .order("fhCreateInventory", { ascending: false });
+
+  if (fkeCodSucursal) {
+    inventarioQuery = inventarioQuery.eq("fkeCodSucursal", fkeCodSucursal);
+  }
+
+  const { data: inventarioRaw, error } = await inventarioQuery;
 
   if (error) console.error("Error cargando inventario:", error);
 
@@ -107,5 +128,5 @@ export default async function InventarioPage() {
       : null,
   }));
 
-  return <InventarioClient inventario={inventario} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} />;
+  return <InventarioClient inventario={inventario} tipoNegocio={tipoNegocio} fkeCodCompany={fkeCodCompany} fkeCodSucursal={fkeCodSucursal} sucursales={sucursales} />;
 }

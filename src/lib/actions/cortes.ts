@@ -5,9 +5,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import type { CorteCaja }    from "@/types";
 
-// ─────────────────────────────────────────────────────────────
-// EMPLEADO: Iniciar turno
-// ─────────────────────────────────────────────────────────────
 export async function iniciarTurno(formData: FormData) {
   try {
     const supabase    = await createClient();
@@ -18,12 +15,16 @@ export async function iniciarTurno(formData: FormData) {
 
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles")
-      .select("fkeCodCompany")
+      .select("fkeCodCompany, fkeCodSucursal")
       .eq("eCodUser", user.id)
       .single();
 
     if (perfilError || !perfil?.fkeCodCompany) {
       return { error: "No se encontró el negocio del empleado" };
+    }
+
+    if (!perfil.fkeCodSucursal) {
+      return { error: "El empleado no tiene una sucursal asignada" };
     }
 
     const { data: turnoAbierto } = await adminClient
@@ -33,9 +34,7 @@ export async function iniciarTurno(formData: FormData) {
       .eq("bStateCorte", "abierto")
       .maybeSingle();
 
-    if (turnoAbierto) {
-      return { error: "Ya tienes un turno abierto" };
-    }
+    if (turnoAbierto) return { error: "Ya tienes un turno abierto" };
 
     const eFondoInicial = parseFloat(formData.get("eFondoInicial") as string);
     const tNombreTurno  = (formData.get("tNombreTurno") as string) || null;
@@ -48,14 +47,15 @@ export async function iniciarTurno(formData: FormData) {
     const { data: corte, error: corteError } = await adminClient
       .from("cortes_caja")
       .insert({
-        fkeCodUser:    user.id,
-        fkeCodCompany: perfil.fkeCodCompany,
+        fkeCodUser:      user.id,
+        fkeCodCompany:   perfil.fkeCodCompany,
+        fkeCodSucursal:  perfil.fkeCodSucursal,  // ← nuevo
         tNombreTurno,
         eFondoInicial,
-        bStateCorte:   "abierto",
-        fhInicioTurno: ahora,
-        fhCreateCorte: ahora,
-        fhUpdateCorte: ahora,
+        bStateCorte:     "abierto",
+        fhInicioTurno:   ahora,
+        fhCreateCorte:   ahora,
+        fhUpdateCorte:   ahora,
       })
       .select("eCodCorte, fhInicioTurno, eFondoInicial, bStateCorte")
       .single();
@@ -72,9 +72,6 @@ export async function iniciarTurno(formData: FormData) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// EMPLEADO: Cerrar turno (enviar corte)
-// ─────────────────────────────────────────────────────────────
 export async function cerrarTurno(formData: FormData) {
   try {
     const supabase    = await createClient();
@@ -85,7 +82,7 @@ export async function cerrarTurno(formData: FormData) {
 
     const { data: corte, error: corteError } = await adminClient
       .from("cortes_caja")
-      .select("eCodCorte, eFondoInicial, fhInicioTurno")
+      .select("eCodCorte, eFondoInicial, fhInicioTurno, fkeCodSucursal")
       .eq("fkeCodUser", user.id)
       .eq("bStateCorte", "abierto")
       .single();
@@ -94,23 +91,21 @@ export async function cerrarTurno(formData: FormData) {
       return { error: "No se encontró un turno abierto" };
     }
 
-    // ── Ventas del turno ──────────────────────────────────────────────────
+    // Ventas del turno — filtradas por sucursal
     const { data: ventas, error: ventasError } = await adminClient
       .from("ventas")
       .select("eTotal, fkeMetodoPago")
       .eq("fkeCodUser", user.id)
-      .eq("bCancelada", false) 
+      .eq("fkeCodSucursal", corte.fkeCodSucursal)  // ← nuevo
+      .eq("bCancelada", false)
       .gte("fhCreateVenta", corte.fhInicioTurno);
 
     if (ventasError) {
       return { error: `Error al calcular ventas: ${ventasError.message}` };
     }
 
-    // ── Total real de ventas (independiente de método) ────────────────────
     const eTotalVentas = (ventas ?? []).reduce((acc, v) => acc + v.eTotal, 0);
 
-    // ── Clasificar por método usando nombres dinámicos (no strings hardcoded)
-    // fkeMetodoPago es un UUID; los strings "efectivo", "tarjeta" son legacy.
     let eTotalEfectivo      = 0;
     let eTotalTarjeta       = 0;
     let eTotalTransferencia = 0;
@@ -138,16 +133,14 @@ export async function cerrarTurno(formData: FormData) {
         .filter((v) => esTarjeta(v.fkeMetodoPago))
         .reduce((acc, v) => acc + v.eTotal, 0);
 
-      // Cualquier método que no sea efectivo ni tarjeta va a transferencia/QR
       eTotalTransferencia = ventas
         .filter((v) => !esEfectivo(v.fkeMetodoPago) && !esTarjeta(v.fkeMetodoPago))
         .reduce((acc, v) => acc + v.eTotal, 0);
     }
 
-    // ── Solo el efectivo entra al cajón físico ────────────────────────────
     const eEfectivoEsperado = corte.eFondoInicial + eTotalEfectivo;
+    const eEfectivoContado  = parseFloat(formData.get("eEfectivoContado") as string);
 
-    const eEfectivoContado = parseFloat(formData.get("eEfectivoContado") as string);
     if (isNaN(eEfectivoContado) || eEfectivoContado < 0) {
       return { error: "Monto de efectivo contado inválido" };
     }
@@ -186,9 +179,6 @@ export async function cerrarTurno(formData: FormData) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// ADMIN: Aprobar o marcar diferencia en un corte
-// ─────────────────────────────────────────────────────────────
 export async function revisarCorte(formData: FormData) {
   try {
     const supabase    = await createClient();
@@ -203,13 +193,11 @@ export async function revisarCorte(formData: FormData) {
       .eq("eCodUser", user.id)
       .single();
 
-    if (perfil?.tRolUser !== "admin") {
-      return { error: "Acceso no autorizado" };
-    }
+    if (perfil?.tRolUser !== "admin") return { error: "Acceso no autorizado" };
 
-    const eCodCorte    = formData.get("eCodCorte")    as string;
-    const bStateCorte = formData.get("bStateCorte") as "aprobado" | "diferencia";
-    const tNotaAdmin   = (formData.get("tNotaAdmin")  as string) || null;
+    const eCodCorte   = formData.get("eCodCorte")    as string;
+    const bStateCorte = formData.get("bStateCorte")  as "aprobado" | "diferencia";
+    const tNotaAdmin  = (formData.get("tNotaAdmin")  as string) || null;
 
     if (!["aprobado", "diferencia"].includes(bStateCorte)) {
       return { error: "Estado inválido" };
@@ -222,10 +210,7 @@ export async function revisarCorte(formData: FormData) {
       .eq("fkeCodCompany", perfil.fkeCodCompany)
       .single();
 
-    if (!corte) {
-      return { error: "Corte no encontrado" };
-    }
-
+    if (!corte) return { error: "Corte no encontrado" };
     if (corte.bStateCorte !== "pendiente") {
       return { error: "Solo se pueden revisar cortes en estado pendiente" };
     }
@@ -254,9 +239,6 @@ export async function revisarCorte(formData: FormData) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// UTIL: Obtener turno abierto del empleado actual
-// ─────────────────────────────────────────────────────────────
 export async function getTurnoAbierto() {
   try {
     const supabase    = await createClient();

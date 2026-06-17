@@ -1,18 +1,19 @@
-// src/components/layout/Sidebar.tsx
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link              from "next/link";
+import { usePathname }   from "next/navigation";
+import { useRouter }     from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { logout } from "@/lib/actions/auth";
-import { useConfiguracionStore } from "@/lib/stores/configuracion";
-import type { Perfil } from "@/types";
+import { logout }        from "@/lib/actions/auth";
+import { setSucursalActivaCookie } from "@/lib/actions/sucursales";
+import { useConfiguracionStore }   from "@/lib/stores/configuracion";
+import type { Perfil, Sucursal }   from "@/types";
 import styles from "./Sidebar.module.css";
 import {
   LayoutDashboard, Package, ReceiptText, BookOpenText,
   Users, LogOut, ClipboardList, ClipboardPenLine,
   Building2, Settings, ChevronUp, CircleDollarSign,
-  Calculator, Menu, X, LayoutGrid,
+  Calculator, Menu, X, LayoutGrid, MapPin, ChevronDown,
 } from "lucide-react";
 
 function buildNavAdmin(modulosActivos: string[]) {
@@ -25,11 +26,9 @@ function buildNavAdmin(modulosActivos: string[]) {
     { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
     { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
   ];
-
   if (modulosActivos.includes("mesas")) {
     nav.push({ icon: LayoutGrid, label: "Mesas", href: "/admin/mesas" });
   }
-
   return nav;
 }
 
@@ -39,11 +38,9 @@ function buildNavEmpleado(modulosActivos: string[]) {
     { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
     { icon: ReceiptText,      label: "Mis ventas", href: "/empleado/ventasEmpleado" },
   ];
-
   if (modulosActivos.includes("mesas")) {
     nav.splice(1, 0, { icon: LayoutGrid, label: "Mesas", href: "/empleado/mesas" });
   }
-
   return nav;
 }
 
@@ -59,12 +56,86 @@ interface NegocioInfo {
 }
 
 interface SidebarProps {
-  perfil:   Perfil;
-  negocio?: NegocioInfo | null;
+  perfil:          Perfil;
+  negocio?:        NegocioInfo | null;
   modulosActivos?: string[];
+  sucursales?:     Sucursal[];
+  sucursalActiva?: string | null;
 }
 
-export function Sidebar({ perfil, negocio, modulosActivos = [] }: SidebarProps) {
+// ── Selector de sucursal ─────────────────────────────────────
+function SucursalSelector({
+  sucursales,
+  sucursalActiva,
+}: {
+  sucursales:     Sucursal[];
+  sucursalActiva: string | null;
+}) {
+  const router      = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref         = useRef<HTMLDivElement>(null);
+
+  const actual = sucursales.find((s) => s.eCodSucursal === sucursalActiva);
+  const label  = actual?.tNombre ?? "Todas las sucursales";
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  async function handleSelect(eCodSucursal: string | null) {
+    setOpen(false);
+    await setSucursalActivaCookie(eCodSucursal ?? "");
+    router.refresh();
+  }
+
+  if (sucursales.length <= 1) return null;
+
+  return (
+    <div className={styles.sucursalSelector} ref={ref}>
+      <button
+        className={styles.sucursalBtn}
+        onClick={() => setOpen((v) => !v)}
+        title={label}
+      >
+        <MapPin size={11} className={styles.sucursalIcon} />
+        <span className={styles.sucursalLabel}>{label}</span>
+        <ChevronDown size={11} className={`${styles.sucursalChevron} ${open ? styles.sucursalChevronOpen : ""}`} />
+      </button>
+
+      {open && (
+        <div className={styles.sucursalDropdown}>
+          <button
+            className={`${styles.sucursalOption} ${!sucursalActiva ? styles.sucursalOptionActiva : ""}`}
+            onClick={() => handleSelect(null)}
+          >
+            Todas las sucursales
+          </button>
+          {sucursales.map((s) => (
+            <button
+              key={s.eCodSucursal}
+              className={`${styles.sucursalOption} ${sucursalActiva === s.eCodSucursal ? styles.sucursalOptionActiva : ""}`}
+              onClick={() => handleSelect(s.eCodSucursal)}
+            >
+              {s.tNombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Sidebar({
+  perfil,
+  negocio,
+  modulosActivos  = [],
+  sucursales      = [],
+  sucursalActiva  = null,
+}: SidebarProps) {
   const pathname = usePathname();
   const [popupAbierto,  setPopupAbierto]  = useState(false);
   const [drawerAbierto, setDrawerAbierto] = useState(false);
@@ -118,12 +189,7 @@ export function Sidebar({ perfil, negocio, modulosActivos = [] }: SidebarProps) 
               <div className={styles.logoText}>Kivi</div>
             </div>
           </div>
-          {/* Botón cerrar — solo visible en mobile */}
-          <button
-            className={styles.btnCerrarDrawer}
-            onClick={cerrarDrawer}
-            aria-label="Cerrar menú"
-          >
+          <button className={styles.btnCerrarDrawer} onClick={cerrarDrawer} aria-label="Cerrar menú">
             <X size={16} />
           </button>
         </div>
@@ -142,12 +208,7 @@ export function Sidebar({ perfil, negocio, modulosActivos = [] }: SidebarProps) 
             <div className={styles.logoText}>{negocio?.tNameCompany ?? "Kivi"}</div>
           </div>
         </div>
-        {/* Botón cerrar — solo visible en mobile */}
-        <button
-          className={styles.btnCerrarDrawer}
-          onClick={cerrarDrawer}
-          aria-label="Cerrar menú"
-        >
+        <button className={styles.btnCerrarDrawer} onClick={cerrarDrawer} aria-label="Cerrar menú">
           <X size={16} />
         </button>
       </div>
@@ -156,25 +217,26 @@ export function Sidebar({ perfil, negocio, modulosActivos = [] }: SidebarProps) 
 
   return (
     <>
-      {/* Hamburger externo — solo cuando el drawer está CERRADO */}
       {!drawerAbierto && (
-        <button
-          className={styles.hamburger}
-          onClick={() => setDrawerAbierto(true)}
-          aria-label="Abrir menú"
-        >
+        <button className={styles.hamburger} onClick={() => setDrawerAbierto(true)} aria-label="Abrir menú">
           <Menu size={18} />
         </button>
       )}
 
-      {/* Overlay */}
       {drawerAbierto && (
         <div className={styles.overlay} onClick={cerrarDrawer} aria-hidden="true" />
       )}
 
       <aside className={`${styles.sidebar} ${drawerAbierto ? styles.sidebarOpen : ""}`}>
-
         {renderLogo()}
+
+        {/* Selector de sucursal — solo admin con más de 1 sucursal */}
+        {esAdmin && (
+          <SucursalSelector
+            sucursales={sucursales}
+            sucursalActiva={sucursalActiva}
+          />
+        )}
 
         <nav className={styles.nav}>
           {nav.map((item) => (

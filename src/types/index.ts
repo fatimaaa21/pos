@@ -2,6 +2,7 @@ export type Rol = "admin" | "empleado" | "sistemas";
 
 export interface Perfil {
   fkeCodCompany: string | null;
+  fkeCodSucursal: string | null;
   eCodUser: string;
   tNameUser: string;
   tEmailUser: string;
@@ -247,6 +248,17 @@ export interface ItemCarritoImpresion {
   cantidad?:       number;
   presentacion?:   PresentacionConStock;
   precioUnitario?: number;
+}
+
+// ── Sucursales ────────────────────────────────────────────────────────────────
+
+export interface Sucursal {
+  eCodSucursal:     string;
+  fkeCodCompany:    string;
+  tNombre:          string;
+  tDireccion?:      string | null;
+  bStateSucursal:   boolean;
+  fhCreateSucursal: string;
 }
 
 // ── Módulo: Mesas ─────────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@ import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CortesAdminClient } from "./CortesAdminClient";
 import type { CorteCaja }    from "@/types";
+import { getSucursalContext } from "@/lib/utils/sucursal";
+
 
 export default async function CortesAdminPage() {
   const supabase    = await createClient();
@@ -19,12 +21,19 @@ export default async function CortesAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
+  const ctx            = await getSucursalContext();
+  const fkeCodSucursal = ctx.fkeCodSucursal;
+
   // Todos los cortes del negocio ordenados por más reciente
-  const { data: cortes, error } = await adminClient
+  let cortesQuery = adminClient
     .from("cortes_caja")
     .select("*")
     .eq("fkeCodCompany", fkeCodCompany)
     .order("fhCreateCorte", { ascending: false });
+
+  if (fkeCodSucursal) cortesQuery = cortesQuery.eq("fkeCodSucursal", fkeCodSucursal);
+
+const { data: cortes, error } = await cortesQuery;
 
   if (error) console.error("Error cargando cortes:", error.message);
 

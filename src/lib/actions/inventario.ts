@@ -10,18 +10,17 @@ export async function agregarStock(formData: FormData) {
 
     const fkeCodProduct      = formData.get("fkeCodProduct") as string;
     const fkeCodPresentacion = (formData.get("fkeCodPresentacion") as string) || null;
+    const fkeCodSucursal     = formData.get("fkeCodSucursal") as string;  // ← nuevo
     const bIlimitado         = formData.get("bUnlimitedInventory") === "true";
     const eCantIngresada     = bIlimitado ? 0 : parseFloat(formData.get("eCantIngresada") as string);
     const eStockMinimo       = bIlimitado ? 0 : (parseFloat(formData.get("eStockMinimo") as string) || 0);
 
     if (!fkeCodProduct) return { error: "Producto requerido" };
+    if (!fkeCodSucursal) return { error: "Sucursal requerida" };  // ← nuevo
     if (!bIlimitado && (isNaN(eCantIngresada) || eCantIngresada <= 0)) {
       return { error: "Cantidad inválida" };
     }
 
-    // ── Regla de negocio: si el producto tiene presentaciones, SIEMPRE se
-    //    requiere fkeCodPresentacion. No puede haber inventario "genérico"
-    //    para un producto que ya maneja presentaciones. ──────────────────────
     if (!fkeCodPresentacion) {
       const { data: presActivas } = await adminClient
         .from("presentaciones")
@@ -39,7 +38,6 @@ export async function agregarStock(formData: FormData) {
       }
     }
 
-    // Obtener fkeCodCompany
     const { data: producto, error: productoError } = await adminClient
       .from("productos")
       .select("fkeCodCompany")
@@ -59,12 +57,13 @@ export async function agregarStock(formData: FormData) {
         fkeCodProduct,
         fkeCodPresentacion,
         fkeCodCompany,
+        fkeCodSucursal,   // ← nuevo
         eCantIngresada,
         eStockMinimo,
         bUnlimitedInventory: bIlimitado,
-        bStateInventory: true,
-        fhCreateInventory: ahora,
-        fhUpdateInventory: ahora,
+        bStateInventory:     true,
+        fhCreateInventory:   ahora,
+        fhUpdateInventory:   ahora,
       })
       .select("eCodInventory")
       .single();

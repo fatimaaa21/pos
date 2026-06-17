@@ -9,6 +9,8 @@ import {
   type TopProducto,
 } from "./DasboardClient";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import { getSucursalContext } from "@/lib/utils/sucursal";
+
 
 export default async function DashboardPage() {
   const supabase    = await createClient();
@@ -26,6 +28,14 @@ export default async function DashboardPage() {
 
   const fkeCodCompany = perfil?.fkeCodCompany;
   if (!fkeCodCompany) return null;
+
+  const ctx            = await getSucursalContext();
+  const fkeCodSucursal = ctx.fkeCodSucursal;
+
+  // Helper para no repetir el filtro en cada query:
+  function addSucursal(q: any) {
+    return fkeCodSucursal ? q.eq("fkeCodSucursal", fkeCodSucursal) : q;
+  }
 
   // ── Rangos de fecha (UTC) ──────────────────────────────────────────────────
   const ahora  = new Date();
@@ -48,78 +58,79 @@ export default async function DashboardPage() {
 
   // ── Batch 1: queries independientes en paralelo ────────────────────────────
   const [
-    { data: ventasHoyRaw },
-    { data: ventasAyerRaw },
-    { data: ventas7DiasRaw },
-    { data: turnosAbiertosRaw },
-    { data: cortesPendientesRaw },
-    { data: inventarioRaw },
-    { data: negocioRaw },
-  ] = await Promise.all([
-    // Ventas de hoy
-    adminClient
-      .from("ventas")
-      .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bCancelada", false)
-      .gte("fhCreateVenta", inicioDia),
+  { data: ventasHoyRaw },
+  { data: ventasAyerRaw },
+  { data: ventas7DiasRaw },
+  { data: turnosAbiertosRaw },
+  { data: cortesPendientesRaw },
+  { data: inventarioRaw },
+  { data: negocioRaw },
+] = await Promise.all([
+  addSucursal(adminClient
+    .from("ventas")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bCancelada", false)
+    .gte("fhCreateVenta", inicioDia)),
 
-    // Ventas de ayer (para comparación de tendencia)
-    adminClient
-      .from("ventas")
-      .select("eTotal, fkeMetodoPago")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bCancelada", false)
-      .gte("fhCreateVenta", inicioAyer)
-      .lt("fhCreateVenta", inicioDia),
+  addSucursal(adminClient
+    .from("ventas")
+    .select("eTotal, fkeMetodoPago")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bCancelada", false)
+    .gte("fhCreateVenta", inicioAyer)
+    .lt("fhCreateVenta", inicioDia)),
 
-    // Ventas 7 días (para gráfica)
-    adminClient
-      .from("ventas")
-      .select("eTotal, fhCreateVenta")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bCancelada", false)
-      .gte("fhCreateVenta", hace6D)
-      .order("fhCreateVenta", { ascending: true }),
+  addSucursal(adminClient
+    .from("ventas")
+    .select("eTotal, fhCreateVenta")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bCancelada", false)
+    .gte("fhCreateVenta", hace6D)
+    .order("fhCreateVenta", { ascending: true })),
 
-    // Turnos abiertos
-    adminClient
-      .from("cortes_caja")
-      .select("*")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bStateCorte", "abierto"),
+  addSucursal(adminClient
+    .from("cortes_caja")
+    .select("*")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bStateCorte", "abierto")),
 
-    // Cortes pendientes de revisión
-    adminClient
-      .from("cortes_caja")
-      .select("eCodCorte, fkeCodUser, tNombreTurno, fhCierreTurno, eDiferencia, bStateCorte")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bStateCorte", "pendiente")
-      .order("fhCierreTurno", { ascending: false })
-      .limit(5),
+  addSucursal(adminClient
+    .from("cortes_caja")
+    .select("eCodCorte, fkeCodUser, tNombreTurno, fhCierreTurno, eDiferencia, bStateCorte")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bStateCorte", "pendiente")
+    .order("fhCierreTurno", { ascending: false })
+    .limit(5)),
 
-    // Inventario activo (sin ilimitados)
-    adminClient
-      .from("vista_inventario")
-      .select("fkeCodProduct, eCantRestante, eStockMinimo, bUnlimitedInventory, bStateInventory")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bStateInventory", true)
-      .eq("bUnlimitedInventory", false),
+  addSucursal(adminClient
+    .from("vista_inventario")
+    .select("fkeCodProduct, eCantRestante, eStockMinimo, bUnlimitedInventory, bStateInventory")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bStateInventory", true)
+    .eq("bUnlimitedInventory", false)),
 
-    // Nombre del negocio
-    adminClient
-      .from("negocios")
-      .select("tNameCompany")
-      .eq("eCodCompany", fkeCodCompany)
-      .single(),
-  ]);
+  // negocioRaw no necesita filtro de sucursal
+  adminClient
+    .from("negocios")
+    .select("tNameCompany")
+    .eq("eCodCompany", fkeCodCompany)
+    .single(),
+]);
 
-  const ventasHoy      = ventasHoyRaw      ?? [];
-  const ventasAyer     = ventasAyerRaw     ?? [];
-  const ventas7Dias    = ventas7DiasRaw    ?? [];
-  const turnosAbiertos = turnosAbiertosRaw ?? [];
-  const cortesPend     = cortesPendientesRaw ?? [];
-  const inventario     = inventarioRaw     ?? [];
+  // Reemplaza el bloque de asignaciones después del Promise.all:
+  const ventasHoy      = (ventasHoyRaw      ?? []) as Array<{ eCodVenta: string; eTotal: number; fkeMetodoPago: string; fhCreateVenta: string; fkeCodUser: string }>;
+  const ventasAyer     = (ventasAyerRaw     ?? []) as Array<{ eTotal: number; fkeMetodoPago: string }>;
+  const ventas7Dias    = (ventas7DiasRaw    ?? []) as Array<{ eTotal: number; fhCreateVenta: string }>;
+  const turnosAbiertos = (turnosAbiertosRaw ?? []) as any[];
+  const cortesPend     = (cortesPendientesRaw ?? []) as any[];
+  const inventario     = (inventarioRaw     ?? []) as Array<{
+    fkeCodProduct:      string;
+    eCantRestante:      number | null;
+    eStockMinimo:       number | null;
+    bUnlimitedInventory: boolean;
+    bStateInventory:    boolean;
+  }>;
 
   // ── Batch 2: queries que dependen del batch 1 ─────────────────────────────
   const metodosIds        = [...new Set([

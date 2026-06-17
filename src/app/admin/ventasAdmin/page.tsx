@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient }      from "@/lib/supabase/server";
 import { VentasAdminClient } from "./ventasAdminClient";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import { getSucursalContext } from "@/lib/utils/sucursal";
 
 export default async function VentasAdminPage() {
   const supabase    = await createClient();
@@ -19,6 +20,9 @@ export default async function VentasAdminPage() {
   const fkeCodCompany = perfilActual?.fkeCodCompany;
   if (!fkeCodCompany) return null;
 
+  const ctx            = await getSucursalContext();
+  const fkeCodSucursal = ctx.fkeCodSucursal;
+
   // ── Configuración del negocio ─────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
@@ -29,11 +33,15 @@ export default async function VentasAdminPage() {
   const aplicarIva: boolean = negocio?.aplicarIva ?? true;
 
   // ── Ventas ────────────────────────────────────────────────────────────────
-  const { data: ventas, error: ventasError } = await adminClient
+  let ventasQuery = adminClient
     .from("ventas")
     .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser, bCancelada, tMotivoCancelacion, fhCancelacion")
     .eq("fkeCodCompany", fkeCodCompany)
     .order("fhCreateVenta", { ascending: false });
+
+  if (fkeCodSucursal) ventasQuery = ventasQuery.eq("fkeCodSucursal", fkeCodSucursal);
+
+  const { data: ventas, error: ventasError } = await ventasQuery;
 
   if (ventasError) console.error("Error ventas:", ventasError.message);
 
