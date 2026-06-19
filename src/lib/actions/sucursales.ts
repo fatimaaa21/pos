@@ -188,3 +188,60 @@ export async function toggleSucursal(
   revalidatePath("/admin");
   return { ok: true };
 }
+
+// ─────────────────────────────────────────────────────────────
+// ELIMINAR SUCURSAL (hard delete)
+// Bloqueado si tiene empleados o ventas asociadas.
+// Agregar al final de src/lib/actions/sucursales.ts
+// ─────────────────────────────────────────────────────────────
+
+export async function eliminarSucursal(
+  eCodSucursal: string
+): Promise<{ ok: true } | { error: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+  if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
+
+  const adminClient = createAdminClient();
+
+  // Verificar propiedad
+  const { data: sucursal } = await adminClient
+    .from("sucursales")
+    .select("fkeCodCompany")
+    .eq("eCodSucursal", eCodSucursal)
+    .single();
+
+  if (!sucursal || sucursal.fkeCodCompany !== perfil.fkeCodCompany) {
+    return { error: "Sin acceso" };
+  }
+
+  // Bloquear si tiene empleados asignados
+  const { count: empleados } = await adminClient
+    .from("perfiles")
+    .select("eCodUser", { count: "exact", head: true })
+    .eq("fkeCodSucursal", eCodSucursal);
+
+  if ((empleados ?? 0) > 0) {
+    return { error: "No puedes eliminar una sucursal con empleados asignados. Reasígnalos primero." };
+  }
+
+  // Bloquear si tiene ventas registradas
+  const { count: ventas } = await adminClient
+    .from("ventas")
+    .select("eCodVenta", { count: "exact", head: true })
+    .eq("fkeCodSucursal", eCodSucursal);
+
+  if ((ventas ?? 0) > 0) {
+    return { error: "No puedes eliminar una sucursal con ventas registradas. Desactívala en su lugar." };
+  }
+
+  const { error } = await adminClient
+    .from("sucursales")
+    .delete()
+    .eq("eCodSucursal", eCodSucursal);
+
+  if (error) return { error: `Error al eliminar: ${error.message}` };
+
+  revalidatePath("/admin");
+  return { ok: true };
+}

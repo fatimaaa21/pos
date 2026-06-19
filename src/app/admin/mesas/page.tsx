@@ -1,8 +1,8 @@
-import { createClient }      from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { redirect }          from "next/navigation";
-import { MesasAdminClient }  from "./MesasAdminClient";
-import { obtenerMesasConEstado } from "@/lib/actions/mesas";
+import { createClient }       from "@/lib/supabase/server";
+import { createAdminClient }  from "@/lib/supabase/admin";
+import { redirect }           from "next/navigation";
+import { MesasAdminClient }   from "./MesasAdminClient";
+import { obtenerMesasAdmin }  from "@/lib/actions/mesas";
 import type { MesaConEstado } from "@/types";
 
 export default async function AdminMesasPage() {
@@ -30,7 +30,9 @@ export default async function AdminMesasPage() {
 
   if (!modulo?.bStateModulo) redirect("/admin/dashboard");
 
-  const mesas = await obtenerMesasConEstado();
+  // obtenerMesasAdmin devuelve activas + inactivas (admin necesita ver ambas
+  // para poder reactivar mesas desactivadas)
+  const mesas = await obtenerMesasAdmin();
 
   return <MesasAdminClient mesasIniciales={mesas as MesaConEstado[]} />;
 }
