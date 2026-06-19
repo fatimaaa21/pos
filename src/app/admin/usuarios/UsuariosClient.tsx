@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Perfil } from "@/types";
+import type { Perfil, Sucursal } from "@/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCards } from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
@@ -17,12 +17,12 @@ import { Eye, Pencil, Trash2 } from "lucide-react";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import { toast } from "react-hot-toast";
 
-
 interface Props {
   usuarios: Perfil[];
+  sucursales: Pick<Sucursal, "eCodSucursal" | "tNombre">[];
 }
 
-export function UsuariosClient({ usuarios: inicial }: Props) {
+export function UsuariosClient({ usuarios: inicial, sucursales }: Props) {
   const [usuarios, setUsuarios] = useState<Perfil[]>(inicial);
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda: "",
@@ -216,6 +216,7 @@ async function confirmarEliminar() {
         <ModalCrearUsuario
           onClose={() => setModalCrear(false)}
           onCreado={handleUsuarioCreado}
+          sucursales={sucursales}
         />
       )}
       {usuarioVer && (
@@ -229,6 +230,7 @@ async function confirmarEliminar() {
           usuario={usuarioEditar}
           onClose={() => setUsuarioEditar(null)}
           onEditado={handleUsuarioEditado}
+          sucursales={sucursales}
         />
       )}
       {usuarioAEliminar && (

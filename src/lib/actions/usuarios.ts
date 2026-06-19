@@ -87,6 +87,8 @@ export async function crearUsuario(formData: FormData) {
       .single();
 
     const fkeCodCompany = perfilAdmin?.fkeCodCompany;
+    const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
+
     const { data: perfil, error: perfilError } = await adminClient
       .from("perfiles")
       .insert({
@@ -97,6 +99,7 @@ export async function crearUsuario(formData: FormData) {
         eCodeUser,
         bStateUser: true,
         fkeCodCompany,
+        fkeCodSucursal: tRolUser === "empleado" ? fkeCodSucursal : null,
         fhCreateUser: ahora,
         fhUpdateUser: ahora,
       })
@@ -130,10 +133,11 @@ export async function editarUsuario(formData: FormData) {
     const tNameUser = formData.get("tNameUser") as string;
     const tEmailUser = formData.get("tEmailUser") as string;
     const tRolUser = formData.get("tRolUser") as string;
+    const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
 
     const { data: perfil, error } = await adminClient
       .from("perfiles")
-      .update({ tNameUser, tEmailUser, tRolUser, fhUpdateUser: new Date().toISOString() })
+      .update({ tNameUser, tEmailUser, tRolUser, fkeCodSucursal: tRolUser === "empleado" ? fkeCodSucursal : null, fhUpdateUser: new Date().toISOString() })
       .eq("eCodUser", eCodUser)
       .select()
       .single();

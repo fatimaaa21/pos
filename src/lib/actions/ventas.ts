@@ -160,7 +160,7 @@ export async function crearVenta(
       let q = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
-        .eq("fkeCodProduct", item.eCodProduct)
+        .eq("fkeCodProduct",   item.eCodProduct)
         .eq("fkeCodSucursal",  fkeCodSucursal)
         .eq("bStateInventory", true);
 
@@ -168,11 +168,15 @@ export async function crearVenta(
         ? q.eq("fkeCodPresentacion", item.eCodPresentacion)
         : q.is("fkeCodPresentacion", null);
 
-      const { data: lote, error: loteError } = await q.single();
+      const { data: lotesDisponibles, error: loteError } = await q.limit(10);
 
-      if (loteError || !lote) {
+      if (loteError || !lotesDisponibles?.length) {
         return { error: "Producto sin inventario activo" };
       }
+
+      // Preferir ilimitado, si no el de mayor stock
+      const lote = lotesDisponibles.find((l) => l.bUnlimitedInventory)
+        ?? [...lotesDisponibles].sort((a, b) => (b.eCantRestante ?? 0) - (a.eCantRestante ?? 0))[0];
 
       if (!lote.bUnlimitedInventory && (lote.eCantRestante ?? 0) < item.cantidad) {
         return {

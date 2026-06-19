@@ -18,13 +18,15 @@ import {
 
 function buildNavAdmin(modulosActivos: string[]) {
   const nav = [
-    { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"   },
+    { icon: LayoutDashboard,  label: "Dashboard",       href: "/admin/dashboard"   },
     { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
     { icon: Package,          label: "Productos",       href: "/admin/productos"   },
     { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
     { icon: ReceiptText,      label: "Ventas",          href: "/admin/ventasAdmin" },
     { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
+    { icon: MapPin,           label: "Sucursales",      href: "/admin/sucursales" },
     { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
+
   ];
   if (modulosActivos.includes("mesas")) {
     nav.push({ icon: LayoutGrid, label: "Mesas", href: "/admin/mesas" });
