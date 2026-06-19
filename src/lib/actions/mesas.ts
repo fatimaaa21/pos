@@ -5,6 +5,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import { crearVenta }        from "@/lib/actions/ventas";
+import { getSucursalContext } from "@/lib/utils/sucursal";
 import type {
   MesaConEstado,
   OrdenMesaConDetalle,
@@ -59,12 +60,20 @@ export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
 
   const adminClient = createAdminClient();
 
-  const { data: mesas } = await adminClient
+  const ctx = await getSucursalContext();
+
+  const mesasQuery = adminClient
     .from("mesas")
     .select("*")
     .eq("fkeCodCompany", perfil.fkeCodCompany)
     .eq("bStateMesa", true)
     .order("tNombre");
+
+  if (ctx.fkeCodSucursal) {
+    mesasQuery.eq("fkeCodSucursal", ctx.fkeCodSucursal);
+  }
+
+  const { data: mesas } = await mesasQuery;
 
   if (!mesas?.length) return [];
 
@@ -160,7 +169,7 @@ export async function abrirOrdenMesa(
   // Verificar que la mesa pertenece al negocio y está activa
   const { data: mesa } = await adminClient
     .from("mesas")
-    .select("eCodMesa, fkeCodCompany, bStateMesa")
+    .select("eCodMesa, fkeCodCompany, fkeCodSucursal, bStateMesa")
     .eq("eCodMesa", eCodMesa)
     .single();
 
@@ -179,14 +188,17 @@ export async function abrirOrdenMesa(
 
   if (ordenExistente) return { error: "La mesa ya tiene una orden abierta" };
 
+  const ctx = await getSucursalContext();
+
   const { data: orden, error: ordenError } = await adminClient
     .from("ordenes_mesa")
     .insert({
-      fkeCodMesa:    eCodMesa,
-      fkeCodCompany: perfil.fkeCodCompany,
-      fkeCodUser:    perfil.uid,
-      tEstado:       "abierta",
-      fhAbierta:     new Date().toISOString(),
+      fkeCodMesa:     eCodMesa,
+      fkeCodCompany:  perfil.fkeCodCompany,
+      fkeCodSucursal: ctx.fkeCodSucursal ?? mesa.fkeCodSucursal,
+      fkeCodUser:     perfil.uid,
+      tEstado:        "abierta",
+      fhAbierta:      new Date().toISOString(),
     })
     .select("eCodOrden")
     .single();
@@ -431,13 +443,17 @@ export async function crearMesa(
 
   const adminClient = createAdminClient();
 
+  const ctx = await getSucursalContext();
+  if (!ctx.fkeCodSucursal) return { error: "Selecciona una sucursal antes de crear mesas" };
+
   const { error } = await adminClient
     .from("mesas")
     .insert({
-      fkeCodCompany: perfil.fkeCodCompany,
-      tNombre:       tNombre.trim(),
-      bStateMesa:    true,
-      fhCreateMesa:  new Date().toISOString(),
+      fkeCodCompany:  perfil.fkeCodCompany,
+      fkeCodSucursal: ctx.fkeCodSucursal,   // ← nueva
+      tNombre:        tNombre.trim(),
+      bStateMesa:     true,
+      fhCreateMesa:   new Date().toISOString(),
     });
 
   if (error) return { error: `Error al crear mesa: ${error.message}` };

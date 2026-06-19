@@ -40,9 +40,12 @@ interface Props {
   inventario: InventarioConProducto[];
   tipoNegocio: "general" | "impresion"
   fkeCodCompany:  string;
+  fkeCodSucursal: string | null;
+  sucursales:    { eCodSucursal: string; tNombre: string }[];
 }
 
-export function InventarioClient({ inventario: inicial, tipoNegocio, fkeCodCompany }: Props) {
+export function InventarioClient({ inventario: inicial, tipoNegocio, fkeCodCompany,
+  fkeCodSucursal, sucursales, }: Props) {
   const [inventario, setInventario] = useState<InventarioConProducto[]>(inicial);
   const [busqueda, setBusqueda]     = useState("");
   const router                      = useRouter();
@@ -351,6 +354,8 @@ export function InventarioClient({ inventario: inicial, tipoNegocio, fkeCodCompa
           onClose={() => setModalAgregar(false)}
           onAgregado={handleStockAgregado}
           fkeCodCompany={fkeCodCompany}
+          fkeCodSucursal={fkeCodSucursal}
+          sucursales={sucursales}
         />
       )}
       {stockVer && (

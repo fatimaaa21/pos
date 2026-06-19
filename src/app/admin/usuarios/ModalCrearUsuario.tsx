@@ -5,19 +5,23 @@ import { Modal, ModalField, ModalInput, ModalSelect, ModalInfo } from "@/compone
 import { crearUsuario } from "@/lib/actions/usuarios";
 import type { Perfil } from "@/types";
 import { Mail } from "lucide-react";
+import { obtenerSucursales } from "@/lib/actions/sucursales";
+import type { Sucursal }     from "@/types";
 
 interface Props {
   onClose: () => void;
   onCreado: (perfil: Perfil) => void;
+  sucursales: Pick<Sucursal, "eCodSucursal" | "tNombre">[];
 }
 
-export function ModalCrearUsuario({ onClose, onCreado }: Props) {
+export function ModalCrearUsuario({ onClose, onCreado, sucursales }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     tNameUser: "",
     tEmailUser: "",
     tRolUser: "empleado" as "admin" | "empleado",
+    fkeCodSucursal: "",
   });
 
   async function handleConfirmar() {
@@ -28,6 +32,7 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
     formData.append("tNameUser", form.tNameUser);
     formData.append("tEmailUser", form.tEmailUser);
     formData.append("tRolUser", form.tRolUser);
+    formData.append("fkeCodSucursal",  form.fkeCodSucursal);
 
     const result = await crearUsuario(formData);
 
@@ -39,7 +44,13 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
     }
   }
 
-  const deshabilitado = !form.tNameUser.trim() || !form.tEmailUser.trim() || !form.tRolUser;
+  const esEmpleado = form.tRolUser === "empleado";
+
+  const deshabilitado =
+    !form.tNameUser.trim() ||
+    !form.tEmailUser.trim() ||
+    !form.tRolUser ||
+    (esEmpleado && !form.fkeCodSucursal);
 
   return (
     <Modal
@@ -81,6 +92,22 @@ export function ModalCrearUsuario({ onClose, onCreado }: Props) {
           <option value="admin">Administrador</option>
         </ModalSelect>
       </ModalField>
+
+      {esEmpleado && (
+        <ModalField label="Sucursal" required>
+          <ModalSelect
+            value={form.fkeCodSucursal}
+            onChange={(e) => setForm({ ...form, fkeCodSucursal: e.target.value })}
+          >
+            <option value="">Seleccionar sucursal...</option>
+            {sucursales.map((s) => (
+              <option key={s.eCodSucursal} value={s.eCodSucursal}>
+                {s.tNombre}
+              </option>
+            ))}
+          </ModalSelect>
+        </ModalField>
+      )}
 
       <ModalInfo>
         <Mail /> Se generará un código de 4 dígitos y se enviará al correo del empleado automáticamente.

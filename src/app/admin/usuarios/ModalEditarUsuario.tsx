@@ -3,22 +3,24 @@
 import { useState } from "react";
 import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { editarUsuario, actualizarAvatar } from "@/lib/actions/usuarios";
-import type { Perfil } from "@/types";
+import type { Perfil, Sucursal } from "@/types";
 import { subirAvatar } from "@/lib/supabase/storage";
 
 interface Props {
   usuario: Perfil;
   onClose: () => void;
   onEditado: (perfil: Perfil) => void;
+  sucursales: Pick<Sucursal, "eCodSucursal" | "tNombre">[];
 }
 
-export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
+export function ModalEditarUsuario({ usuario, onClose, onEditado, sucursales }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     tNameUser: usuario.tNameUser,
     tEmailUser: usuario.tEmailUser,
     tRolUser: usuario.tRolUser,
+    fkeCodSucursal: usuario.fkeCodSucursal ?? "",
   });
 
   async function handleConfirmar() {
@@ -30,6 +32,7 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
     formData.append("tNameUser", form.tNameUser);
     formData.append("tEmailUser", form.tEmailUser);
     formData.append("tRolUser", form.tRolUser);
+    formData.append("fkeCodSucursal", form.fkeCodSucursal);
 
     const result = await editarUsuario(formData);
 
@@ -40,6 +43,8 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
       onEditado(result.perfil);
     }
   }
+
+  const esEmpleado = form.tRolUser === "empleado";
 
   const deshabilitado = !form.tNameUser.trim() || !form.tEmailUser.trim();
 
@@ -71,7 +76,7 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
         />
       </ModalField>
 
-      <ModalField label="Rol">
+      <ModalField label="Rol" required>
         <ModalSelect
           value={form.tRolUser}
           onChange={(e) =>
@@ -82,6 +87,22 @@ export function ModalEditarUsuario({ usuario, onClose, onEditado }: Props) {
           <option value="admin">Administrador</option>
         </ModalSelect>
       </ModalField>
+
+      {esEmpleado && (
+        <ModalField label="Sucursal" required>
+          <ModalSelect
+            value={form.fkeCodSucursal}
+            onChange={(e) => setForm({ ...form, fkeCodSucursal: e.target.value })}
+          >
+            <option value="">Seleccionar sucursal...</option>
+            {sucursales.map((s) => (
+              <option key={s.eCodSucursal} value={s.eCodSucursal}>
+                {s.tNombre}
+              </option>
+            ))}
+          </ModalSelect>
+        </ModalField>
+      )}
     </Modal>
   );
 }

@@ -30,15 +30,19 @@ export async function crearVenta(
 
     const { data: perfil, error: perfilError } = await supabase
       .from("perfiles")
-      .select("fkeCodCompany")
+      .select("fkeCodCompany, fkeCodSucursal")
       .eq("eCodUser", user.id)
       .single();
 
     if (perfilError || !perfil?.fkeCodCompany) {
       return { error: "No se encontró el negocio del empleado" };
     }
+    if (!perfil.fkeCodSucursal) {
+      return { error: "El empleado no tiene una sucursal asignada" };
+    }
 
-    const fkeCodCompany = perfil.fkeCodCompany;
+    const fkeCodCompany  = perfil.fkeCodCompany;
+    const fkeCodSucursal = perfil.fkeCodSucursal;
 
     type LoteCapturado = {
       eCodInventory:       string;
@@ -156,18 +160,23 @@ export async function crearVenta(
       let q = adminClient
         .from("vista_inventario")
         .select("eCodInventory, eCantRestante, bUnlimitedInventory")
-        .eq("fkeCodProduct", item.eCodProduct)
+        .eq("fkeCodProduct",   item.eCodProduct)
+        .eq("fkeCodSucursal",  fkeCodSucursal)
         .eq("bStateInventory", true);
 
       q = item.eCodPresentacion
         ? q.eq("fkeCodPresentacion", item.eCodPresentacion)
         : q.is("fkeCodPresentacion", null);
 
-      const { data: lote, error: loteError } = await q.single();
+      const { data: lotesDisponibles, error: loteError } = await q.limit(10);
 
-      if (loteError || !lote) {
+      if (loteError || !lotesDisponibles?.length) {
         return { error: "Producto sin inventario activo" };
       }
+
+      // Preferir ilimitado, si no el de mayor stock
+      const lote = lotesDisponibles.find((l) => l.bUnlimitedInventory)
+        ?? [...lotesDisponibles].sort((a, b) => (b.eCantRestante ?? 0) - (a.eCantRestante ?? 0))[0];
 
       if (!lote.bUnlimitedInventory && (lote.eCantRestante ?? 0) < item.cantidad) {
         return {
@@ -203,6 +212,7 @@ export async function crearVenta(
       .insert({
         fkeCodUser:    user.id,
         fkeCodCompany,
+        fkeCodSucursal,
         eTotal,
         fkeMetodoPago,
         fhCreateVenta: new Date().toISOString(),
@@ -367,7 +377,7 @@ export async function cancelarVenta(formData: FormData) {
 
     const { data: venta } = await adminClient
       .from("ventas")
-      .select("eCodVenta, fkeCodUser, fkeCodCompany, bCancelada, fhCreateVenta")
+      .select("eCodVenta, fkeCodUser, fkeCodCompany, fkeCodSucursal, bCancelada, fhCreateVenta")
       .eq("eCodVenta", eCodVenta)
       .single();
 
@@ -426,7 +436,8 @@ export async function cancelarVenta(formData: FormData) {
       let q = adminClient
         .from("inventario")
         .select("eCodInventory, eCantIngresada, bUnlimitedInventory, version")
-        .eq("fkeCodProduct", detalle.fkeCodProduct);
+        .eq("fkeCodProduct", detalle.fkeCodProduct)
+        .eq("fkeCodSucursal", venta.fkeCodSucursal);
 
       q = detalle.fkeCodPresentacion
         ? q.eq("fkeCodPresentacion", detalle.fkeCodPresentacion)

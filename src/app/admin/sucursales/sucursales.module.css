@@ -1,0 +1,10 @@
+.btnEditar {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--gray);
+  transition: all 0.12s;
+}

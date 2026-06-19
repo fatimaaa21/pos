@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { UsuariosClient } from "./UsuariosClient";
 import type { Perfil } from "@/types";
+import { obtenerSucursales } from "@/lib/actions/sucursales";
+import type { Sucursal }     from "@/types";
 
 export default async function UsuariosPage() {
   const supabase = await createClient();
@@ -23,5 +25,11 @@ export default async function UsuariosPage() {
 
   if (error) console.error("Error cargando usuarios:", error);
 
-  return <UsuariosClient usuarios={(usuarios as Perfil[]) ?? []} />;
+  const sucursales = await obtenerSucursales();
+  const sucursalesSimple = sucursales.map((s: Sucursal) => ({
+    eCodSucursal: s.eCodSucursal,
+    tNombre:      s.tNombre,
+  }));
+
+  return <UsuariosClient usuarios={(usuarios as Perfil[]) ?? []} sucursales={sucursalesSimple} />;
 }

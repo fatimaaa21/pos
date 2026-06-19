@@ -12,15 +12,20 @@ interface Props {
   onClose:    () => void;
   onAgregado: (inventario: Inventario) => void;
   fkeCodCompany: string;
+  fkeCodSucursal:       string | null;
+  sucursales:           { eCodSucursal: string; tNombre: string }[];
 }
 
-export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany }: Props) {
+export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany,
+  fkeCodSucursal: sucursalProp,
+  sucursales, }: Props) {
   const [loading, setLoading]                     = useState(false);
   const [error, setError]                         = useState<string | null>(null);
   const [productos, setProductos]                 = useState<Producto[]>([]);
   const [cargandoProductos, setCargandoProductos] = useState(true);
   const [presentaciones, setPresentaciones]       = useState<Presentacion[]>([]);
   const [cargandoPres, setCargandoPres]           = useState(false);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState(sucursalProp ?? "");
 
   const [form, setForm] = useState({
     fkeCodProduct:      "",
@@ -85,6 +90,7 @@ export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany }: Props)
     const formData = new FormData();
     formData.append("fkeCodProduct",       form.fkeCodProduct);
     formData.append("bUnlimitedInventory", form.bIlimitado ? "true" : "false");
+    formData.append("fkeCodSucursal", sucursalSeleccionada);
     if (form.fkeCodPresentacion) {
       formData.append("fkeCodPresentacion", form.fkeCodPresentacion);
     }
@@ -104,6 +110,7 @@ export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany }: Props)
   }
 
   const deshabilitado =
+    !sucursalSeleccionada ||
     !form.fkeCodProduct ||
     (tienePresentaciones && !form.fkeCodPresentacion) ||
     (!form.bIlimitado && (!form.eCantIngresada || parseFloat(form.eCantIngresada) <= 0));
@@ -119,6 +126,22 @@ export function ModalAgregarStock({ onClose, onAgregado, fkeCodCompany }: Props)
       error={error}
       ancho="sm"
     >
+      {!sucursalProp && (
+        <ModalField label="Sucursal" required>
+          <ModalSelect
+            value={sucursalSeleccionada}
+            onChange={(e) => setSucursalSeleccionada(e.target.value)}
+          >
+            <option value="">Seleccionar sucursal...</option>
+            {sucursales.map((s) => (
+              <option key={s.eCodSucursal} value={s.eCodSucursal}>
+                {s.tNombre}
+              </option>
+            ))}
+          </ModalSelect>
+        </ModalField>
+      )}
+
       {/* Preview del producto seleccionado */}
       {productoSeleccionado && (
         <div style={{
