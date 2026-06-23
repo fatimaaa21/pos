@@ -42,7 +42,7 @@ export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: 
     fd.append("tNombreTurno",  nombreTurno);
     const result = await iniciarTurno(fd);
     setLoadingTurno(false);
-    if (result.error) setErrorTurno(result.error);
+    if ("error" in result) setErrorTurno(result.error ?? null);
     else { setModalTurno(false); router.refresh(); }
   }
 
