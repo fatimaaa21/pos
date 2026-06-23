@@ -94,6 +94,179 @@ export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ADMIN: OBTENER TODAS LAS MESAS (activas e inactivas)
+// El empleado usa obtenerMesasConEstado (solo activas).
+// El admin necesita ver también las inactivas para poder reactivarlas.
+// ─────────────────────────────────────────────────────────────
+
+export async function obtenerMesasAdmin(): Promise<MesaConEstado[]> {
+  const perfil = await getPerfilActual();
+  if (!perfil?.fkeCodCompany) return [];
+
+  const adminClient = createAdminClient();
+  const ctx         = await getSucursalContext();
+
+  const mesasQuery = adminClient
+    .from("mesas")
+    .select("*")
+    .eq("fkeCodCompany", perfil.fkeCodCompany)
+    // Sin filtro bStateMesa: devuelve activas e inactivas
+    .order("tNombre");
+
+  if (ctx.fkeCodSucursal) {
+    mesasQuery.eq("fkeCodSucursal", ctx.fkeCodSucursal);
+  }
+
+  const { data: mesas } = await mesasQuery;
+  if (!mesas?.length) return [];
+
+  const { data: ordenes } = await adminClient
+    .from("ordenes_mesa")
+    .select("*")
+    .eq("fkeCodCompany", perfil.fkeCodCompany)
+    .eq("tEstado", "abierta");
+
+  const ordenesPorMesa = new Map(
+    (ordenes ?? []).map((o) => [o.fkeCodMesa, o])
+  );
+
+  return mesas.map((mesa) => ({
+    ...mesa,
+    ordenAbierta: ordenesPorMesa.get(mesa.eCodMesa) ?? null,
+  }));
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN: EDITAR NOMBRE DE MESA
+// ─────────────────────────────────────────────────────────────
+
+export async function editarMesa(
+  eCodMesa: string,
+  tNombre: string
+): Promise<{ ok: true } | { error: string }> {
+  const nombre = tNombre.trim();
+  if (!nombre) return { error: "El nombre es requerido" };
+
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+  if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
+
+  const adminClient = createAdminClient();
+
+  const { data: mesa } = await adminClient
+    .from("mesas")
+    .select("fkeCodCompany")
+    .eq("eCodMesa", eCodMesa)
+    .single();
+
+  if (!mesa || mesa.fkeCodCompany !== perfil.fkeCodCompany) {
+    return { error: "Sin acceso" };
+  }
+
+  const { error } = await adminClient
+    .from("mesas")
+    .update({ tNombre: nombre })
+    .eq("eCodMesa", eCodMesa);
+
+  if (error) return { error: `Error al editar: ${error.message}` };
+
+  revalidatePath("/admin/mesas");
+  revalidatePath("/empleado/mesas");
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN: ELIMINAR MESA (hard delete)
+// Bloqueado si la mesa tiene una orden abierta.
+// ─────────────────────────────────────────────────────────────
+
+export async function eliminarMesa(
+  eCodMesa: string
+): Promise<{ ok: true } | { error: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+  if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
+
+  const adminClient = createAdminClient();
+
+  // Verificar propiedad
+  const { data: mesa } = await adminClient
+    .from("mesas")
+    .select("fkeCodCompany")
+    .eq("eCodMesa", eCodMesa)
+    .single();
+
+  if (!mesa || mesa.fkeCodCompany !== perfil.fkeCodCompany) {
+    return { error: "Sin acceso" };
+  }
+
+  // Bloquear si hay orden abierta
+  const { data: ordenAbierta } = await adminClient
+    .from("ordenes_mesa")
+    .select("eCodOrden")
+    .eq("fkeCodMesa", eCodMesa)
+    .eq("tEstado", "abierta")
+    .maybeSingle();
+
+  if (ordenAbierta) {
+    return { error: "No puedes eliminar una mesa con una orden abierta" };
+  }
+
+  const { error } = await adminClient
+    .from("mesas")
+    .delete()
+    .eq("eCodMesa", eCodMesa);
+
+  if (error) return { error: `Error al eliminar: ${error.message}` };
+
+  revalidatePath("/admin/mesas");
+  revalidatePath("/empleado/mesas");
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN: CERRAR ORDEN DE MESA SIN COBRO (force-close)
+// Cancela la orden abierta sin generar venta.
+// ─────────────────────────────────────────────────────────────
+
+export async function cerrarOrdenMesa(
+  eCodOrden: string
+): Promise<{ ok: true } | { error: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+  if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
+
+  const adminClient = createAdminClient();
+
+  const { data: orden } = await adminClient
+    .from("ordenes_mesa")
+    .select("fkeCodCompany, tEstado")
+    .eq("eCodOrden", eCodOrden)
+    .single();
+
+  if (!orden || orden.fkeCodCompany !== perfil.fkeCodCompany) {
+    return { error: "Sin acceso" };
+  }
+  if (orden.tEstado !== "abierta") {
+    return { error: "La orden ya no está abierta" };
+  }
+
+  const { error } = await adminClient
+    .from("ordenes_mesa")
+    .update({
+      tEstado:   "cancelada",
+      fhCerrada: new Date().toISOString(),
+    })
+    .eq("eCodOrden", eCodOrden);
+
+  if (error) return { error: `Error al cerrar: ${error.message}` };
+
+  revalidatePath("/admin/mesas");
+  revalidatePath("/empleado/mesas");
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
 // OBTENER DETALLE DE ORDEN ABIERTA
 // ─────────────────────────────────────────────────────────────
 

@@ -1,102 +1,23 @@
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
-.vacio {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--gray-light);
-  padding: var(--space-10) 0;
-  font-size: 14px;
-}
-
-.vacioSub {
-  font-size: 12px;
-  color: var(--gray-light);
-  margin: 0;
-}
-
-/* ── Lista de mesas ── */
-.lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.mesaRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  background: var(--white);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  transition: opacity 0.15s;
-}
-
-.mesaInactiva {
-  opacity: 0.55;
-}
-
-.mesaInfo {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex: 1;
-  min-width: 0;
-}
-
-.mesaNombre {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--dark);
-  white-space: nowrap;
-}
-
-.mesaBadges {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-/* ── Botón toggle ── */
-.btnToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  font-family: var(--font-family);
-  font-size: 12px;
-  font-weight: 700;
+/* Botones de acción */
+.actionBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  border: 1px solid transparent;
-  transition: opacity 0.15s;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--gray);
 }
 
-.btnToggle:disabled {
-  opacity: 0.4;
+.actionBtnDanger {
+  color: var(--color-error);
+}
+
+.actionBtn:disabled {
+  opacity: 0.35;
   cursor: not-allowed;
 }
-
-.btnToggleActiva {
-  background: var(--color-error-bg);
-  color: var(--color-error);
-  border-color: var(--color-error-border, #fca5a5);
-}
-
-.btnToggleActiva:hover:not(:disabled) { opacity: 0.8; }
-
-.btnToggleInactiva {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-  border-color: var(--color-success-border, #86efac);
-}
-
-.btnToggleInactiva:hover:not(:disabled) { opacity: 0.8; }

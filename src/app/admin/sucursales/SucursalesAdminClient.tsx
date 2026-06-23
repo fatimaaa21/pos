@@ -1,21 +1,33 @@
 "use client";
 
-import { useState, useTransition }          from "react";
+import { useState, useTransition, useMemo }  from "react";
 import toast                                  from "react-hot-toast";
-import { Pencil }                             from "lucide-react";
+import { Pencil, Trash2 }                     from "lucide-react";
 import { PageHeader }                         from "@/components/ui/PageHeader";
 import { StatCards }                          from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla }       from "@/components/ui/DataTable";
 import { Badge }                              from "@/components/ui/Badge";
+import { TablaToolbar, type FiltrosUsuario }  from "@/components/ui/TablaToolbar";
 import { Modal, ModalField, ModalInput }      from "@/components/ui/Modal";
 import { formatFechaHora }                    from "@/lib/utils/fecha";
-import { crearSucursal, editarSucursal, toggleSucursal } from "@/lib/actions/sucursales";
-import type { Sucursal } from "@/types";
-import styles from "./sucursales.module.css";
+import {
+  crearSucursal,
+  editarSucursal,
+  toggleSucursal,
+  eliminarSucursal,
+}                                             from "@/lib/actions/sucursales";
+import type { Sucursal }                      from "@/types";
+import styles                                 from "./sucursales.module.css";
 
 interface Props {
   sucursalesIniciales: Sucursal[];
 }
+
+const OPCIONES_ESTADO = [
+  { value: "todos",    label: "Todas"     },
+  { value: "activa",   label: "Activas"   },
+  { value: "inactiva", label: "Inactivas" },
+];
 
 export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
   const [sucursales,   setSucursales]   = useState(sucursalesIniciales);
@@ -25,6 +37,34 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
   const [toggleando,   setToggleando]   = useState<string | null>(null);
   const [isPending,    startTransition] = useTransition();
 
+  const [filtros, setFiltros] = useState<FiltrosUsuario>({
+    busqueda:   "",
+    roles:      [],
+    estados:    [],
+    periodo:    "todo",
+    metodo:     "todos",
+    empleado:   "todos",
+    categorias: [],
+  });
+
+  // ── Filtrado ─────────────────────────────────────────────────────────────────
+  const filtradas = useMemo(() => sucursales.filter((s) => {
+    const txt = filtros.busqueda.toLowerCase().trim();
+    const coincideTexto =
+      !txt ||
+      s.tNombre.toLowerCase().includes(txt) ||
+      (s.tDireccion ?? "").toLowerCase().includes(txt);
+
+    const filtroEstado = filtros.estadoFiltro ?? "todos";
+    const coincideEstado =
+      filtroEstado === "todos" ||
+      (filtroEstado === "activa"   &&  s.bStateSucursal) ||
+      (filtroEstado === "inactiva" && !s.bStateSucursal);
+
+    return coincideTexto && coincideEstado;
+  }), [sucursales, filtros]);
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
   function handleAbrirCrear() {
     setForm({ tNombre: "", tDireccion: "" });
     setModalCrear(true);
@@ -85,9 +125,57 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     setToggleando(null);
   }
 
+  function handleEliminar(s: Sucursal) {
+    toast((t) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>
+          ¿Eliminar <strong>{s.tNombre}</strong>?
+        </span>
+        <span style={{ fontSize: 12, color: "var(--gray)" }}>
+          Esta acción es permanente y no se puede deshacer.
+        </span>
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{
+              padding: "4px 10px", fontSize: 12, borderRadius: 6,
+              border: "1px solid var(--border-light)", background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const result = await eliminarSucursal(s.eCodSucursal);
+              if ("error" in result) {
+                toast.error(result.error);
+              } else {
+                setSucursales((prev) =>
+                  prev.filter((x) => x.eCodSucursal !== s.eCodSucursal)
+                );
+                toast.success("Sucursal eliminada");
+              }
+            }}
+            style={{
+              padding: "4px 10px", fontSize: 12, borderRadius: 6,
+              border: "none", background: "var(--color-error)", color: "#fff",
+              cursor: "pointer", fontWeight: 700,
+            }}
+          >
+            Eliminar
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity });
+  }
+
+  // ── Stats ─────────────────────────────────────────────────────────────────────
   const activas   = sucursales.filter((s) =>  s.bStateSucursal).length;
   const inactivas = sucursales.filter((s) => !s.bStateSucursal).length;
 
+  // ── Columnas ──────────────────────────────────────────────────────────────────
   const columnas: ColumnaTabla<Sucursal>[] = [
     {
       key: "tNombre",
@@ -125,14 +213,24 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
       key: "acciones",
       label: "Acciones",
       render: (s) => (
-        <button
-          className={styles.btnEditar}
-          onClick={() => handleAbrirEditar(s)}
-          disabled={isPending}
-          title="Editar"
-        >
-          <Pencil size={18} />
-        </button>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button
+            className={styles.actionBtn}
+            onClick={() => handleAbrirEditar(s)}
+            disabled={isPending}
+            title="Editar"
+          >
+            <Pencil size={18} />
+          </button>
+          <button
+            className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+            onClick={() => handleEliminar(s)}
+            disabled={isPending}
+            title="Eliminar"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -147,13 +245,22 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
 
       <StatCards stats={[
         { label: "Total sucursales", value: sucursales.length, variante: "primary" },
-        { label: "Activas",          value: activas,           variante: "success" },
-        { label: "Inactivas",        value: inactivas,         variante: "accent"  },
+        { label: "Activas",          value: activas,           variante: "success"  },
+        { label: "Inactivas",        value: inactivas,         variante: "accent"   },
       ]} />
+
+      <TablaToolbar
+        filtros={filtros}
+        onChange={setFiltros}
+        total={filtradas.length}
+        ocultarRol
+        ocultarEstado
+        opcionesEstadoFiltro={OPCIONES_ESTADO}
+      />
 
       <DataTable
         columnas={columnas}
-        datos={sucursales}
+        datos={filtradas}
         keyExtractor={(s) => s.eCodSucursal}
         vacio="No hay sucursales registradas"
       />

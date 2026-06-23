@@ -230,11 +230,6 @@ export function MesasClient({
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.titulo}>Mesas</h1>
-          {!tieneTurno && (
-            <p className={styles.avisoTurno}>
-              Abre un turno desde el Menú para atender mesas
-            </p>
-          )}
         </div>
 
         {mesas.length === 0 ? (
