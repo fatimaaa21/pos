@@ -19,6 +19,7 @@ import {
 function buildNavAdmin(modulosActivos: string[]) {
   const nav = [
     { icon: LayoutDashboard,  label: "Dashboard",       href: "/admin/dashboard"   },
+    { icon: ClipboardList,     label: "Menú",          href: "/admin/menu"      },
     { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
     { icon: Package,          label: "Productos",       href: "/admin/productos"   },
     { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
@@ -34,15 +35,14 @@ function buildNavAdmin(modulosActivos: string[]) {
   return nav;
 }
 
-function buildNavEmpleado(modulosActivos: string[]) {
+function buildNavEmpleado(_modulosActivos: string[]) {
+  // "Mesas" ya no es un ítem aparte: cuando el módulo está activo,
+  // /empleado/menu se convierte en el flujo de mesas automáticamente.
   const nav = [
     { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
     { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
     { icon: ReceiptText,      label: "Mis ventas", href: "/empleado/ventasEmpleado" },
   ];
-  if (modulosActivos.includes("mesas")) {
-    nav.splice(1, 0, { icon: LayoutGrid, label: "Mesas", href: "/empleado/mesas" });
-  }
   return nav;
 }
 

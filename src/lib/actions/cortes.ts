@@ -3,6 +3,7 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
+import { resolverSucursalVenta } from "@/lib/utils/sucursal";
 import type { CorteCaja }    from "@/types";
 
 export async function iniciarTurno(formData: FormData) {
@@ -13,19 +14,11 @@ export async function iniciarTurno(formData: FormData) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    const { data: perfil, error: perfilError } = await supabase
-      .from("perfiles")
-      .select("fkeCodCompany, fkeCodSucursal")
-      .eq("eCodUser", user.id)
-      .single();
+    // Resuelve sucursal: fija para empleado, por cookie (o única) para admin.
+    const ctx = await resolverSucursalVenta();
+    if ("error" in ctx) return ctx;
 
-    if (perfilError || !perfil?.fkeCodCompany) {
-      return { error: "No se encontró el negocio del empleado" };
-    }
-
-    if (!perfil.fkeCodSucursal) {
-      return { error: "El empleado no tiene una sucursal asignada" };
-    }
+    const { fkeCodCompany, fkeCodSucursal } = ctx;
 
     const { data: turnoAbierto } = await adminClient
       .from("cortes_caja")
@@ -48,8 +41,8 @@ export async function iniciarTurno(formData: FormData) {
       .from("cortes_caja")
       .insert({
         fkeCodUser:      user.id,
-        fkeCodCompany:   perfil.fkeCodCompany,
-        fkeCodSucursal:  perfil.fkeCodSucursal,  // ← nuevo
+        fkeCodCompany,
+        fkeCodSucursal,
         tNombreTurno,
         eFondoInicial,
         bStateCorte:     "abierto",
@@ -65,6 +58,7 @@ export async function iniciarTurno(formData: FormData) {
     }
 
     revalidatePath("/empleado/corte");
+    revalidatePath("/admin/vender");
     return { corte: corte as CorteCaja };
 
   } catch (e: any) {
@@ -172,6 +166,7 @@ export async function cerrarTurno(formData: FormData) {
 
     revalidatePath("/empleado/corte");
     revalidatePath("/admin/cortes");
+    revalidatePath("/admin/vender");
     return { corte: corteActualizado as CorteCaja };
 
   } catch (e: any) {

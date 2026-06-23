@@ -3,6 +3,7 @@
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
+import { resolverSucursalVenta } from "@/lib/utils/sucursal";
 import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
@@ -28,21 +29,12 @@ export async function crearVenta(
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return { error: "No autenticado" };
 
-    const { data: perfil, error: perfilError } = await supabase
-      .from("perfiles")
-      .select("fkeCodCompany, fkeCodSucursal")
-      .eq("eCodUser", user.id)
-      .single();
+    // Resuelve sucursal: fija para empleado, por cookie (o única) para admin.
+    const ctx = await resolverSucursalVenta();
+    if ("error" in ctx) return ctx;
 
-    if (perfilError || !perfil?.fkeCodCompany) {
-      return { error: "No se encontró el negocio del empleado" };
-    }
-    if (!perfil.fkeCodSucursal) {
-      return { error: "El empleado no tiene una sucursal asignada" };
-    }
-
-    const fkeCodCompany  = perfil.fkeCodCompany;
-    const fkeCodSucursal = perfil.fkeCodSucursal;
+    const fkeCodCompany  = ctx.fkeCodCompany;
+    const fkeCodSucursal = ctx.fkeCodSucursal;
 
     type LoteCapturado = {
       eCodInventory:       string;
@@ -347,6 +339,7 @@ export async function crearVenta(
 
     revalidatePath("/empleado/menu");
     revalidatePath("/admin/inventario");
+    revalidatePath("/admin/ventas");
     return { eCodVenta: venta.eCodVenta };
 
   } catch (e: any) {
