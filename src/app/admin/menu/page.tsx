@@ -1,8 +1,16 @@
 import { createClient }           from "@/lib/supabase/server";
 import { redirect }               from "next/navigation";
 import { MenuClient }             from "@/app/empleado/menu/MenuClient";
-import { obtenerDatosMenuPOS, obtenerEstadoTurno } from "@/lib/data/menu-pos";
+import { MesasClient }            from "@/app/empleado/mesas/MesasClient";
+import {
+  obtenerDatosMenuPOS,
+  obtenerDatosMesasPOS,
+  obtenerEstadoTurno,
+}                                  from "@/lib/data/menu-pos";
 import { resolverSucursalVenta }  from "@/lib/utils/sucursal";
+import { verificarModuloMesas, obtenerMesasConEstado } from "@/lib/actions/mesas";
+import { AbrirTurnoGate }         from "@/components/pos/AbrirTurnoGate";
+import type { MesaConEstado }     from "@/types";
 import { Store } from "lucide-react";
 
 export default async function AdminMenuPage() {
@@ -19,10 +27,9 @@ export default async function AdminMenuPage() {
 
   if (!perfil || perfil.tRolUser !== "admin") redirect("/admin/dashboard");
 
-  // Resuelve la sucursal donde se registrará la venta.
-  // Si el admin tiene "Todas las sucursales" seleccionado y el negocio
-  // tiene más de una activa, no hay forma de saber dónde vender — se
-  // le pide elegir una específica desde el selector del sidebar.
+  // Resuelve la sucursal donde se va a vender. Si el admin tiene "Todas las
+  // sucursales" seleccionado y el negocio tiene más de una activa, no hay
+  // forma de saber dónde — se le pide elegir una específica primero.
   const ctx = await resolverSucursalVenta();
 
   if ("error" in ctx) {
@@ -50,6 +57,41 @@ export default async function AdminMenuPage() {
     );
   }
 
+  // ── Si el negocio tiene el módulo de mesas activo, el "Menú" del admin se
+  //    convierte en el flujo de mesas: seleccionar mesa → tomar/editar pedido.
+  //    Reutiliza exactamente el mismo MesasClient que usa el empleado, sin
+  //    cambios — el pedido se puede seguir editando (agregar productos) hasta
+  //    que se cobra, igual que en /empleado/mesas.
+  const moduloMesas = await verificarModuloMesas(ctx.fkeCodCompany);
+
+  if (moduloMesas) {
+    const [mesas, datos, turno] = await Promise.all([
+      obtenerMesasConEstado(),
+      obtenerDatosMesasPOS(ctx.fkeCodCompany),
+      obtenerEstadoTurno(ctx.uid),
+    ]);
+
+    return (
+      <AbrirTurnoGate
+        tieneTurno={turno.tieneTurno}
+        corte={turno.corte}
+        ventasDelTurno={turno.ventasDelTurno}
+      >
+        <MesasClient
+          mesasIniciales={mesas as MesaConEstado[]}
+          categorias={datos.categorias}
+          productos={datos.productos}
+          metodosPago={datos.metodosPago}
+          tieneTurno={turno.tieneTurno}
+          aplicarIva={datos.aplicarIva}
+          tipo_negocio={datos.tipo_negocio}
+          costo_hora_billar={datos.costo_hora_billar}
+        />
+      </AbrirTurnoGate>
+    );
+  }
+
+  // ── Sin módulo de mesas: venta directa de mostrador (comportamiento actual) ──
   const [datos, turno] = await Promise.all([
     obtenerDatosMenuPOS(ctx.fkeCodCompany),
     obtenerEstadoTurno(ctx.uid),

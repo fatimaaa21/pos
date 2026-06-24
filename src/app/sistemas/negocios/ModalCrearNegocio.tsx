@@ -56,6 +56,7 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Nombre del negocio" required>
         <ModalInput
