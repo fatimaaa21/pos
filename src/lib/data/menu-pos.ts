@@ -1,8 +1,4 @@
 // src/lib/data/menu-pos.ts
-//
-// Lógica de carga de datos del POS (catálogo + inventario + métodos de pago),
-// compartida entre /empleado/menu y /admin/menu para que ambas vistas
-// usen exactamente la misma fuente de verdad y no se desincronicen.
 
 import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -12,6 +8,10 @@ import type {
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
+// ─────────────────────────────────────────────────────────────
+// INTERFACES
+// ─────────────────────────────────────────────────────────────
+
 export interface DatosMenuPOS {
   categorias:  Categoria[];
   productos:   ProductoConStock[];
@@ -19,15 +19,23 @@ export interface DatosMenuPOS {
   aplicarIva:  boolean;
 }
 
+export interface DatosMesasPOS {
+  categorias:        Categoria[];
+  productos:         ProductoConStock[];
+  metodosPago:       MetodoPagoGlobal[];
+  aplicarIva:        boolean;
+  tipo_negocio:      "general" | "impresion" | "billar";
+  costo_hora_billar: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────
-// Catálogo + inventario + métodos de pago (sin estado de turno)
+// obtenerDatosMenuPOS
 // ─────────────────────────────────────────────────────────────
 
 export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosMenuPOS> {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
 
-  // ── Configuración del negocio ─────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("metodosPago, aplicarIva, tipo_negocio")
@@ -49,7 +57,6 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
 
-  // ── Categorías ────────────────────────────────────────────────────────────
   const { data: categorias } = await supabase
     .from("categorias")
     .select("eCodCategory, tNameCategory, ImgCategory")
@@ -121,7 +128,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
             tNombre:            p.tNombre,
             ePricePresentacion: p.ePricePresentacion,
             eCostPresentacion:  p.eCostPresentacion,
-            eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
+            eCantidadUnidades:  p.eCantidadUnidades ?? 1,
             stockDisponible:    stock,
             bInfinito:          bInf,
           } as PresentacionConStock);
@@ -144,7 +151,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
           tNombre:            p.tNombre,
           ePricePresentacion: p.ePricePresentacion,
           eCostPresentacion:  p.eCostPresentacion,
-          eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
+          eCantidadUnidades:  p.eCantidadUnidades ?? 1,
           stockDisponible:    Number.MAX_SAFE_INTEGER,
           bInfinito:          true,
         } as PresentacionConStock);
@@ -185,9 +192,9 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
           bInfinito:       anyInfinito,
           presentaciones:  pres,
           tipo_producto:   "unidad" as const,
-          eAnchoCm:        p.eAnchoCm       ?? null,
-          eAltoCm:         p.eAltoCm        ?? null,
-          fkeCodMaterial:  p.fkeCodMaterial  ?? null,
+          eAnchoCm:        p.eAnchoCm      ?? null,
+          eAltoCm:         p.eAltoCm       ?? null,
+          fkeCodMaterial:  p.fkeCodMaterial ?? null,
         };
       }
 
@@ -201,9 +208,9 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
         stockDisponible: bInf ? Number.MAX_SAFE_INTEGER : (stockProducto.get(p.eCodProduct) ?? 0),
         bInfinito:       bInf,
         tipo_producto:   "unidad" as const,
-        eAnchoCm:        p.eAnchoCm       ?? null,
-        eAltoCm:         p.eAltoCm        ?? null,
-        fkeCodMaterial:  p.fkeCodMaterial  ?? null,
+        eAnchoCm:        p.eAnchoCm      ?? null,
+        eAltoCm:         p.eAltoCm       ?? null,
+        fkeCodMaterial:  p.fkeCodMaterial ?? null,
       };
     });
 
@@ -215,7 +222,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
     };
   }
 
-  // ── Rama general ─────────────────────────────────────────────────────────
+  // ── Rama general ──────────────────────────────────────────────────────────
   const { data: lotes, error } = await adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
@@ -226,12 +233,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
   if (error) console.error("Error menú lotes:", JSON.stringify(error));
 
   if (!lotes || lotes.length === 0) {
-    return {
-      categorias: (categorias as Categoria[]) ?? [],
-      productos:  [],
-      metodosPago,
-      aplicarIva,
-    };
+    return { categorias: (categorias as Categoria[]) ?? [], productos: [], metodosPago, aplicarIva };
   }
 
   const lotesSinPres = lotes.filter((l: any) => !l.fkeCodPresentacion);
@@ -239,82 +241,67 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
 
   const stockProducto    = new Map<string, number>();
   const infinitoProducto = new Map<string, boolean>();
+  const stockPorPres     = new Map<string, number>();
+  const infinitoPorPres  = new Map<string, boolean>();
 
   for (const l of lotesSinPres) {
-    if (l.bUnlimitedInventory) {
-      infinitoProducto.set(l.fkeCodProduct, true);
-    } else {
-      stockProducto.set(l.fkeCodProduct, (stockProducto.get(l.fkeCodProduct) ?? 0) + (l.eCantRestante ?? 0));
-    }
+    if (l.bUnlimitedInventory) infinitoProducto.set(l.fkeCodProduct, true);
+    else stockProducto.set(l.fkeCodProduct, (stockProducto.get(l.fkeCodProduct) ?? 0) + (l.eCantRestante ?? 0));
   }
-
-  const stockPorPres    = new Map<string, number>();
-  const infinitoPorPres = new Map<string, boolean>();
-
   for (const l of lotesConPres) {
     const pid = l.fkeCodPresentacion as string;
-    if (l.bUnlimitedInventory) {
-      infinitoPorPres.set(pid, true);
-    } else {
-      stockPorPres.set(pid, (stockPorPres.get(pid) ?? 0) + (l.eCantRestante ?? 0));
-    }
+    if (l.bUnlimitedInventory) infinitoPorPres.set(pid, true);
+    else stockPorPres.set(pid, (stockPorPres.get(pid) ?? 0) + (l.eCantRestante ?? 0));
   }
 
-  const idsConStock = [
-    ...new Set([
-      ...lotesSinPres.map((l: any) => l.fkeCodProduct as string),
-      ...lotesConPres.map((l: any) => l.fkeCodProduct as string),
-    ]),
-  ];
-
-  const { data: productos } = await adminClient
-    .from("productos")
-    .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
-    .in("eCodProduct", idsConStock)
-    .eq("bStateProduct", true);
+  const idsConStock = [...new Set([
+    ...lotesSinPres.map((l: any) => l.fkeCodProduct as string),
+    ...lotesConPres.map((l: any) => l.fkeCodProduct as string),
+  ])];
 
   const presentacionIds = [...new Set(lotesConPres.map((l: any) => l.fkeCodPresentacion as string))];
-  let presentacionesDetalle: any[] = [];
 
-  if (presentacionIds.length > 0) {
-    const { data: pres } = await adminClient
-      .from("presentaciones")
-      .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
-      .in("eCodPresentacion", presentacionIds)
-      .eq("bStatePresentacion", true);
-    presentacionesDetalle = pres ?? [];
-  }
+  // ── Productos y presentaciones en paralelo ────────────────────────────────
+  const [productosRes, presRes] = await Promise.all([
+    adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
+      .in("eCodProduct", idsConStock)
+      .eq("bStateProduct", true),
+    presentacionIds.length > 0
+      ? adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
+          .in("eCodPresentacion", presentacionIds)
+          .eq("bStatePresentacion", true)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const productos            = productosRes.data;
+  const presentacionesDetalle = presRes.data ?? [];
 
   const presByProducto = new Map<string, PresentacionConStock[]>();
-
   for (const p of presentacionesDetalle) {
     const bInf  = infinitoPorPres.get(p.eCodPresentacion) ?? false;
     const stock = bInf ? Number.MAX_SAFE_INTEGER : (stockPorPres.get(p.eCodPresentacion) ?? 0);
-
-    const pcs: PresentacionConStock = {
+    const lista = presByProducto.get(p.fkeCodProduct) ?? [];
+    lista.push({
       eCodPresentacion:   p.eCodPresentacion,
       tNombre:            p.tNombre,
       ePricePresentacion: p.ePricePresentacion,
       eCostPresentacion:  p.eCostPresentacion,
-      eCantidadUnidades:  p.eCantidadUnidades  ?? 1,
+      eCantidadUnidades:  p.eCantidadUnidades ?? 1,
       stockDisponible:    stock,
       bInfinito:          bInf,
-    };
-
-    const lista = presByProducto.get(p.fkeCodProduct) ?? [];
-    lista.push(pcs);
+    });
     presByProducto.set(p.fkeCodProduct, lista);
   }
 
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => {
     const pres = presByProducto.get(p.eCodProduct);
-
     if (pres && pres.length > 0) {
       const anyInfinito = pres.some((pr) => pr.bInfinito);
-      const totalStock  = pres.reduce(
-        (acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible),
-        0
-      );
+      const totalStock  = pres.reduce((acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible), 0);
       return {
         eCodProduct:     p.eCodProduct,
         tNameProduct:    p.tNameProduct,
@@ -326,7 +313,6 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
         presentaciones:  pres,
       };
     }
-
     const bInf = infinitoProducto.get(p.eCodProduct) ?? false;
     return {
       eCodProduct:     p.eCodProduct,
@@ -348,8 +334,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
 }
 
 // ─────────────────────────────────────────────────────────────
-// Estado del turno activo del usuario (idéntico para admin/empleado,
-// las tablas de cortes_caja y ventas se filtran por fkeCodUser)
+// obtenerEstadoTurno
 // ─────────────────────────────────────────────────────────────
 
 export async function obtenerEstadoTurno(userId: string): Promise<{
@@ -412,34 +397,45 @@ export async function obtenerEstadoTurno(userId: string): Promise<{
 }
 
 // ─────────────────────────────────────────────────────────────
-// Catálogo para el flujo de MESAS (selección de mesa → pedido).
-// Réplica fiel de la carga de /empleado/mesas/page.tsx: SOLO rama
-// general, sin soporte de tipo_negocio "impresion" (igual que hoy).
-// Si en el futuro un negocio de impresión activa mesas, esto se
-// queda corto — no es nuevo, ya era así antes de este cambio.
+// obtenerDatosMesasPOS
 // ─────────────────────────────────────────────────────────────
-
-export interface DatosMesasPOS {
-  categorias:  Categoria[];
-  productos:   ProductoConStock[];
-  metodosPago: MetodoPagoGlobal[];
-  aplicarIva:  boolean;
-}
 
 export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<DatosMesasPOS> {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
 
-  const { data: negocio } = await adminClient
-    .from("negocios")
-    .select("metodosPago, aplicarIva")
-    .eq("eCodCompany", fkeCodCompany)
-    .single();
+  // ── Queries independientes en paralelo ────────────────────────────────────
+  const [negocioRes, categoriasRes, lotesRes] = await Promise.all([
+    adminClient
+      .from("negocios")
+      .select("metodosPago, aplicarIva, tipo_negocio, costo_hora_billar")
+      .eq("eCodCompany", fkeCodCompany)
+      .single(),
+    supabase
+      .from("categorias")
+      .select("eCodCategory, tNameCategory, ImgCategory")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bStateCategory", true)
+      .order("tNameCategory"),
+    adminClient
+      .from("vista_inventario")
+      .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bStateInventory", true)
+      .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0"),
+  ]);
 
-  const aplicarIva: boolean = negocio?.aplicarIva ?? true;
+  const negocio        = negocioRes.data;
+  const categorias     = categoriasRes.data;
+  const lotes          = lotesRes.data;
+
+  const aplicarIva: boolean             = negocio?.aplicarIva             ?? true;
+  const tipo_negocio                    = (negocio?.tipo_negocio          ?? "general") as "general" | "impresion" | "billar";
+  const costo_hora_billar: number | null = negocio?.costo_hora_billar     ?? null;
+
+  // ── Métodos de pago (depende de negocio.metodosPago) ─────────────────────
   let metodosPago: MetodoPagoGlobal[] = [];
-
-  const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
+  const idsSeleccionados: string[]    = negocio?.metodosPago ?? [];
   if (idsSeleccionados.length > 0) {
     const { data: metodos } = await adminClient
       .from("metodos_pago")
@@ -448,20 +444,6 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
       .eq("bStatePay", true);
     metodosPago = (metodos as MetodoPagoGlobal[]) ?? [];
   }
-
-  const { data: categorias } = await supabase
-    .from("categorias")
-    .select("eCodCategory, tNameCategory, ImgCategory")
-    .eq("fkeCodCompany", fkeCodCompany)
-    .eq("bStateCategory", true)
-    .order("tNameCategory");
-
-  const { data: lotes } = await adminClient
-    .from("vista_inventario")
-    .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
-    .eq("fkeCodCompany", fkeCodCompany)
-    .eq("bStateInventory", true)
-    .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
 
   const stockProducto    = new Map<string, number>();
   const infinitoProducto = new Map<string, boolean>();
@@ -486,23 +468,26 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
     ...lotesConPres.map((l: any) => l.fkeCodProduct as string),
   ])];
 
-  const { data: productos } = await adminClient
-    .from("productos")
-    .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
-    .in("eCodProduct", idsConStock)
-    .eq("bStateProduct", true);
-
   const presentacionIds = [...new Set(lotesConPres.map((l: any) => l.fkeCodPresentacion as string))];
-  let presentacionesDetalle: any[] = [];
 
-  if (presentacionIds.length > 0) {
-    const { data: pres } = await adminClient
-      .from("presentaciones")
-      .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
-      .in("eCodPresentacion", presentacionIds)
-      .eq("bStatePresentacion", true);
-    presentacionesDetalle = pres ?? [];
-  }
+  // ── Productos y presentaciones en paralelo ────────────────────────────────
+  const [productosRes, presRes] = await Promise.all([
+    adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct, fkeCodCategory, ePriceProduct, ImgProduct")
+      .in("eCodProduct", idsConStock)
+      .eq("bStateProduct", true),
+    presentacionIds.length > 0
+      ? adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, fkeCodProduct, tNombre, ePricePresentacion, eCostPresentacion, eCantidadUnidades")
+          .in("eCodPresentacion", presentacionIds)
+          .eq("bStatePresentacion", true)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const productos             = productosRes.data;
+  const presentacionesDetalle = presRes.data ?? [];
 
   const presByProducto = new Map<string, PresentacionConStock[]>();
   for (const p of presentacionesDetalle) {
@@ -549,9 +534,11 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
   });
 
   return {
-    categorias:  (categorias as Categoria[]) ?? [],
-    productos:   productosConStock,
+    categorias:        (categorias as Categoria[]) ?? [],
+    productos:         productosConStock,
     metodosPago,
     aplicarIva,
+    tipo_negocio,
+    costo_hora_billar,
   };
 }

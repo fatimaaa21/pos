@@ -200,8 +200,12 @@ export function MenuClient({
     fd.append("tNombreTurno",  nombreTurno);
     const result = await iniciarTurno(fd);
     setLoadingTurno(false);
-    if (result.error) setErrorTurno(result.error);
-    else { setModalTurno(false); router.refresh(); }
+    if (result && "error" in result) {
+      setErrorTurno(result.error as string);
+    } else {
+      setModalTurno(false);
+      router.refresh();
+    }
   }
 
   async function handleAgregarPorMedida(producto: ProductoConStock) {

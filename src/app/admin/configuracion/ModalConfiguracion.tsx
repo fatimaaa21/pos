@@ -29,11 +29,12 @@ const ZONAS = [
   { value: "America/New_York",               label: "Nueva York (UTC-5)"       },
 ];
 
-type Tab = "general" | "pagos";
+type Tab = "general" | "pagos" | "billar";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General"         },
   { id: "pagos",   label: "Métodos de pago" },
+  { id: "billar",  label: "Billar"          },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -110,13 +111,18 @@ export function ModalConfiguracion({
   const [guardado, setGuardado] = useState(false);
 
   const [savedForm, setSavedForm] = useState({
-    tNameCompany: config.tNameCompany,
-    imgCompany:   config.imgCompany ?? "",
-    moneda:       config.moneda      ?? "MXN",
-    zona_horaria: config.zona_horaria ?? "America/Mexico_City",
-    aplicarIva:   config.aplicarIva  ?? true,
+    tNameCompany:      config.tNameCompany,
+    imgCompany:        config.imgCompany        ?? "",
+    moneda:            config.moneda            ?? "MXN",
+    zona_horaria:      config.zona_horaria      ?? "America/Mexico_City",
+    aplicarIva:        config.aplicarIva        ?? true,
+    costo_hora_billar: config.costo_hora_billar != null
+      ? String(config.costo_hora_billar)
+      : "",
   });
   const [form, setForm] = useState(savedForm);
+
+  const esBillar = config.tipo_negocio === "billar";
 
   const [savedMetodos, setSavedMetodos] = useState<string[]>(activados ?? []);
   const [metodosPago, setMetodosPago]   = useState<string[]>(activados ?? []);
@@ -152,11 +158,12 @@ export function ModalConfiguracion({
     setError(null);
 
     const fd = new FormData();
-    fd.append("tNameCompany", form.tNameCompany);
-    fd.append("imgCompany",   form.imgCompany);
-    fd.append("moneda",       form.moneda);
-    fd.append("zona_horaria", form.zona_horaria);
-    fd.append("aplicarIva",   String(form.aplicarIva));
+    fd.append("tNameCompany",      form.tNameCompany);
+    fd.append("imgCompany",        form.imgCompany);
+    fd.append("moneda",            form.moneda);
+    fd.append("zona_horaria",      form.zona_horaria);
+    fd.append("aplicarIva",        String(form.aplicarIva));
+    fd.append("costo_hora_billar", form.costo_hora_billar);
 
     const [resConfig, resMetodos] = await Promise.all([
       guardarConfigNegocio(fd),
@@ -177,17 +184,19 @@ export function ModalConfiguracion({
 
   // ── Detectar cambios ──────────────────────────────────────────────────────
   const hayChangesGeneral =
-    form.tNameCompany !== savedForm.tNameCompany ||
-    form.imgCompany   !== savedForm.imgCompany   ||
-    form.moneda       !== savedForm.moneda        ||
-    form.zona_horaria !== savedForm.zona_horaria  ||
-    form.aplicarIva   !== savedForm.aplicarIva;
+    form.tNameCompany      !== savedForm.tNameCompany      ||
+    form.imgCompany        !== savedForm.imgCompany        ||
+    form.moneda            !== savedForm.moneda            ||
+    form.zona_horaria      !== savedForm.zona_horaria      ||
+    form.aplicarIva        !== savedForm.aplicarIva;
+
+  const hayChangesBillar  = form.costo_hora_billar !== savedForm.costo_hora_billar;
 
   const hayChangesPagos =
     JSON.stringify([...metodosPago].sort()) !==
     JSON.stringify([...savedMetodos].sort());
 
-  const hayChanges = hayChangesGeneral || hayChangesPagos;
+  const hayChanges = hayChangesGeneral || hayChangesPagos || hayChangesBillar;
 
   const inicialesNegocio = (form.tNameCompany || config.tNameCompany)
     .split(" ")
@@ -232,7 +241,7 @@ export function ModalConfiguracion({
 
         {/* ── Tabs ── */}
         <div className={styles.tabs}>
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.id !== "billar" || esBillar).map((t) => (
             <button
               key={t.id}
               className={`${styles.tab} ${tab === t.id ? styles.tabActivo : ""}`}
@@ -241,6 +250,7 @@ export function ModalConfiguracion({
               {t.label}
               {t.id === "general" && hayChangesGeneral && <span className={styles.tabDot} />}
               {t.id === "pagos"   && hayChangesPagos   && <span className={styles.tabDot} />}
+              {t.id === "billar"  && hayChangesBillar  && <span className={styles.tabDot} />}
             </button>
           ))}
         </div>
@@ -388,6 +398,52 @@ export function ModalConfiguracion({
 
               <div className={styles.infoBox}>
                 Los métodos activos aparecerán en la pantalla de cobro del empleado.
+              </div>
+            </>
+          )}
+
+          {/* Tab: Billar */}
+          {tab === "billar" && esBillar && (
+            <>
+              <p className={styles.tabDesc}>
+                Configura el costo por hora de uso de mesa. Este monto se calcula
+                proporcionalmente al tiempo que la mesa estuvo abierta y se suma
+                automáticamente al total al cobrar.
+              </p>
+
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>
+                  Costo por hora de mesa
+                  <span className={styles.fieldRequired}>*</span>
+                </label>
+                <div style={{ position: "relative" }}>
+                  <span style={{
+                    position: "absolute", left: 12, top: "50%",
+                    transform: "translateY(-50%)",
+                    fontSize: 13, fontWeight: 600, color: "var(--gray)",
+                    pointerEvents: "none",
+                  }}>$</span>
+                  <input
+                    className={styles.input}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Ej. 60.00"
+                    value={form.costo_hora_billar}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, costo_hora_billar: e.target.value }))
+                    }
+                    style={{ paddingLeft: 28 }}
+                  />
+                </div>
+                <p style={{ fontSize: 11, color: "var(--gray)", margin: "4px 0 0" }}>
+                  Precio final (IVA incluido). Si la mesa estuvo 45 min a $60/hr, se cobrarán $45.
+                </p>
+              </div>
+
+              <div className={styles.infoBox}>
+                El cargo por tiempo se muestra en el desglose al cobrar y queda
+                registrado en el historial de ventas.
               </div>
             </>
           )}

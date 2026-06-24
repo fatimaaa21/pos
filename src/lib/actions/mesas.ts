@@ -294,26 +294,35 @@ export async function obtenerOrdenAbierta(
     .eq("fkeCodOrden", orden.eCodOrden)
     .order("fhAgregado");
 
-  const detalleConProducto: OrdenMesaDetalleConProducto[] = await Promise.all(
-    (detalle ?? []).map(async (d) => {
-      const { data: producto } = await adminClient
-        .from("productos")
-        .select("tNameProduct, ImgProduct")
-        .eq("eCodProduct", d.fkeCodProduct)
-        .single();
+  if (!detalle?.length) {
+    return { ...orden, detalle: [], eTotal: 0 };
+  }
 
-      const presentacion = d.fkeCodPresentacion
-        ? await adminClient
-            .from("presentaciones")
-            .select("tNombre")
-            .eq("eCodPresentacion", d.fkeCodPresentacion)
-            .single()
-            .then(({ data }) => data)
-        : null;
+  // ── Batch: 2 queries en paralelo en lugar de N*2 queries secuenciales ────
+  const productIds      = [...new Set(detalle.map((d) => d.fkeCodProduct))];
+  const presentacionIds = [...new Set(detalle.map((d) => d.fkeCodPresentacion).filter(Boolean))] as string[];
 
-      return { ...d, producto: producto ?? null, presentacion: presentacion ?? null };
-    })
-  );
+  const [productosRes, presentacionesRes] = await Promise.all([
+    adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct, ImgProduct")
+      .in("eCodProduct", productIds),
+    presentacionIds.length > 0
+      ? adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, tNombre")
+          .in("eCodPresentacion", presentacionIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const productosMap     = new Map((productosRes.data     ?? []).map((p) => [p.eCodProduct,      p]));
+  const presentacionesMap = new Map((presentacionesRes.data ?? []).map((p) => [p.eCodPresentacion, p]));
+
+  const detalleConProducto: OrdenMesaDetalleConProducto[] = detalle.map((d) => ({
+    ...d,
+    producto:     productosMap.get(d.fkeCodProduct)                                           ?? null,
+    presentacion: d.fkeCodPresentacion ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null) : null,
+  }));
 
   const eTotal = detalleConProducto.reduce(
     (acc, d) => acc + d.ePrecio * d.eCantidad,

@@ -67,6 +67,8 @@ export default async function MenuPage() {
           metodosPago={datos.metodosPago}
           tieneTurno={turno.tieneTurno}
           aplicarIva={datos.aplicarIva}
+          tipo_negocio={datos.tipo_negocio}
+          costo_hora_billar={datos.costo_hora_billar}
         />
       </AbrirTurnoGate>
     );

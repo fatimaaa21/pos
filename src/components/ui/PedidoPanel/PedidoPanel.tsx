@@ -17,6 +17,10 @@ interface Props {
   error?:            string | null;
   bloqueado?:        boolean;
   aplicarIva?:       boolean;
+  /** Cargo adicional a mostrar en el desglose (ej. tiempo de mesa en billar) */
+  cargoExtra?: { label: string; monto: number } | null;
+  /** Se llama en el momento exacto que el usuario pulsa "Cobrar", antes de cualquier modal */
+  onIniciarCobro?: () => void;
 }
 
 const IVA_RATE = 0.16;
@@ -107,6 +111,8 @@ export function PedidoPanel({
   error,
   bloqueado = false,
   aplicarIva = true,
+  cargoExtra = null,
+  onIniciarCobro,
 }: Props) {
   const [metodoPago, setMetodoPago]           = useState<string>(metodosPago[0]?.eCodPay ?? "");
   const [cargando, setCargando]               = useState(false);
@@ -118,16 +124,21 @@ export function PedidoPanel({
       ? (item.precioCalculado ?? 0)
       : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct);
 
-  const total      = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
-  const subtotal   = aplicarIva ? total / (1 + IVA_RATE) : total;
-  const iva        = aplicarIva ? total - subtotal : 0;
-  const totalItems = items.reduce((acc, i) => acc + i.cantidad, 0);
+  const totalProductos = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
+  const total          = totalProductos + (cargoExtra?.monto ?? 0);
+  const subtotal       = aplicarIva ? total / (1 + IVA_RATE) : total;
+  const iva            = aplicarIva ? total - subtotal : 0;
+  const totalItems     = items.reduce((acc, i) => acc + i.cantidad, 0);
 
   const metodoSeleccionado = metodosPago.find((m) => m.eCodPay === metodoPago);
   const metodoEsEfectivo   = metodoSeleccionado ? esMetodoEfectivo(metodoSeleccionado) : false;
 
+  // En billar puede cobrarse solo tiempo sin productos
+  const hayAlgoQueCobrar = items.length > 0 || (cargoExtra != null && cargoExtra.monto > 0);
+
   function handleClickCobrar() {
-    if (items.length === 0 || cargando || !metodoPago) return;
+    if (!hayAlgoQueCobrar || cargando || !metodoPago) return;
+    onIniciarCobro?.();   // congela el timer ANTES del modal o del procesarVenta
     if (metodoEsEfectivo) { setModalEfectivo(true); return; }
     procesarVenta();
   }
@@ -287,20 +298,34 @@ export function PedidoPanel({
           </div>
 
           {/* Totales */}
-          {items.length > 0 && (
+          {hayAlgoQueCobrar && (
             <div className={styles.totales}>
-              <div className={styles.lineaTotal}>
-                <span className={styles.totalLabel}>Sub Total</span>
-                <span className={styles.totalValor}>${subtotal.toFixed(2)}</span>
-              </div>
-              {aplicarIva ? (
+              {items.length > 0 && (
+                <>
+                  <div className={styles.lineaTotal}>
+                    <span className={styles.totalLabel}>Sub Total</span>
+                    <span className={styles.totalValor}>${subtotal.toFixed(2)}</span>
+                  </div>
+                  {aplicarIva ? (
+                    <div className={styles.lineaTotal}>
+                      <span className={styles.totalLabel}>IVA (16%)</span>
+                      <span className={styles.totalValor}>${iva.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <div className={styles.lineaTotal}>
+                      <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>Sin IVA</span>
+                    </div>
+                  )}
+                </>
+              )}
+              {cargoExtra && cargoExtra.monto > 0 && (
                 <div className={styles.lineaTotal}>
-                  <span className={styles.totalLabel}>IVA (16%)</span>
-                  <span className={styles.totalValor}>${iva.toFixed(2)}</span>
-                </div>
-              ) : (
-                <div className={styles.lineaTotal}>
-                  <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>Sin IVA</span>
+                  <span className={styles.totalLabel} style={{ color: "var(--color-primary)" }}>
+                    {cargoExtra.label}
+                  </span>
+                  <span className={styles.totalValor} style={{ color: "var(--color-primary)", fontWeight: 700 }}>
+                    +${cargoExtra.monto.toFixed(2)}
+                  </span>
                 </div>
               )}
               <div className={styles.separador} />
@@ -312,7 +337,7 @@ export function PedidoPanel({
           )}
 
           {/* Métodos de pago */}
-          {items.length > 0 && (
+          {hayAlgoQueCobrar && (
             <div className={styles.metodos}>
               {metodosPago.length === 0 ? (
                 <p style={{ fontSize: 11, color: "var(--gray)", textAlign: "center", padding: "var(--space-2) 0" }}>
@@ -334,19 +359,19 @@ export function PedidoPanel({
             </div>
           )}
 
-          {error && items.length > 0 && (
+          {error && hayAlgoQueCobrar && (
             <div className={styles.error}>⚠ {error}</div>
           )}
 
           <div className={styles.footerAccion}>
             <button
               className={styles.btnFinalizar}
-              disabled={items.length === 0 || cargando || !metodoPago || bloqueado}
+              disabled={!hayAlgoQueCobrar || cargando || !metodoPago || bloqueado}
               onClick={handleClickCobrar}
             >
               {cargando
                 ? "Procesando..."
-                : items.length === 0
+                : !hayAlgoQueCobrar
                 ? "Finalizar"
                 : `Cobrar $${total.toFixed(2)}`}
             </button>
