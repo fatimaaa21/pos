@@ -7,7 +7,8 @@
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
 }
@@ -24,6 +25,31 @@
   color: var(--color-warning);
   font-weight: 600;
   margin: 0;
+}
+
+/* ── Botón pedido directo ── */
+.btnPedidoDirecto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px var(--space-4);
+  background: var(--white);
+  color: var(--gray);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btnPedidoDirecto:hover {
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* ── Grid de mesas ── */
@@ -103,20 +129,13 @@
   font-size: 14px;
 }
 
-/* ── Vista orden ── */
+/* ── Vista orden / directo ── */
 .ordenLayout {
-  display: flex;
-  gap: var(--space-4);
-  min-height: 100%;
-  padding-right: calc(300px + var(--space-4));
-}
-
-.catalogo {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  min-width: 0;
+  padding-right: calc(300px + var(--space-4));
+  min-height: 100%;
 }
 
 .ordenHeader {
@@ -149,14 +168,6 @@
   margin: 0;
 }
 
-.ordenLayout {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding-right: calc(300px + var(--space-4));
-  min-height: 100%;
-}
-
 @media (min-width: 769px) and (max-width: 1024px) {
   .ordenLayout { padding-right: calc(260px + var(--space-3)); }
 }
@@ -165,5 +176,10 @@
   .ordenLayout {
     padding-right: 0;
     padding-bottom: 80px;
+  }
+
+  .btnPedidoDirecto {
+    font-size: 12px;
+    padding: 8px var(--space-3);
   }
 }
