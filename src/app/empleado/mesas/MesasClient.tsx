@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition }  from "react";
+import { useState, useTransition, useEffect, useCallback }  from "react";
 import toast                         from "react-hot-toast";
 import { ArrowLeft, UtensilsCrossed } from "lucide-react";
 import { Buscador }          from "@/components/ui/Buscador";
@@ -33,12 +33,14 @@ import styles from "./mesas.module.css";
 type Vista = "mesas" | "orden";
 
 interface Props {
-  mesasIniciales: MesaConEstado[];
-  categorias:     Categoria[];
-  productos:      ProductoConStock[];
-  metodosPago:    MetodoPagoGlobal[];
-  tieneTurno:     boolean;
-  aplicarIva:     boolean;
+  mesasIniciales:   MesaConEstado[];
+  categorias:       Categoria[];
+  productos:        ProductoConStock[];
+  metodosPago:      MetodoPagoGlobal[];
+  tieneTurno:       boolean;
+  aplicarIva:       boolean;
+  tipo_negocio:     "general" | "impresion" | "billar";
+  costo_hora_billar: number | null;
 }
 
 // Convierte los items de la orden al formato que espera PedidoPanel
@@ -75,17 +77,58 @@ export function MesasClient({
   metodosPago,
   tieneTurno,
   aplicarIva,
+  tipo_negocio,
+  costo_hora_billar,
 }: Props) {
   const [vista,           setVista]           = useState<Vista>("mesas");
   const [mesas,           setMesas]           = useState(mesasIniciales);
   const [mesaActiva,      setMesaActiva]      = useState<MesaConEstado | null>(null);
   const [eCodOrden,       setECodOrden]       = useState<string | null>(null);
+  const [fhOrdenActiva,   setFhOrdenActiva]   = useState<string | null>(null);
   const [items,           setItems]           = useState<OrdenMesaDetalleConProducto[]>([]);
   const [categoriaActiva, setCategoriaActiva] = useState("todas");
   const [busqueda,        setBusqueda]        = useState("");
   const [ventaExitosa,    setVentaExitosa]    = useState<string | null>(null);
   const [errorVenta,      setErrorVenta]      = useState<string | null>(null);
   const [isPending,       startTransition]    = useTransition();
+
+  // ── Timer para billar ────────────────────────────────────────────────────
+  // Tick cada segundo para refrescar el tiempo mostrado en el grid de mesas
+  const esBillar = tipo_negocio === "billar";
+  const [ahora, setAhora]               = useState<Date | null>(null);
+  const [ahoraCongelado, setCongelado]  = useState<Date | null>(null);
+
+  // ahoraEfectivo: snapshot congelado cuando se confirma el cobro, o el tick en vivo
+  const ahoraEfectivo = ahoraCongelado ?? ahora;
+
+  useEffect(() => {
+    if (!esBillar) return;
+    setAhora(new Date()); // valor inicial en cliente — evita hydration mismatch
+    const id = setInterval(() => setAhora(new Date()), 1000);
+    return () => clearInterval(id);
+  }, [esBillar]);
+
+  /** Tiempo transcurrido desde fhAbierta hasta ahora, formateado */
+  const formatTiempo = useCallback((fhAbierta: string): string => {
+    if (!ahoraEfectivo) return "00:00";
+    const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
+    const totalSeg = Math.floor(diff / 1000);
+    const h   = Math.floor(totalSeg / 3600);
+    const min = Math.floor((totalSeg % 3600) / 60);
+    const seg = totalSeg % 60;
+    if (h > 0) {
+      return `${h}:${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+    }
+    return `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+  }, [ahoraEfectivo]);
+
+  /** Costo acumulado en pesos */
+  const calcCosto = useCallback((fhAbierta: string): number => {
+    if (!costo_hora_billar || !ahoraEfectivo) return 0;
+    const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
+    const horas = diff / (1000 * 60 * 60);
+    return Math.round(horas * costo_hora_billar * 100) / 100;
+  }, [ahoraEfectivo, costo_hora_billar]);
 
   // ── Filtros de catálogo ──────────────────────────────────────────────────
   const productosFiltrados = productos.filter((p) => {
@@ -127,6 +170,7 @@ export function MesasClient({
 
     if (mesa.ordenAbierta) {
       setECodOrden(mesa.ordenAbierta.eCodOrden);
+      setFhOrdenActiva(mesa.ordenAbierta.fhAbierta);
       const orden = await obtenerOrdenAbierta(mesa.eCodMesa);
       setItems(orden?.detalle ?? []);
       setVista("orden");
@@ -137,6 +181,7 @@ export function MesasClient({
       const result = await abrirOrdenMesa(mesa.eCodMesa);
       if ("error" in result) { toast.error(result.error); return; }
       setECodOrden(result.eCodOrden);
+      setFhOrdenActiva(new Date().toISOString()); // orden recién creada
       setItems([]);
       setVista("orden");
       await recargarMesas();
@@ -206,6 +251,7 @@ export function MesasClient({
 
     if ("error" in result) {
       setErrorVenta(result.error);
+      setCongelado(null); // descongelar si falla para que el timer retome
       return;
     }
 
@@ -218,10 +264,12 @@ export function MesasClient({
     setVista("mesas");
     setMesaActiva(null);
     setECodOrden(null);
+    setFhOrdenActiva(null);
     setItems([]);
     setBusqueda("");
     setCategoriaActiva("todas");
     setErrorVenta(null);
+    setCongelado(null);
   }
 
   // ── Vista: grid de mesas ─────────────────────────────────────────────────
@@ -240,7 +288,8 @@ export function MesasClient({
         ) : (
           <div className={styles.grid}>
             {mesas.map((mesa) => {
-              const ocupada = !!mesa.ordenAbierta;
+              const ocupada   = !!mesa.ordenAbierta;
+              const fhAbierta = mesa.ordenAbierta?.fhAbierta;
               return (
                 <button
                   key={mesa.eCodMesa}
@@ -252,6 +301,23 @@ export function MesasClient({
                   <span className={`${styles.mesaEstado} ${ocupada ? styles.estadoOcupada : styles.estadoLibre}`}>
                     {ocupada ? "Ocupada" : "Libre"}
                   </span>
+                  {esBillar && ocupada && fhAbierta && ahora && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--color-primary)",
+                      marginTop: 2,
+                      fontVariantNumeric: "tabular-nums",
+                      letterSpacing: "0.02em",
+                    }}>
+                      {formatTiempo(fhAbierta)}
+                      {costo_hora_billar != null && (
+                        <span style={{ marginLeft: 4, color: "var(--gray)", fontWeight: 500 }}>
+                          · ${calcCosto(fhAbierta).toFixed(2)}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -298,8 +364,17 @@ export function MesasClient({
         onCambiarCantidad={handleCambiarCantidad}
         onLimpiar={handleLimpiar}
         onFinalizar={handleFinalizar}
+        onIniciarCobro={esBillar ? () => setCongelado(new Date()) : undefined}
         error={errorVenta}
         aplicarIva={aplicarIva}
+        cargoExtra={
+          esBillar && fhOrdenActiva
+            ? {
+                label: `Tiempo de mesa (${formatTiempo(fhOrdenActiva)})`,
+                monto: calcCosto(fhOrdenActiva),
+              }
+            : null
+        }
       />
 
       {ventaExitosa && (

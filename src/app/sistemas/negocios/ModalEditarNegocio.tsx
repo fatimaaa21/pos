@@ -60,6 +60,7 @@ export function ModalEditarNegocio({ negocio, onClose, onEditado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Nombre del negocio" required>
         <ModalInput

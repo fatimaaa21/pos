@@ -19,7 +19,7 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
     nombreNegocio: "",
     nombreAdmin:   "",
     emailAdmin:    "",
-    tipo_negocio:  "general" as "general" | "impresion",
+    tipo_negocio:  "general" as "general" | "impresion" | "billar",
   });
 
   async function handleConfirmar() {
@@ -56,6 +56,7 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
       cargando={loading}
       deshabilitado={deshabilitado}
       error={error}
+      ancho="sm"
     >
       <ModalField label="Nombre del negocio" required>
         <ModalInput
@@ -89,11 +90,12 @@ export function ModalCrearNegocio({ onClose, onCreado }: Props) {
         <ModalSelect
           value={form.tipo_negocio}
           onChange={(e) =>
-            setForm({ ...form, tipo_negocio: e.target.value as "general" | "impresion" })
+            setForm({ ...form, tipo_negocio: e.target.value as "general" | "impresion" | "billar" })
           }
         >
           <option value="general">General (panadería, café, fonda...)</option>
           <option value="impresion">Impresión y diseño (lonas, material gráfico...)</option>
+          <option value="billar">Billar (cobro por tiempo de mesa)</option>
         </ModalSelect>
       </ModalField>
 

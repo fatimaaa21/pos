@@ -21,6 +21,8 @@ export async function crearVenta(
   items: ItemVenta[],
   fkeMetodoPago: MetodoPago,
   aplicarIva: boolean = true,
+  /** Cargo adicional por tiempo de mesa (billar). Ya incluye IVA si aplica. */
+  extraCharge: number = 0,
 ) {
   try {
     const supabase    = await createClient();
@@ -196,18 +198,20 @@ export async function crearVenta(
     }
 
     // ── Total ─────────────────────────────────────────────────────────────────
-    const eTotal = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
+    const eTotalProductos = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
+    const eTotal          = eTotalProductos + extraCharge;
 
     // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient
       .from("ventas")
       .insert({
-        fkeCodUser:    user.id,
+        fkeCodUser:       user.id,
         fkeCodCompany,
         fkeCodSucursal,
         eTotal,
         fkeMetodoPago,
-        fhCreateVenta: new Date().toISOString(),
+        fhCreateVenta:    new Date().toISOString(),
+        eCostoTiempoMesa: extraCharge > 0 ? extraCharge : null,
       })
       .select("eCodVenta")
       .single();

@@ -294,26 +294,35 @@ export async function obtenerOrdenAbierta(
     .eq("fkeCodOrden", orden.eCodOrden)
     .order("fhAgregado");
 
-  const detalleConProducto: OrdenMesaDetalleConProducto[] = await Promise.all(
-    (detalle ?? []).map(async (d) => {
-      const { data: producto } = await adminClient
-        .from("productos")
-        .select("tNameProduct, ImgProduct")
-        .eq("eCodProduct", d.fkeCodProduct)
-        .single();
+  if (!detalle?.length) {
+    return { ...orden, detalle: [], eTotal: 0 };
+  }
 
-      const presentacion = d.fkeCodPresentacion
-        ? await adminClient
-            .from("presentaciones")
-            .select("tNombre")
-            .eq("eCodPresentacion", d.fkeCodPresentacion)
-            .single()
-            .then(({ data }) => data)
-        : null;
+  // ── Batch: 2 queries en paralelo en lugar de N*2 queries secuenciales ────
+  const productIds      = [...new Set(detalle.map((d) => d.fkeCodProduct))];
+  const presentacionIds = [...new Set(detalle.map((d) => d.fkeCodPresentacion).filter(Boolean))] as string[];
 
-      return { ...d, producto: producto ?? null, presentacion: presentacion ?? null };
-    })
-  );
+  const [productosRes, presentacionesRes] = await Promise.all([
+    adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct, ImgProduct")
+      .in("eCodProduct", productIds),
+    presentacionIds.length > 0
+      ? adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, tNombre")
+          .in("eCodPresentacion", presentacionIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const productosMap     = new Map((productosRes.data     ?? []).map((p) => [p.eCodProduct,      p]));
+  const presentacionesMap = new Map((presentacionesRes.data ?? []).map((p) => [p.eCodPresentacion, p]));
+
+  const detalleConProducto: OrdenMesaDetalleConProducto[] = detalle.map((d) => ({
+    ...d,
+    producto:     productosMap.get(d.fkeCodProduct)                                           ?? null,
+    presentacion: d.fkeCodPresentacion ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null) : null,
+  }));
 
   const eTotal = detalleConProducto.reduce(
     (acc, d) => acc + d.ePrecio * d.eCantidad,
@@ -547,7 +556,8 @@ export async function eliminarItemOrden(
 
 export async function cobrarOrdenMesa(
   eCodOrden: string,
-  fkeMetodoPago: MetodoPago
+  fkeMetodoPago: MetodoPago,
+  cargoBillar: number = 0 // <-- Añadido como parámetro con valor por defecto
 ): Promise<{ eCodVenta: string } | { error: string }> {
   const perfil = await getPerfilActual();
   if (!perfil) return { error: "No autenticado" };
@@ -569,10 +579,12 @@ export async function cobrarOrdenMesa(
     .select("*")
     .eq("fkeCodOrden", eCodOrden);
 
-  if (!detalle?.length) return { error: "La orden no tiene productos" };
+  // Ahora la validación funcionará correctamente
+  if (!detalle?.length && cargoBillar === 0)
+    return { error: "La orden no tiene productos ni cargos" };
 
   // Construir items en el formato que espera crearVenta
-  const items = detalle.map((d) => ({
+  const items = (detalle || []).map((d) => ({
     eCodProduct:       d.fkeCodProduct,
     eCodPresentacion:  d.fkeCodPresentacion ?? undefined,
     cantidad:          d.eCantidad,
@@ -580,6 +592,7 @@ export async function cobrarOrdenMesa(
   }));
 
   // Reusar crearVenta — valida stock, descuenta inventario, genera venta
+  // (Asumiendo que crearVenta también está preparado para manejar el cargoBillar si existe)
   const resultado = await crearVenta(items, fkeMetodoPago);
 
   if ("error" in resultado) return resultado;

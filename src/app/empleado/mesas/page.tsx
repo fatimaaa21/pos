@@ -57,11 +57,13 @@ export default async function MesasPage() {
   // ── Métodos de pago ───────────────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("metodosPago, aplicarIva")
+    .select("metodosPago, aplicarIva, tipo_negocio, costo_hora_billar")
     .eq("eCodCompany", fkeCodCompany)
     .single();
 
-  const aplicarIva = negocio?.aplicarIva ?? true;
+  const aplicarIva        = negocio?.aplicarIva             ?? true;
+  const tipo_negocio      = (negocio?.tipo_negocio          ?? "general") as "general" | "impresion" | "billar";
+  const costo_hora_billar = (negocio?.costo_hora_billar     ?? null) as number | null;
   let metodosPago: MetodoPagoGlobal[] = [];
 
   const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
@@ -183,6 +185,8 @@ export default async function MesasPage() {
       metodosPago={metodosPago}
       tieneTurno={tieneTurno}
       aplicarIva={aplicarIva}
+      tipo_negocio={tipo_negocio}
+      costo_hora_billar={costo_hora_billar}
     />
   );
 }
