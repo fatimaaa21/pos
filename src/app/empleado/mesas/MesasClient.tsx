@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useCallback }  from "react";
 import toast                         from "react-hot-toast";
-import { ArrowLeft, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, ShoppingBag } from "lucide-react";
 import { Buscador }          from "@/components/ui/Buscador";
 import { CategoriaCarrusel } from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
 import { ProductoGrid }      from "@/components/ui/ProductoGrid/ProductoGrid";
@@ -18,6 +18,7 @@ import {
   cobrarOrdenMesa,
   limpiarOrdenMesa,
 } from "@/lib/actions/mesas";
+import { crearVenta } from "@/lib/actions/ventas";
 import type {
   MesaConEstado,
   Categoria,
@@ -30,7 +31,7 @@ import type {
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./mesas.module.css";
 
-type Vista = "mesas" | "orden";
+type Vista = "mesas" | "orden" | "directo";
 
 interface Props {
   mesasIniciales:   MesaConEstado[];
@@ -70,6 +71,10 @@ function itemsACarrito(items: OrdenMesaDetalleConProducto[]): ItemCarritoMenu[] 
   }));
 }
 
+function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): string {
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
+}
+
 export function MesasClient({
   mesasIniciales,
   categorias,
@@ -92,23 +97,25 @@ export function MesasClient({
   const [errorVenta,      setErrorVenta]      = useState<string | null>(null);
   const [isPending,       startTransition]    = useTransition();
 
+  // ── Carrito para pedidos directos (sin mesa) ─────────────────────────────
+  const [carritoDirecto,  setCarritoDirecto]  = useState<ItemCarritoMenu[]>([]);
+  const [errorDirecto,    setErrorDirecto]    = useState<string | null>(null);
+  const [ventaDirectaOk,  setVentaDirectaOk]  = useState<string | null>(null);
+
   // ── Timer para billar ────────────────────────────────────────────────────
-  // Tick cada segundo para refrescar el tiempo mostrado en el grid de mesas
   const esBillar = tipo_negocio === "billar";
   const [ahora, setAhora]               = useState<Date | null>(null);
   const [ahoraCongelado, setCongelado]  = useState<Date | null>(null);
 
-  // ahoraEfectivo: snapshot congelado cuando se confirma el cobro, o el tick en vivo
   const ahoraEfectivo = ahoraCongelado ?? ahora;
 
   useEffect(() => {
     if (!esBillar) return;
-    setAhora(new Date()); // valor inicial en cliente — evita hydration mismatch
+    setAhora(new Date());
     const id = setInterval(() => setAhora(new Date()), 1000);
     return () => clearInterval(id);
   }, [esBillar]);
 
-  /** Tiempo transcurrido desde fhAbierta hasta ahora, formateado */
   const formatTiempo = useCallback((fhAbierta: string): string => {
     if (!ahoraEfectivo) return "00:00";
     const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
@@ -122,7 +129,6 @@ export function MesasClient({
     return `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
   }, [ahoraEfectivo]);
 
-  /** Costo acumulado en pesos */
   const calcCosto = useCallback((fhAbierta: string): number => {
     if (!costo_hora_billar || !ahoraEfectivo) return 0;
     const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
@@ -158,6 +164,11 @@ export function MesasClient({
     setItems(orden?.detalle ?? []);
   }
 
+  function resetFiltros() {
+    setBusqueda("");
+    setCategoriaActiva("todas");
+  }
+
   // ── Entrar a una mesa ────────────────────────────────────────────────────
   async function handleClickMesa(mesa: MesaConEstado) {
     if (!tieneTurno) {
@@ -181,14 +192,77 @@ export function MesasClient({
       const result = await abrirOrdenMesa(mesa.eCodMesa);
       if ("error" in result) { toast.error(result.error); return; }
       setECodOrden(result.eCodOrden);
-      setFhOrdenActiva(new Date().toISOString()); // orden recién creada
+      setFhOrdenActiva(new Date().toISOString());
       setItems([]);
       setVista("orden");
       await recargarMesas();
     });
   }
 
-  // ── Agregar producto ─────────────────────────────────────────────────────
+  // ── Pedido directo: agregar producto ─────────────────────────────────────
+  function agregarProductoDirecto(
+    producto: ProductoConStock,
+    presentacion?: PresentacionConStock
+  ) {
+    if (!tieneTurno) return;
+    setErrorDirecto(null);
+
+    const key   = carritoKey({ producto, presentacion });
+    const stock = presentacion?.stockDisponible ?? producto.stockDisponible;
+    const bInf  = presentacion?.bInfinito       ?? producto.bInfinito;
+
+    setCarritoDirecto((prev) => {
+      const existe = prev.find((i) => carritoKey(i) === key);
+      if (existe) {
+        if (!bInf && existe.cantidad >= stock) return prev;
+        return prev.map((i) =>
+          carritoKey(i) === key ? { ...i, cantidad: i.cantidad + 1 } : i
+        );
+      }
+      return [...prev, { producto, cantidad: 1, presentacion }];
+    });
+  }
+
+  function cambiarCantidadDirecto(key: string, delta: number) {
+    setErrorDirecto(null);
+    setCarritoDirecto((prev) =>
+      prev
+        .map((i) => {
+          if (carritoKey(i) !== key) return i;
+          const stock = i.presentacion?.stockDisponible ?? i.producto.stockDisponible;
+          const bInf  = i.presentacion?.bInfinito       ?? i.producto.bInfinito;
+          const nueva = i.cantidad + delta;
+          if (!bInf && nueva > stock) return i;
+          return { ...i, cantidad: nueva };
+        })
+        .filter((i) => i.cantidad > 0)
+    );
+  }
+
+  function limpiarCarritoDirecto() {
+    setCarritoDirecto([]);
+    setErrorDirecto(null);
+  }
+
+  async function handleFinalizarDirecto(metodoPago: MetodoPago): Promise<void> {
+    setErrorDirecto(null);
+
+    const result = await crearVenta(
+      carritoDirecto.map((i) => ({
+        eCodProduct:      i.producto.eCodProduct,
+        eCodPresentacion: i.presentacion?.eCodPresentacion,
+        cantidad:         i.cantidad,
+        precioUnitario:   i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct,
+      })),
+      metodoPago,
+      aplicarIva,
+    );
+
+    if (result.error) { setErrorDirecto(result.error); return; }
+    setVentaDirectaOk(result.eCodVenta!);
+  }
+
+  // ── Agregar producto (flujo de mesa) ────────────────────────────────────
   function handleAgregarProducto(
     producto: ProductoConStock,
     presentacion?: PresentacionConStock
@@ -212,9 +286,7 @@ export function MesasClient({
     });
   }
 
-  // ── Cambiar cantidad (callback de PedidoPanel) ───────────────────────────
   function handleCambiarCantidad(key: string, delta: number) {
-    // key = eCodDetalle
     const item = items.find((i) => i.eCodDetalle === key);
     if (!item) return;
 
@@ -232,7 +304,6 @@ export function MesasClient({
     });
   }
 
-  // ── Limpiar orden (callback de PedidoPanel) ──────────────────────────────
   function handleLimpiar() {
     if (!eCodOrden) return;
     startTransition(async () => {
@@ -242,7 +313,6 @@ export function MesasClient({
     });
   }
 
-  // ── Finalizar/cobrar (callback de PedidoPanel) ───────────────────────────
   async function handleFinalizar(metodoPago: MetodoPago): Promise<void> {
     if (!eCodOrden) return;
     setErrorVenta(null);
@@ -251,7 +321,7 @@ export function MesasClient({
 
     if ("error" in result) {
       setErrorVenta(result.error);
-      setCongelado(null); // descongelar si falla para que el timer retome
+      setCongelado(null);
       return;
     }
 
@@ -259,17 +329,23 @@ export function MesasClient({
     await recargarMesas();
   }
 
-  // ── Volver al grid ───────────────────────────────────────────────────────
+  // ── Volver al grid de mesas ──────────────────────────────────────────────
   function handleVolver() {
     setVista("mesas");
     setMesaActiva(null);
     setECodOrden(null);
     setFhOrdenActiva(null);
     setItems([]);
-    setBusqueda("");
-    setCategoriaActiva("todas");
+    resetFiltros();
     setErrorVenta(null);
     setCongelado(null);
+  }
+
+  // ── Volver desde pedido directo ──────────────────────────────────────────
+  function handleVolverDeDirecto() {
+    setVista("mesas");
+    limpiarCarritoDirecto();
+    resetFiltros();
   }
 
   // ── Vista: grid de mesas ─────────────────────────────────────────────────
@@ -278,6 +354,15 @@ export function MesasClient({
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.titulo}>Mesas</h1>
+          {tieneTurno && (
+            <button
+              className={styles.btnPedidoDirecto}
+              onClick={() => { resetFiltros(); setVista("directo"); }}
+            >
+              <ShoppingBag size={14} />
+              Pedido directo
+            </button>
+          )}
         </div>
 
         {mesas.length === 0 ? (
@@ -324,6 +409,62 @@ export function MesasClient({
           </div>
         )}
       </div>
+    );
+  }
+
+  // ── Vista: pedido directo (sin mesa) ─────────────────────────────────────
+  if (vista === "directo") {
+    return (
+      <>
+        <div className={styles.ordenLayout}>
+          <div className={styles.ordenHeader}>
+            <button className={styles.btnVolver} onClick={handleVolverDeDirecto}>
+              <ArrowLeft size={16} />
+              <span>Mesas</span>
+            </button>
+            <h2 className={styles.mesaNombreHeader}>Pedido directo</h2>
+          </div>
+
+          <Buscador
+            valor={busqueda}
+            onChange={setBusqueda}
+            placeholder="Buscar producto..."
+          />
+
+          <CategoriaCarrusel
+            categorias={categorias}
+            categoriaActiva={categoriaActiva}
+            onSeleccionar={setCategoriaActiva}
+            conteoPorCategoria={conteoPorCategoria}
+          />
+
+          <ProductoGrid
+            productos={productosFiltrados}
+            onAgregar={agregarProductoDirecto}
+          />
+        </div>
+
+        <PedidoPanel
+          items={carritoDirecto}
+          metodosPago={metodosPago}
+          onCambiarCantidad={cambiarCantidadDirecto}
+          onLimpiar={limpiarCarritoDirecto}
+          onFinalizar={handleFinalizarDirecto}
+          error={errorDirecto}
+          aplicarIva={aplicarIva}
+        />
+
+        {ventaDirectaOk && (
+          <ModalVentaExitosa
+            eCodVenta={ventaDirectaOk}
+            onNuevoPedido={() => {
+              setVentaDirectaOk(null);
+              limpiarCarritoDirecto();
+              resetFiltros();
+            }}
+          />
+        )}
+      </>
     );
   }
 
