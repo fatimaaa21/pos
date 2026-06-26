@@ -556,8 +556,7 @@ export async function eliminarItemOrden(
 
 export async function cobrarOrdenMesa(
   eCodOrden: string,
-  fkeMetodoPago: MetodoPago,
-  cargoBillar: number = 0 // <-- Añadido como parámetro con valor por defecto
+  fkeMetodoPago: MetodoPago
 ): Promise<{ eCodVenta: string } | { error: string }> {
   const perfil = await getPerfilActual();
   if (!perfil) return { error: "No autenticado" };
@@ -579,40 +578,50 @@ export async function cobrarOrdenMesa(
     .select("*")
     .eq("fkeCodOrden", eCodOrden);
 
-  // Ahora la validación funcionará correctamente
+  // ── Cargo por tiempo de mesa (solo negocios tipo billar) ──────────────────
+  let cargoBillar = 0;
+
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("tipo_negocio, costo_hora_billar")
+    .eq("eCodCompany", perfil.fkeCodCompany)
+    .single();
+
+  if (negocio?.tipo_negocio === "billar" && negocio.costo_hora_billar) {
+    const horasTranscurridas =
+      (new Date().getTime() - new Date(orden.fhAbierta).getTime()) / (1000 * 60 * 60);
+    cargoBillar = Math.round(horasTranscurridas * negocio.costo_hora_billar * 100) / 100;
+  }
+
+  // Sin productos y sin cargo de tiempo → no hay nada que cobrar
   if (!detalle?.length && cargoBillar === 0)
-    return { error: "La orden no tiene productos ni cargos" };
+    return { error: "La orden no tiene productos" };
 
   // Construir items en el formato que espera crearVenta
-  const items = (detalle || []).map((d) => ({
-    eCodProduct:       d.fkeCodProduct,
-    eCodPresentacion:  d.fkeCodPresentacion ?? undefined,
-    cantidad:          d.eCantidad,
-    precioUnitario:    d.ePrecio,
+  const items = (detalle ?? []).map((d) => ({
+    eCodProduct:      d.fkeCodProduct,
+    eCodPresentacion: d.fkeCodPresentacion ?? undefined,
+    cantidad:         d.eCantidad,
+    precioUnitario:   d.ePrecio,
   }));
 
-  // Reusar crearVenta — valida stock, descuenta inventario, genera venta
-  // (Asumiendo que crearVenta también está preparado para manejar el cargoBillar si existe)
-  const resultado = await crearVenta(items, fkeMetodoPago);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
 
   if ("error" in resultado) return resultado;
 
-  // Cerrar la orden y vincularla a la venta generada
   const { error: cierreError } = await adminClient
     .from("ordenes_mesa")
     .update({
-      tEstado:      "cerrada",
-      fhCerrada:    new Date().toISOString(),
-      fkeCodVenta:  resultado.eCodVenta,
+      tEstado:     "cerrada",
+      fhCerrada:   new Date().toISOString(),
+      fkeCodVenta: resultado.eCodVenta,
     })
     .eq("eCodOrden", eCodOrden);
 
-  if (cierreError) {
-    // La venta ya se creó — loggear pero no bloquear
-    console.error("Error al cerrar orden:", cierreError.message);
-  }
+  if (cierreError) console.error("Error al cerrar orden:", cierreError.message);
 
   revalidatePath("/empleado/mesas");
+  revalidatePath("/admin/menu");
   return { eCodVenta: resultado.eCodVenta };
 }
 
