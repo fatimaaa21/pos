@@ -556,7 +556,8 @@ export async function eliminarItemOrden(
 
 export async function cobrarOrdenMesa(
   eCodOrden: string,
-  fkeMetodoPago: MetodoPago
+  fkeMetodoPago: MetodoPago,
+  cargoBillar: number = 0 // <-- Añadido como parámetro con valor por defecto
 ): Promise<{ eCodVenta: string } | { error: string }> {
   const perfil = await getPerfilActual();
   if (!perfil) return { error: "No autenticado" };
@@ -578,10 +579,12 @@ export async function cobrarOrdenMesa(
     .select("*")
     .eq("fkeCodOrden", eCodOrden);
 
-  if (!detalle?.length) return { error: "La orden no tiene productos" };
+  // Ahora la validación funcionará correctamente
+  if (!detalle?.length && cargoBillar === 0)
+    return { error: "La orden no tiene productos ni cargos" };
 
   // Construir items en el formato que espera crearVenta
-  const items = detalle.map((d) => ({
+  const items = (detalle || []).map((d) => ({
     eCodProduct:       d.fkeCodProduct,
     eCodPresentacion:  d.fkeCodPresentacion ?? undefined,
     cantidad:          d.eCantidad,
@@ -589,6 +592,7 @@ export async function cobrarOrdenMesa(
   }));
 
   // Reusar crearVenta — valida stock, descuenta inventario, genera venta
+  // (Asumiendo que crearVenta también está preparado para manejar el cargoBillar si existe)
   const resultado = await crearVenta(items, fkeMetodoPago);
 
   if ("error" in resultado) return resultado;
