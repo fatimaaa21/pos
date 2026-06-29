@@ -2,7 +2,9 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
+  height: calc(100dvh - 48px); /* 48px = márgenes AppLayout */
+  overflow: hidden;
 }
 
 .header {
@@ -182,4 +184,137 @@
     font-size: 12px;
     padding: 8px var(--space-3);
   }
+}
+/* ── Floor plan (layout visual de mesas) ── */
+/* Renderiza las mesas en sus posiciones reales. Sin drag, solo tap. */
+
+.floorPlan {
+  display: grid;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  background: var(--border-light);
+  gap: 1px;
+  padding: 1px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+}
+
+/* Celdas de fondo — cuadrícula visual */
+.floorCell {
+  background: var(--background);
+}
+
+/* Mesa base */
+.floorMesa {
+  position: relative;
+  z-index: 2;
+  margin: 3px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  border: 2px solid;
+  font-family: var(--font-family);
+  transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  padding: var(--space-1);
+}
+
+.floorMesa:hover:not(:disabled) {
+  transform: scale(1.04);
+  box-shadow: var(--shadow);
+  z-index: 3;
+}
+
+.floorMesa:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.floorMesaCircle {
+  border-radius: 50%;
+}
+
+/* Libre: contorno verde, fondo blanco */
+.floorMesaLibre {
+  background: var(--white);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* Ocupada: rellena con verde, texto blanco */
+.floorMesaOcupada {
+  background: var(--color-primary);
+  border-color: var(--color-primary-dark);
+  color: var(--white);
+}
+
+.floorMesaNombre {
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.floorMesaEstado {
+  font-size: 0.52rem;
+  font-weight: 600;
+  opacity: 0.8;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Timer de billar */
+.floorMesaTimer {
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: center;
+  pointer-events: none;
+  margin-top: 1px;
+}
+
+.floorMesaCosto {
+  font-size: 0.52rem;
+  font-weight: 600;
+  opacity: 0.85;
+  text-align: center;
+  pointer-events: none;
+}
+/* ── Header actions (botones alineados) ─────────────────────────────────── */
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.btnCerrarCaja {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px var(--space-4);
+  background: var(--white);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dark);
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.btnCerrarCaja:hover {
+  background: var(--color-error-bg);
+  border-color: var(--color-error);
+  color: var(--color-error);
 }

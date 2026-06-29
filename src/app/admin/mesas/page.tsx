@@ -1,9 +1,9 @@
 import { createClient }       from "@/lib/supabase/server";
 import { createAdminClient }  from "@/lib/supabase/admin";
 import { redirect }           from "next/navigation";
-import { MesasAdminClient }   from "./MesasAdminClient";
-import { obtenerMesasAdmin }  from "@/lib/actions/mesas";
-import type { MesaConEstado } from "@/types";
+import { getSucursalContext }  from "@/lib/utils/sucursal";
+import { LayoutEditorMesas }    from "./LayoutEditorMesas";
+import type { MesaEditorData } from "./mesas-editor-types";
 
 export default async function AdminMesasPage() {
   const supabase    = await createClient();
@@ -20,7 +20,7 @@ export default async function AdminMesasPage() {
 
   if (!perfil || perfil.tRolUser !== "admin") redirect("/admin/dashboard");
 
-  // Verificar módulo activo
+  // ── Módulo activo ──────────────────────────────────────────────────────────
   const { data: modulo } = await adminClient
     .from("modulos_tenant")
     .select("bStateModulo")
@@ -30,9 +30,88 @@ export default async function AdminMesasPage() {
 
   if (!modulo?.bStateModulo) redirect("/admin/dashboard");
 
-  // obtenerMesasAdmin devuelve activas + inactivas (admin necesita ver ambas
-  // para poder reactivar mesas desactivadas)
-  const mesas = await obtenerMesasAdmin();
+  // ── Mesas de la sucursal activa ────────────────────────────────────────────
+  const ctx = await getSucursalContext();
 
-  return <MesasAdminClient mesasIniciales={mesas as MesaConEstado[]} />;
+  const q = adminClient
+    .from("mesas")
+    .select("eCodMesa, tNombre, bStateMesa, e_grid_col, e_grid_row, e_grid_w, e_grid_h, t_shape")
+    .eq("fkeCodCompany", perfil.fkeCodCompany)
+    .order("tNombre");
+
+  if (ctx.fkeCodSucursal) q.eq("fkeCodSucursal", ctx.fkeCodSucursal);
+
+  // Negocio (tipo y costo de billar)
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("tipo_negocio, costo_hora_billar, metodosPago")
+    .eq("eCodCompany", perfil.fkeCodCompany)
+    .single();
+
+  const tipo_negocio      = (negocio?.tipo_negocio      ?? "general") as "general" | "impresion" | "billar";
+  const costo_hora_billar = (negocio?.costo_hora_billar ?? null) as number | null;
+
+  // Métodos de pago activos
+  const idsMetodos: string[] = negocio?.metodosPago ?? [];
+  let metodosPago: { eCodPay: string; tNamePay: string }[] = [];
+  if (idsMetodos.length > 0) {
+    const { data: metodos } = await adminClient
+      .from("metodos_pago")
+      .select("eCodPay, tNamePay")
+      .in("eCodPay", idsMetodos)
+      .eq("bStatePay", true);
+    metodosPago = (metodos as { eCodPay: string; tNamePay: string }[]) ?? [];
+  }
+
+  // Órdenes abiertas para saber qué mesas ya están en uso
+  const [{ data: mesas }, { data: ordenesAbiertas }] = await Promise.all([
+    q,
+    adminClient
+      .from("ordenes_mesa")
+      .select("eCodOrden, fkeCodMesa, fhAbierta")
+      .eq("fkeCodCompany", perfil.fkeCodCompany)
+      .eq("tEstado", "abierta"),
+  ]);
+
+  const ordenPorMesa = new Map(
+    (ordenesAbiertas ?? []).map(o => [o.fkeCodMesa, { eCodOrden: o.eCodOrden, fhAbierta: o.fhAbierta }])
+  );
+
+  const mesasEditor: MesaEditorData[] = (mesas ?? []).map((m) => ({
+    eCodMesa:    m.eCodMesa,
+    tNombre:     m.tNombre,
+    e_grid_col:  m.e_grid_col ?? 0,
+    e_grid_row:  m.e_grid_row ?? 0,
+    e_grid_w:    m.e_grid_w   ?? 1,
+    e_grid_h:    m.e_grid_h   ?? 1,
+    t_shape:     (m.t_shape   ?? "rect") as "rect" | "circle",
+    bStateMesa:  m.bStateMesa ?? true,
+    ordenAbierta: ordenPorMesa.get(m.eCodMesa) ?? null,
+  }));
+
+  // ── Layout ─────────────────────────────────────────────────────────────────
+  // El header ocupa ~80px (título + descripción), el resto al editor.
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", height: "100%" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--dark)", margin: 0 }}>
+            Mesas
+          </h1>
+          <p style={{ fontSize: 13, color: "var(--gray)", margin: "var(--space-1) 0 0" }}>
+            Arrastra para organizar · Ajusta tamaño con los controles · Guarda cuando termines
+          </p>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <LayoutEditorMesas
+          mesasIniciales={mesasEditor}
+          pathRevalidar="/admin/mesas"
+          tipo_negocio={tipo_negocio}
+          costo_hora_billar={costo_hora_billar}
+        />
+      </div>
+    </div>
+  );
 }

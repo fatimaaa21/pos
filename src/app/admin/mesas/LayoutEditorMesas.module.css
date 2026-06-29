@@ -1,0 +1,559 @@
+/* LayoutEditorMesas.module.css */
+
+/* ── Root ────────────────────────────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  gap: var(--space-4);
+  /* Altura fija basada en viewport: evita scroll sin depender de herencia %.
+     48px = márgenes AppLayout | 56px = título+descripción | 16px = gap */
+  height: calc(100dvh - 130px);
+  min-height: 400px;
+  overflow: hidden;
+}
+
+/* ── Canvas wrapper ──────────────────────────────────────────────────────── */
+
+.canvasWrapper {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  /* display: block — el canvas hija llena todo el espacio disponible */
+}
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+/* Sin aspect-ratio: el canvas ocupa 100% del ancho y alto del wrapper.
+   Las celdas serán algo más anchas que altas, que es correcto para un
+   salón de restaurante visto desde arriba. */
+
+.canvas {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  background: var(--border-default);
+  gap: 1px;
+  padding: 1px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ── Celdas ──────────────────────────────────────────────────────────────── */
+
+.cell {
+  background: var(--background);
+  transition: background 0.08s ease;
+}
+
+.cellCanDrop {
+  background: var(--color-success-bg);
+}
+
+.cellNoDrop {
+  background: var(--color-error-bg);
+}
+
+/* ── Mesas ───────────────────────────────────────────────────────────────── */
+
+.mesa {
+  position: relative;
+  z-index: 2;
+  margin: 4px;
+  background: var(--white);
+  border: 2px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: grab;
+  user-select: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.mesa:active { cursor: grabbing; }
+
+.mesaCircle { border-radius: 50%; }
+
+.mesaSelected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-50);
+}
+
+.mesaDragging {
+  /* La mesa se mueve en tiempo real — sin overlay fantasma.
+     Borde primary y sombra indican que está siendo arrastrada. */
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+  z-index: 10;
+  cursor: grabbing;
+  opacity: 0.85;
+}
+
+.mesaOverlay {
+  background: var(--color-primary);
+  border: 2px solid var(--color-primary-dark);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+  box-shadow: var(--shadow-lg);
+  pointer-events: none;
+}
+
+.mesaOverlay.mesaCircle { border-radius: 50%; }
+
+.mesaNombre {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--dark);
+  text-align: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.mesaNombreOverlay {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--white);
+  text-align: center;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.mesaDim {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: var(--gray);
+  pointer-events: none;
+}
+
+/* ── Panel lateral ───────────────────────────────────────────────────────── */
+/* height: 100% + box-sizing asegura que el panel tenga la misma altura
+   que el canvas (ambos son flex children de .root con align-items:stretch) */
+
+.panel {
+  width: 224px;
+  flex-shrink: 0;
+  height: 100%;
+  box-sizing: border-box;
+  background: var(--white);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  box-shadow: var(--shadow-sm);
+}
+
+.panelSection {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.panelLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gray);
+  margin: 0;
+}
+
+/* ── Botones agregar ─────────────────────────────────────────────────────── */
+
+.addButtons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.btnAdd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 9px var(--space-3);
+  background: var(--background);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--dark);
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.1s ease, border-color 0.1s ease;
+  text-align: left;
+}
+
+.btnAdd:hover:not(:disabled) {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary-light);
+}
+
+.btnAdd:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ── Controles mesa seleccionada ─────────────────────────────────────────── */
+
+.nameInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--background);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  color: var(--dark);
+  font-family: var(--font-family);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.nameInput:focus {
+  border-color: var(--color-primary);
+  background: var(--white);
+}
+
+.sizeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sizeLabel { flex: 1; font-size: 0.82rem; color: var(--dark); }
+
+.btnSize {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--dark);
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.1s ease;
+  flex-shrink: 0;
+}
+
+.btnSize:hover { background: var(--color-primary-50); }
+
+.sizeVal {
+  width: 24px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dark);
+  flex-shrink: 0;
+}
+
+.btnEliminar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px var(--space-3);
+  background: transparent;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.1s ease;
+}
+
+.btnEliminar:hover { background: var(--color-error-bg); }
+
+/* ── Hint ────────────────────────────────────────────────────────────────── */
+
+.panelHintWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+}
+
+.panelHint {
+  font-size: 0.8rem;
+  color: var(--gray);
+  text-align: center;
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.panelFooter {
+  margin-top: auto;
+  padding: var(--space-4);
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.cambiosPendientes {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-warning);
+  margin: 0;
+}
+
+.btnGuardar {
+  width: 100%;
+  padding: 10px;
+  background: var(--color-primary);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: opacity 0.15s ease;
+}
+
+.btnGuardar:hover:not(:disabled) { opacity: 0.88; }
+.btnGuardar:disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* ── Toast confirmar ─────────────────────────────────────────────────────── */
+
+.toastConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  font-size: 0.85rem;
+  color: var(--dark);
+}
+
+.toastButtons {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.toastBtnCancel {
+  padding: 5px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: var(--font-family);
+  color: var(--dark);
+}
+
+.toastBtnConfirm {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--color-error);
+  color: var(--white);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+}
+
+/* ── Mobile block ────────────────────────────────────────────────────────── */
+
+.mobileBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-12) var(--space-6);
+  text-align: center;
+}
+
+.mobileTitle { font-size: 1rem; font-weight: 700; color: var(--dark); margin: 0; }
+.mobileDesc  { font-size: 0.875rem; color: var(--gray); margin: 0; line-height: 1.5; }
+
+/* ── Elemento flotante durante el drag ───────────────────────────────────── */
+/* Movido via DOM directo (style.left/top) — sin React state, sin lag */
+
+.floatingMesa {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--color-primary);
+  border: 2px solid var(--color-primary-dark);
+  border-radius: var(--radius-md);
+  color: var(--white);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-family: var(--font-family);
+  opacity: 0.85;
+  box-shadow: var(--shadow-lg);
+  will-change: transform;
+}
+
+/* ── Switch de activar/desactivar ────────────────────────────────────────── */
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.switchLabel {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--dark);
+  margin: 0 0 2px;
+}
+
+.switchDesc {
+  font-size: 0.7rem;
+  color: var(--gray);
+  margin: 0;
+}
+
+.switch {
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  background: var(--border-strong);
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--white);
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.switchOn {
+  background: var(--color-primary);
+}
+
+.switchOn::after {
+  transform: translateX(16px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mesa inactiva en el canvas */
+.mesaInactiva {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+/* ── Timer de mesa abierta ───────────────────────────────────────────────── */
+
+.timerBox {
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.timerLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.timerValue {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  margin: 0;
+  font-family: var(--font-family);
+}
+
+.timerCosto {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* ── Mesa abierta (tiene orden activa) ───────────────────────────────────── */
+
+.mesaAbierta {
+  background: var(--color-primary-50);
+  border-color: var(--color-primary);
+}
+
+.mesaTimer {
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.mesaCostoCard {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  opacity: 0.85;
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* ── Cerrar mesa sin cobrar ──────────────────────────────────────────────── */
+
+.btnCerrarMesa {
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-family);
+  transition: background 0.1s ease;
+}
+
+.btnCerrarMesa:hover:not(:disabled) { background: var(--color-error-bg); }
+.btnCerrarMesa:disabled { opacity: 0.4; cursor: not-allowed; }

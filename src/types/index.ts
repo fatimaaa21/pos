@@ -275,9 +275,16 @@ export interface ModuloTenant {
 export interface Mesa {
   eCodMesa:      string;
   fkeCodCompany: string;
+  fkeCodSucursal?: string | null;
   tNombre:       string;
   bStateMesa:    boolean;
   fhCreateMesa:  string;
+  // ── Columnas de layout (agregadas en migración) ──
+  e_grid_col:    number;            // columna inicial en el grid (default 0)
+  e_grid_row:    number;            // fila inicial en el grid (default 0)
+  e_grid_w:      number;            // columnas que ocupa (default 1)
+  e_grid_h:      number;            // filas que ocupa (default 1)
+  t_shape:       "rect" | "circle"; // forma visual (default "rect")
 }
 
 export type EstadoOrdenMesa = "abierta" | "cerrada" | "cancelada";
