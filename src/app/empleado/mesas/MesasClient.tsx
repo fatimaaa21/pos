@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback }  from "react";
+// src/app/empleado/mesas/MesasClient.tsx
+// Cambio principal: vista "mesas" ahora muestra el floor plan con las
+// posiciones que el admin configuró, en lugar de un grid auto-fill.
+// La lógica de órdenes, pedido directo y billar es idéntica a la versión anterior.
+
+import { useState, useTransition, useEffect, useCallback } from "react";
 import toast                         from "react-hot-toast";
-import { ArrowLeft, UtensilsCrossed, ShoppingBag } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, ShoppingBag, LogOut } from "lucide-react";
 import { Buscador }          from "@/components/ui/Buscador";
 import { CategoriaCarrusel } from "@/components/ui/CategoriaCarrusel/CategoriaCarrusel";
 import { ProductoGrid }      from "@/components/ui/ProductoGrid/ProductoGrid";
@@ -31,20 +36,117 @@ import type {
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./mesas.module.css";
 
+// ── Constantes del grid (deben coincidir con LayoutEditorMesas) ───────────────
+const COLS = 10;
+const ROWS = 6;
+
 type Vista = "mesas" | "orden" | "directo";
 
 interface Props {
-  mesasIniciales:   MesaConEstado[];
-  categorias:       Categoria[];
-  productos:        ProductoConStock[];
-  metodosPago:      MetodoPagoGlobal[];
-  tieneTurno:       boolean;
-  aplicarIva:       boolean;
-  tipo_negocio:     "general" | "impresion" | "billar";
+  mesasIniciales:    MesaConEstado[];
+  categorias:        Categoria[];
+  productos:         ProductoConStock[];
+  metodosPago:       MetodoPagoGlobal[];
+  tieneTurno:        boolean;
+  aplicarIva:        boolean;
+  tipo_negocio:      "general" | "impresion" | "billar";
   costo_hora_billar: number | null;
+  onCerrarCaja?:     () => void;
 }
 
-// Convierte los items de la orden al formato que espera PedidoPanel
+// ── Floor plan de mesas (read-only) ──────────────────────────────────────────
+// Renderiza las mesas en sus posiciones reales del grid configurado por el admin.
+// Sin drag — solo tap/click para abrir una orden.
+
+function MesaFloorPlan({
+  mesas,
+  disabled,
+  ahora,
+  esBillar,
+  formatTiempo,
+  calcCosto,
+  costo_hora_billar,
+  onClick,
+}: {
+  mesas:             MesaConEstado[];
+  disabled:          boolean;
+  ahora:             Date | null;
+  esBillar:          boolean;
+  formatTiempo:      (fh: string) => string;
+  calcCosto:         (fh: string) => number;
+  costo_hora_billar: number | null;
+  onClick:           (mesa: MesaConEstado) => void;
+}) {
+  return (
+    <div
+      className={styles.floorPlan}
+      style={{
+        gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+        gridTemplateRows:    `repeat(${ROWS}, 1fr)`,
+      }}
+    >
+      {/* Celdas con posición explícita — sin esto, auto-placement las desplaza al saltarse mesas */}
+      {Array.from({ length: COLS * ROWS }).map((_, i) => {
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        return (
+          <div
+            key={i}
+            className={styles.floorCell}
+            style={{ gridColumn: col + 1, gridRow: row + 1 }}
+          />
+        );
+      })}
+
+      {/* Mesas en sus posiciones reales */}
+      {mesas.map((mesa) => {
+        const ocupada   = !!mesa.ordenAbierta;
+        const fhAbierta = mesa.ordenAbierta?.fhAbierta;
+
+        return (
+          <button
+            key={mesa.eCodMesa}
+            className={[
+              styles.floorMesa,
+              mesa.t_shape === "circle" ? styles.floorMesaCircle   : "",
+              ocupada                   ? styles.floorMesaOcupada  : styles.floorMesaLibre,
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            style={{
+              gridColumn: `${(mesa.e_grid_col ?? 0) + 1} / span ${mesa.e_grid_w ?? 1}`,
+              gridRow:    `${(mesa.e_grid_row ?? 0) + 1} / span ${mesa.e_grid_h ?? 1}`,
+            }}
+            onClick={() => onClick(mesa)}
+            disabled={disabled}
+          >
+            <span className={styles.floorMesaNombre}>{mesa.tNombre}</span>
+            <span className={styles.floorMesaEstado}>
+              {ocupada ? "Ocupada" : "Libre"}
+            </span>
+
+            {/* Timer de billar — solo si aplica */}
+            {esBillar && ocupada && fhAbierta && ahora && (
+              <>
+                <span className={styles.floorMesaTimer}>
+                  {formatTiempo(fhAbierta)}
+                </span>
+                {costo_hora_billar != null && (
+                  <span className={styles.floorMesaCosto}>
+                    ${calcCosto(fhAbierta).toFixed(2)}
+                  </span>
+                )}
+              </>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function itemsACarrito(items: OrdenMesaDetalleConProducto[]): ItemCarritoMenu[] {
   return items.map((item) => ({
     key:      item.eCodDetalle,
@@ -56,7 +158,7 @@ function itemsACarrito(items: OrdenMesaDetalleConProducto[]): ItemCarritoMenu[] 
       stockDisponible: Number.MAX_SAFE_INTEGER,
       bInfinito:       true,
     },
-    cantidad: item.eCantidad,
+    cantidad:    item.eCantidad,
     presentacion: item.fkeCodPresentacion
       ? {
           eCodPresentacion:   item.fkeCodPresentacion,
@@ -75,6 +177,8 @@ function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): s
   return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export function MesasClient({
   mesasIniciales,
   categorias,
@@ -84,6 +188,7 @@ export function MesasClient({
   aplicarIva,
   tipo_negocio,
   costo_hora_billar,
+  onCerrarCaja,
 }: Props) {
   const [vista,           setVista]           = useState<Vista>("mesas");
   const [mesas,           setMesas]           = useState(mesasIniciales);
@@ -97,16 +202,14 @@ export function MesasClient({
   const [errorVenta,      setErrorVenta]      = useState<string | null>(null);
   const [isPending,       startTransition]    = useTransition();
 
-  // ── Carrito para pedidos directos (sin mesa) ─────────────────────────────
   const [carritoDirecto,  setCarritoDirecto]  = useState<ItemCarritoMenu[]>([]);
   const [errorDirecto,    setErrorDirecto]    = useState<string | null>(null);
   const [ventaDirectaOk,  setVentaDirectaOk]  = useState<string | null>(null);
 
-  // ── Timer para billar ────────────────────────────────────────────────────
+  // ── Timer para billar ─────────────────────────────────────────────────────
   const esBillar = tipo_negocio === "billar";
-  const [ahora, setAhora]               = useState<Date | null>(null);
-  const [ahoraCongelado, setCongelado]  = useState<Date | null>(null);
-
+  const [ahora,          setAhora]     = useState<Date | null>(null);
+  const [ahoraCongelado, setCongelado] = useState<Date | null>(null);
   const ahoraEfectivo = ahoraCongelado ?? ahora;
 
   useEffect(() => {
@@ -118,25 +221,23 @@ export function MesasClient({
 
   const formatTiempo = useCallback((fhAbierta: string): string => {
     if (!ahoraEfectivo) return "00:00";
-    const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
+    const diff     = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
     const totalSeg = Math.floor(diff / 1000);
     const h   = Math.floor(totalSeg / 3600);
     const min = Math.floor((totalSeg % 3600) / 60);
     const seg = totalSeg % 60;
-    if (h > 0) {
-      return `${h}:${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
-    }
-    return `${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`;
+    if (h > 0) return `${h}:${String(min).padStart(2,"0")}:${String(seg).padStart(2,"0")}`;
+    return `${String(min).padStart(2,"0")}:${String(seg).padStart(2,"0")}`;
   }, [ahoraEfectivo]);
 
   const calcCosto = useCallback((fhAbierta: string): number => {
     if (!costo_hora_billar || !ahoraEfectivo) return 0;
-    const diff = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
+    const diff  = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
     const horas = diff / (1000 * 60 * 60);
     return Math.round(horas * costo_hora_billar * 100) / 100;
   }, [ahoraEfectivo, costo_hora_billar]);
 
-  // ── Filtros de catálogo ──────────────────────────────────────────────────
+  // ── Filtros de catálogo ───────────────────────────────────────────────────
   const productosFiltrados = productos.filter((p) => {
     const cat = categoriaActiva === "todas" || p.fkeCodCategory === categoriaActiva;
     const nom = p.tNameProduct.toLowerCase().includes(busqueda.toLowerCase());
@@ -153,7 +254,7 @@ export function MesasClient({
     ),
   };
 
-  // ── Helpers ──────────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   async function recargarMesas() {
     const actualizadas = await obtenerMesasConEstado();
     setMesas(actualizadas);
@@ -169,7 +270,7 @@ export function MesasClient({
     setCategoriaActiva("todas");
   }
 
-  // ── Entrar a una mesa ────────────────────────────────────────────────────
+  // ── Click en mesa del floor plan ──────────────────────────────────────────
   async function handleClickMesa(mesa: MesaConEstado) {
     if (!tieneTurno) {
       toast.error("Debes abrir un turno antes de atender mesas");
@@ -199,14 +300,13 @@ export function MesasClient({
     });
   }
 
-  // ── Pedido directo: agregar producto ─────────────────────────────────────
+  // ── Pedido directo ────────────────────────────────────────────────────────
   function agregarProductoDirecto(
     producto: ProductoConStock,
     presentacion?: PresentacionConStock
   ) {
     if (!tieneTurno) return;
     setErrorDirecto(null);
-
     const key   = carritoKey({ producto, presentacion });
     const stock = presentacion?.stockDisponible ?? producto.stockDisponible;
     const bInf  = presentacion?.bInfinito       ?? producto.bInfinito;
@@ -246,7 +346,6 @@ export function MesasClient({
 
   async function handleFinalizarDirecto(metodoPago: MetodoPago): Promise<void> {
     setErrorDirecto(null);
-
     const result = await crearVenta(
       carritoDirecto.map((i) => ({
         eCodProduct:      i.producto.eCodProduct,
@@ -257,23 +356,18 @@ export function MesasClient({
       metodoPago,
       aplicarIva,
     );
-
     if (result.error) { setErrorDirecto(result.error); return; }
     setVentaDirectaOk(result.eCodVenta!);
   }
 
-  // ── Agregar producto (flujo de mesa) ────────────────────────────────────
+  // ── Mesa: agregar producto ────────────────────────────────────────────────
   function handleAgregarProducto(
     producto: ProductoConStock,
     presentacion?: PresentacionConStock
   ) {
     if (!eCodOrden) return;
     setErrorVenta(null);
-
-    const ePrecio = presentacion
-      ? presentacion.ePricePresentacion
-      : producto.ePriceProduct;
-
+    const ePrecio = presentacion?.ePricePresentacion ?? producto.ePriceProduct;
     startTransition(async () => {
       const result = await agregarItemOrden(eCodOrden, {
         eCodProduct:      producto.eCodProduct,
@@ -289,9 +383,7 @@ export function MesasClient({
   function handleCambiarCantidad(key: string, delta: number) {
     const item = items.find((i) => i.eCodDetalle === key);
     if (!item) return;
-
     const nueva = item.eCantidad + delta;
-
     startTransition(async () => {
       if (nueva <= 0) {
         const result = await eliminarItemOrden(key);
@@ -316,20 +408,16 @@ export function MesasClient({
   async function handleFinalizar(metodoPago: MetodoPago): Promise<void> {
     if (!eCodOrden) return;
     setErrorVenta(null);
-
     const result = await cobrarOrdenMesa(eCodOrden, metodoPago);
-
     if ("error" in result) {
       setErrorVenta(result.error);
       setCongelado(null);
       return;
     }
-
     setVentaExitosa(result.eCodVenta);
     await recargarMesas();
   }
 
-  // ── Volver al grid de mesas ──────────────────────────────────────────────
   function handleVolver() {
     setVista("mesas");
     setMesaActiva(null);
@@ -341,28 +429,35 @@ export function MesasClient({
     setCongelado(null);
   }
 
-  // ── Volver desde pedido directo ──────────────────────────────────────────
   function handleVolverDeDirecto() {
     setVista("mesas");
     limpiarCarritoDirecto();
     resetFiltros();
   }
 
-  // ── Vista: grid de mesas ─────────────────────────────────────────────────
+  // ── Vista: floor plan de mesas ────────────────────────────────────────────
   if (vista === "mesas") {
     return (
       <div className={styles.page}>
         <div className={styles.header}>
           <h1 className={styles.titulo}>Mesas</h1>
-          {tieneTurno && (
-            <button
-              className={styles.btnPedidoDirecto}
-              onClick={() => { resetFiltros(); setVista("directo"); }}
-            >
-              <ShoppingBag size={14} />
-              Pedido directo
-            </button>
-          )}
+          <div className={styles.headerActions}>
+            {tieneTurno && onCerrarCaja && (
+              <button className={styles.btnCerrarCaja} onClick={onCerrarCaja}>
+                <LogOut size={14} />
+                Cerrar caja
+              </button>
+            )}
+            {tieneTurno && (
+              <button
+                className={styles.btnPedidoDirecto}
+                onClick={() => { resetFiltros(); setVista("directo"); }}
+              >
+                <ShoppingBag size={14} />
+                Pedido directo
+              </button>
+            )}
+          </div>
         </div>
 
         {mesas.length === 0 ? (
@@ -371,48 +466,22 @@ export function MesasClient({
             <p>No hay mesas configuradas</p>
           </div>
         ) : (
-          <div className={styles.grid}>
-            {mesas.map((mesa) => {
-              const ocupada   = !!mesa.ordenAbierta;
-              const fhAbierta = mesa.ordenAbierta?.fhAbierta;
-              return (
-                <button
-                  key={mesa.eCodMesa}
-                  className={`${styles.mesaCard} ${ocupada ? styles.mesaOcupada : styles.mesaLibre}`}
-                  onClick={() => handleClickMesa(mesa)}
-                  disabled={isPending || !tieneTurno}
-                >
-                  <span className={styles.mesaNombre}>{mesa.tNombre}</span>
-                  <span className={`${styles.mesaEstado} ${ocupada ? styles.estadoOcupada : styles.estadoLibre}`}>
-                    {ocupada ? "Ocupada" : "Libre"}
-                  </span>
-                  {esBillar && ocupada && fhAbierta && ahora && (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "var(--color-primary)",
-                      marginTop: 2,
-                      fontVariantNumeric: "tabular-nums",
-                      letterSpacing: "0.02em",
-                    }}>
-                      {formatTiempo(fhAbierta)}
-                      {costo_hora_billar != null && (
-                        <span style={{ marginLeft: 4, color: "var(--gray)", fontWeight: 500 }}>
-                          · ${calcCosto(fhAbierta).toFixed(2)}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <MesaFloorPlan
+            mesas={mesas}
+            disabled={isPending || !tieneTurno}
+            ahora={ahora}
+            esBillar={esBillar}
+            formatTiempo={formatTiempo}
+            calcCosto={calcCosto}
+            costo_hora_billar={costo_hora_billar}
+            onClick={handleClickMesa}
+          />
         )}
       </div>
     );
   }
 
-  // ── Vista: pedido directo (sin mesa) ─────────────────────────────────────
+  // ── Vista: pedido directo ─────────────────────────────────────────────────
   if (vista === "directo") {
     return (
       <>
@@ -425,23 +494,14 @@ export function MesasClient({
             <h2 className={styles.mesaNombreHeader}>Pedido directo</h2>
           </div>
 
-          <Buscador
-            valor={busqueda}
-            onChange={setBusqueda}
-            placeholder="Buscar producto..."
-          />
-
+          <Buscador valor={busqueda} onChange={setBusqueda} placeholder="Buscar producto..." />
           <CategoriaCarrusel
             categorias={categorias}
             categoriaActiva={categoriaActiva}
             onSeleccionar={setCategoriaActiva}
             conteoPorCategoria={conteoPorCategoria}
           />
-
-          <ProductoGrid
-            productos={productosFiltrados}
-            onAgregar={agregarProductoDirecto}
-          />
+          <ProductoGrid productos={productosFiltrados} onAgregar={agregarProductoDirecto} />
         </div>
 
         <PedidoPanel
@@ -457,18 +517,14 @@ export function MesasClient({
         {ventaDirectaOk && (
           <ModalVentaExitosa
             eCodVenta={ventaDirectaOk}
-            onNuevoPedido={() => {
-              setVentaDirectaOk(null);
-              limpiarCarritoDirecto();
-              resetFiltros();
-            }}
+            onNuevoPedido={() => { setVentaDirectaOk(null); limpiarCarritoDirecto(); resetFiltros(); }}
           />
         )}
       </>
     );
   }
 
-  // ── Vista: orden de mesa ─────────────────────────────────────────────────
+  // ── Vista: orden de mesa ──────────────────────────────────────────────────
   return (
     <>
       <div className={styles.ordenLayout}>
@@ -480,23 +536,14 @@ export function MesasClient({
           <h2 className={styles.mesaNombreHeader}>{mesaActiva?.tNombre}</h2>
         </div>
 
-        <Buscador
-          valor={busqueda}
-          onChange={setBusqueda}
-          placeholder="Buscar producto..."
-        />
-
+        <Buscador valor={busqueda} onChange={setBusqueda} placeholder="Buscar producto..." />
         <CategoriaCarrusel
           categorias={categorias}
           categoriaActiva={categoriaActiva}
           onSeleccionar={setCategoriaActiva}
           conteoPorCategoria={conteoPorCategoria}
         />
-
-        <ProductoGrid
-          productos={productosFiltrados}
-          onAgregar={handleAgregarProducto}
-        />
+        <ProductoGrid productos={productosFiltrados} onAgregar={handleAgregarProducto} />
       </div>
 
       <PedidoPanel
@@ -510,10 +557,7 @@ export function MesasClient({
         aplicarIva={aplicarIva}
         cargoExtra={
           esBillar && fhOrdenActiva
-            ? {
-                label: `Tiempo de mesa (${formatTiempo(fhOrdenActiva)})`,
-                monto: calcCosto(fhOrdenActiva),
-              }
+            ? { label: `Tiempo de mesa (${formatTiempo(fhOrdenActiva)})`, monto: calcCosto(fhOrdenActiva) }
             : null
         }
       />

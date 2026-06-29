@@ -9,6 +9,7 @@
 // que sí la tiene).
 
 import { useState }       from "react";
+import React              from "react";
 import { useRouter }      from "next/navigation";
 import { Calculator, LogOut } from "lucide-react";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
@@ -66,16 +67,12 @@ export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: 
         </div>
       )}
 
-      {tieneTurno && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-3)" }}>
-          <button className={styles.btnCerrarCaja} onClick={() => setModalCerrarCaja(true)}>
-            <LogOut size={15} />
-            Cerrar caja
-          </button>
-        </div>
-      )}
-
-      {children}
+      {/* Pasa onCerrarCaja a MesasClient para que lo coloque junto a sus botones */}
+      {tieneTurno
+        ? React.cloneElement(children as React.ReactElement<any>, {
+            onCerrarCaja: () => setModalCerrarCaja(true),
+          })
+        : children}
 
       {modalTurno && (
         <Modal
