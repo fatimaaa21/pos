@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const RUTAS_PUBLICAS = ["/auth", "/conoce-kivi"];
+const RUTAS_PUBLICAS = ["/auth", "/conoce-kivi", "/cocina", "/api/cocina"];
 
 function esRutaPublica(pathname: string) {
   return RUTAS_PUBLICAS.some(

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { crearProducto } from "@/lib/actions/productos";
 import { crearPresentacion } from "@/lib/actions/presentaciones";
-import { createClient } from "@/lib/supabase/client";
 import type { Categoria, Producto } from "@/types";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 
@@ -22,6 +21,7 @@ interface Props {
 }
 
 export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
+  const checkboxId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -30,6 +30,7 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
     ePriceProduct:  "",
     eCostProduct:   "",
     fkeCodCategory: "",
+    bCocina:        false,
   });
 
   // ── Presentaciones ────────────────────────────────────────────────────────
@@ -61,13 +62,13 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
     setLoading(true);
     setError(null);
 
-    // 1. Crear el producto
     const formData = new FormData();
     formData.append("tNameProduct",   form.tNameProduct);
     formData.append("ImgProduct",     form.ImgProduct);
     formData.append("ePriceProduct",  form.ePriceProduct);
     formData.append("eCostProduct",   form.eCostProduct);
     formData.append("fkeCodCategory", form.fkeCodCategory);
+    formData.append("bCocina",        form.bCocina ? "true" : "false");
 
     const result = await crearProducto(formData);
 
@@ -79,7 +80,6 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
 
     const producto = result?.producto!;
 
-    // 2. Crear las presentaciones (si las hay)
     for (const p of presentacionesList) {
       const fd = new FormData();
       fd.append("fkeCodProduct",      producto.eCodProduct);
@@ -88,10 +88,9 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
       fd.append("eCostPresentacion",  p.eCostPresentacion || "0");
       const resP = await crearPresentacion(fd);
       if (resP?.error) {
-        // El producto ya fue creado — notificamos pero no revertimos
         setError(`Producto creado, pero falló una presentación: ${resP.error}`);
         setLoading(false);
-        onCreado(producto); // de todas formas avisamos que el producto existe
+        onCreado(producto);
         return;
       }
     }
@@ -156,10 +155,7 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
         </ModalSelect>
       </ModalField>
 
-      <ModalField
-        label="Precio al público"
-        required
-      >
+      <ModalField label="Precio al público" required>
         <ModalInput
           type="number"
           placeholder="0.00"
@@ -168,10 +164,7 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
         />
       </ModalField>
 
-      <ModalField
-        label= "Costo de producción"
-        required
-      >
+      <ModalField label="Costo de producción" required>
         <ModalInput
           type="number"
           placeholder="0.00"
@@ -180,7 +173,42 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
         />
       </ModalField>
 
-      {/* ── Sección presentaciones ── */}
+      {/* ── Cocina ── */}
+      <ModalField label="Cocina">
+        <label
+          htmlFor={checkboxId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            padding: "10px 12px",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md)",
+            background: form.bCocina ? "var(--color-primary-50)" : "var(--white)",
+            transition: "background 0.15s, border-color 0.15s",
+            borderColor: form.bCocina ? "var(--color-primary)" : "var(--border-default)",
+          }}
+        >
+          <input
+            id={checkboxId}
+            type="checkbox"
+            checked={form.bCocina}
+            onChange={(e) => setForm({ ...form, bCocina: e.target.checked })}
+            style={{ width: 16, height: 16, accentColor: "var(--color-primary)", cursor: "pointer" }}
+          />
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)", display: "block" }}>
+              Requiere preparación en cocina
+            </span>
+            <span style={{ fontSize: 11, color: "var(--gray)" }}>
+              El pedido aparece en la pantalla de cocina al agregarlo a una orden
+            </span>
+          </div>
+        </label>
+      </ModalField>
+
+      {/* ── Presentaciones ── */}
       <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
           <div>

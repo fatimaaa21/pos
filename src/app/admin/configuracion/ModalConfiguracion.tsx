@@ -34,7 +34,7 @@ type Tab = "general" | "pagos" | "billar";
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General"         },
   { id: "pagos",   label: "Métodos de pago" },
-  { id: "billar",  label: "Billar"          },
+  { id: "billar",  label: "Costos"          },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────

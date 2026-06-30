@@ -53,12 +53,12 @@ export interface Producto {
   bStateProduct?: boolean;
   tipo_producto:  "unidad" | "medida";
   ePrecioM2?:     number | null;
-  // Dimensiones para productos tipo "unidad" en negocios de impresión
   eAnchoCm?:      number | null;
   eAltoCm?:       number | null;
   fkeCodMaterial?: string | null;
   fhCreateProduct?: string;
   fhUpdateProduct?: string;
+  bCocina?:       boolean;
 }
 
 // Presentaciones
@@ -69,7 +69,7 @@ export interface Presentacion {
   tNombre:             string;
   ePricePresentacion:  number;
   eCostPresentacion:   number;
-  eCantidadUnidades:   number;   // cuántas piezas físicas representa (ej. 12 para "docena")
+  eCantidadUnidades:   number;
   bStatePresentacion:  boolean;
   fhCreate?:           string;
   fhUpdate?:           string;
@@ -80,7 +80,7 @@ export interface PresentacionConStock {
   tNombre:            string;
   ePricePresentacion: number;
   eCostPresentacion:  number;
-  eCantidadUnidades:  number;    // cuántas piezas físicas representa
+  eCantidadUnidades:  number;
   stockDisponible:    number;
   bInfinito:          boolean;
 }
@@ -124,7 +124,6 @@ export interface ProductoConStock {
   presentaciones?:  PresentacionConStock[];
   tipo_producto?:   "unidad" | "medida";
   ePrecioM2?:       number | null;
-  // Dimensiones para productos tipo "unidad" con consumo de hojas
   eAnchoCm?:        number | null;
   eAltoCm?:         number | null;
   fkeCodMaterial?:  string | null;
@@ -132,16 +131,11 @@ export interface ProductoConStock {
 
 // Carrito empleado
 
-/**
- * Item en el carrito. Exportado desde types para que PedidoPanel
- * pueda importarlo sin depender de MenuClient.
- */
 export interface ItemCarritoMenu {
   key?:            string;
   producto:        ProductoConStock;
   cantidad:        number;
   presentacion?:   PresentacionConStock;
-  // Campos para productos por medida
   tipo_producto?:  "unidad" | "medida";
   anchoCm?:        number;
   largoCm?:        number;
@@ -181,7 +175,7 @@ export interface DetalleVenta {
 
 export interface DetalleVentaConProducto extends DetalleVenta {
   producto?:     { tNameProduct: string; ImgProduct?: string } | null;
-  presentacion?: { tNombre: string } | null;   // ← agregar esta línea
+  presentacion?: { tNombre: string } | null;
 }
 
 export interface VentasDelTurno {
@@ -223,9 +217,9 @@ export interface Material {
   fkeCodCompany:   string;
   tNombre:         string;
   tipo_material:   "rollo" | "hoja";
-  eAnchoCm:        number | null;  // ancho del rollo (cm) o ancho de la hoja (cm)
-  eAltoCm:         number | null;  // alto de la hoja (cm); null para rollos
-  eMetrosLineales: number;         // metros para rollos; cantidad de hojas para hojas
+  eAnchoCm:        number | null;
+  eAltoCm:         number | null;
+  eMetrosLineales: number;
   eStockMinimo:    number;
   bStateMaterial:  boolean;
   fhCreateMaterial: string;
@@ -237,14 +231,12 @@ export interface Material {
 export interface ItemCarritoImpresion {
   producto:        Producto;
   tipo_producto:   "medida" | "unidad";
-  // Para productos por medida
   anchoCm?:        number;
   largoCm?:        number;
   materialNombre?: string;
   eCodMaterial?:   string;
   metrosConsumidos?: number;
   precioCalculado?: number;
-  // Para productos por unidad
   cantidad?:       number;
   presentacion?:   PresentacionConStock;
   precioUnitario?: number;
@@ -259,6 +251,7 @@ export interface Sucursal {
   tDireccion?:      string | null;
   bStateSucursal:   boolean;
   fhCreateSucursal: string;
+  tTokenCocina?: string | null
 }
 
 // ── Módulo: Mesas ─────────────────────────────────────────────────────────────
@@ -279,12 +272,11 @@ export interface Mesa {
   tNombre:       string;
   bStateMesa:    boolean;
   fhCreateMesa:  string;
-  // ── Columnas de layout (agregadas en migración) ──
-  e_grid_col:    number;            // columna inicial en el grid (default 0)
-  e_grid_row:    number;            // fila inicial en el grid (default 0)
-  e_grid_w:      number;            // columnas que ocupa (default 1)
-  e_grid_h:      number;            // filas que ocupa (default 1)
-  t_shape:       "rect" | "circle"; // forma visual (default "rect")
+  e_grid_col:    number;
+  e_grid_row:    number;
+  e_grid_w:      number;
+  e_grid_h:      number;
+  t_shape:       "rect" | "circle";
 }
 
 export type EstadoOrdenMesa = "abierta" | "cerrada" | "cancelada";
@@ -300,6 +292,8 @@ export interface OrdenMesa {
   fkeCodVenta?:  string | null;
 }
 
+export type EstadoCocina = "pendiente" | "listo" | "entregado";
+
 export interface OrdenMesaDetalle {
   eCodDetalle:        string;
   fkeCodOrden:        string;
@@ -308,11 +302,14 @@ export interface OrdenMesaDetalle {
   eCantidad:          number;
   ePrecio:            number;
   fhAgregado:         string;
+  tEstadoCocina?:     EstadoCocina | null;
 }
 
 // Vista enriquecida para el layout de mesas
 export interface MesaConEstado extends Mesa {
   ordenAbierta?: OrdenMesa | null;
+  /** Número de items con tEstadoCocina = 'listo' en la orden abierta */
+  itemsListos?:  number;
 }
 
 // Vista enriquecida para el detalle de una orden
@@ -325,5 +322,16 @@ export interface OrdenMesaConDetalle extends OrdenMesa {
   mesa?:     Mesa | null;
   empleado?: Pick<Perfil, "eCodUser" | "tNameUser"> | null;
   detalle:   OrdenMesaDetalleConProducto[];
-  eTotal:    number; // suma calculada del detalle
+  eTotal:    number;
+}
+
+// ── Módulo: Cocina ────────────────────────────────────────────────────────────
+
+/** Item listo para entregar — usado por el modal de entrega en el POS */
+export interface ItemListoCocina {
+  eCodDetalle:         string;
+  tNameProduct:        string;
+  tNombrePresentacion: string | null;
+  eCantidad:           number;
+  fhAgregado:          string;
 }
