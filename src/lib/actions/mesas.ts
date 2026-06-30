@@ -10,6 +10,7 @@ import type {
   MesaConEstado,
   OrdenMesaConDetalle,
   OrdenMesaDetalleConProducto,
+  ItemListoCocina,
   MetodoPago,
 } from "@/types";
 
@@ -52,6 +53,7 @@ export async function verificarModuloMesas(
 
 // ─────────────────────────────────────────────────────────────
 // OBTENER MESAS CON ESTADO
+// Incluye conteo de items con tEstadoCocina='listo' por mesa
 // ─────────────────────────────────────────────────────────────
 
 export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
@@ -59,7 +61,6 @@ export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
   if (!perfil?.fkeCodCompany) return [];
 
   const adminClient = createAdminClient();
-
   const ctx = await getSucursalContext();
 
   const mesasQuery = adminClient
@@ -74,7 +75,6 @@ export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
   }
 
   const { data: mesas } = await mesasQuery;
-
   if (!mesas?.length) return [];
 
   const { data: ordenes } = await adminClient
@@ -87,16 +87,37 @@ export async function obtenerMesasConEstado(): Promise<MesaConEstado[]> {
     (ordenes ?? []).map((o) => [o.fkeCodMesa, o])
   );
 
-  return mesas.map((mesa) => ({
-    ...mesa,
-    ordenAbierta: ordenesPorMesa.get(mesa.eCodMesa) ?? null,
-  }));
+  // ── Conteo de items listos por orden ────────────────────────────────────
+  const codOrdenes = (ordenes ?? []).map((o) => o.eCodOrden);
+  const itemsListosPorOrden = new Map<string, number>();
+
+  if (codOrdenes.length > 0) {
+    const { data: itemsListos } = await adminClient
+      .from("ordenes_mesa_detalle")
+      .select("fkeCodOrden")
+      .in("fkeCodOrden", codOrdenes)
+      .eq("tEstadoCocina", "listo");
+
+    for (const item of itemsListos ?? []) {
+      const prev = itemsListosPorOrden.get(item.fkeCodOrden) ?? 0;
+      itemsListosPorOrden.set(item.fkeCodOrden, prev + 1);
+    }
+  }
+
+  return mesas.map((mesa) => {
+    const orden = ordenesPorMesa.get(mesa.eCodMesa) ?? null;
+    return {
+      ...mesa,
+      ordenAbierta: orden,
+      itemsListos: orden
+        ? (itemsListosPorOrden.get(orden.eCodOrden) ?? 0)
+        : 0,
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
 // ADMIN: OBTENER TODAS LAS MESAS (activas e inactivas)
-// El empleado usa obtenerMesasConEstado (solo activas).
-// El admin necesita ver también las inactivas para poder reactivarlas.
 // ─────────────────────────────────────────────────────────────
 
 export async function obtenerMesasAdmin(): Promise<MesaConEstado[]> {
@@ -110,7 +131,6 @@ export async function obtenerMesasAdmin(): Promise<MesaConEstado[]> {
     .from("mesas")
     .select("*")
     .eq("fkeCodCompany", perfil.fkeCodCompany)
-    // Sin filtro bStateMesa: devuelve activas e inactivas
     .order("tNombre");
 
   if (ctx.fkeCodSucursal) {
@@ -133,6 +153,7 @@ export async function obtenerMesasAdmin(): Promise<MesaConEstado[]> {
   return mesas.map((mesa) => ({
     ...mesa,
     ordenAbierta: ordenesPorMesa.get(mesa.eCodMesa) ?? null,
+    itemsListos: 0,
   }));
 }
 
@@ -177,7 +198,6 @@ export async function editarMesa(
 
 // ─────────────────────────────────────────────────────────────
 // ADMIN: ELIMINAR MESA (hard delete)
-// Bloqueado si la mesa tiene una orden abierta.
 // ─────────────────────────────────────────────────────────────
 
 export async function eliminarMesa(
@@ -189,7 +209,6 @@ export async function eliminarMesa(
 
   const adminClient = createAdminClient();
 
-  // Verificar propiedad
   const { data: mesa } = await adminClient
     .from("mesas")
     .select("fkeCodCompany")
@@ -200,7 +219,6 @@ export async function eliminarMesa(
     return { error: "Sin acceso" };
   }
 
-  // Bloquear si hay orden abierta
   const { data: ordenAbierta } = await adminClient
     .from("ordenes_mesa")
     .select("eCodOrden")
@@ -226,7 +244,6 @@ export async function eliminarMesa(
 
 // ─────────────────────────────────────────────────────────────
 // ADMIN: CERRAR ORDEN DE MESA SIN COBRO (force-close)
-// Cancela la orden abierta sin generar venta.
 // ─────────────────────────────────────────────────────────────
 
 export async function cerrarOrdenMesa(
@@ -298,7 +315,6 @@ export async function obtenerOrdenAbierta(
     return { ...orden, detalle: [], eTotal: 0 };
   }
 
-  // ── Batch: 2 queries en paralelo en lugar de N*2 queries secuenciales ────
   const productIds      = [...new Set(detalle.map((d) => d.fkeCodProduct))];
   const presentacionIds = [...new Set(detalle.map((d) => d.fkeCodPresentacion).filter(Boolean))] as string[];
 
@@ -348,7 +364,6 @@ export async function abrirOrdenMesa(
 
   const adminClient = createAdminClient();
 
-  // Verificar que la mesa pertenece al negocio y está activa
   const { data: mesa } = await adminClient
     .from("mesas")
     .select("eCodMesa, fkeCodCompany, fkeCodSucursal, bStateMesa")
@@ -359,8 +374,6 @@ export async function abrirOrdenMesa(
   if (mesa.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (!mesa.bStateMesa) return { error: "Mesa inactiva" };
 
-  // Verificar que no hay orden abierta (el índice único en BD ya lo protege,
-  // pero preferimos un mensaje claro)
   const { data: ordenExistente } = await adminClient
     .from("ordenes_mesa")
     .select("eCodOrden")
@@ -395,6 +408,7 @@ export async function abrirOrdenMesa(
 
 // ─────────────────────────────────────────────────────────────
 // AGREGAR PRODUCTO A ORDEN
+// Si el producto tiene bCocina=true, el item entra como 'pendiente'
 // ─────────────────────────────────────────────────────────────
 
 interface ItemOrden {
@@ -413,7 +427,6 @@ export async function agregarItemOrden(
 
   const adminClient = createAdminClient();
 
-  // Verificar que la orden es del negocio y está abierta
   const { data: orden } = await adminClient
     .from("ordenes_mesa")
     .select("fkeCodCompany, tEstado")
@@ -424,6 +437,16 @@ export async function agregarItemOrden(
   if (orden.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (orden.tEstado !== "abierta") return { error: "La orden ya no está abierta" };
 
+  // ── Verificar si el producto va a cocina ──────────────────────────────────
+  const { data: producto } = await adminClient
+    .from("productos")
+    .select("bCocina")
+    .eq("eCodProduct", item.eCodProduct)
+    .single();
+
+  const esCocina = producto?.bCocina === true;
+
+  // ── Buscar item existente ─────────────────────────────────────────────────
   let q = adminClient
     .from("ordenes_mesa_detalle")
     .select("eCodDetalle, eCantidad")
@@ -437,9 +460,17 @@ export async function agregarItemOrden(
   const { data: itemExistente } = await q.maybeSingle();
 
   if (itemExistente) {
+    // Incrementar cantidad; si es de cocina, volver a 'pendiente'
+    const updateData: Record<string, unknown> = {
+      eCantidad: itemExistente.eCantidad + item.eCantidad,
+    };
+    if (esCocina) {
+      updateData.tEstadoCocina = "pendiente";
+    }
+
     const { error } = await adminClient
       .from("ordenes_mesa_detalle")
-      .update({ eCantidad: itemExistente.eCantidad + item.eCantidad })
+      .update(updateData)
       .eq("eCodDetalle", itemExistente.eCodDetalle);
 
     if (error) return { error: `Error al actualizar cantidad: ${error.message}` };
@@ -453,10 +484,11 @@ export async function agregarItemOrden(
         eCantidad:          item.eCantidad,
         ePrecio:            item.ePrecio,
         fhAgregado:         new Date().toISOString(),
+        tEstadoCocina:      esCocina ? "pendiente" : null,
       });
 
     if (error) return { error: `Error al agregar producto: ${error.message}` };
-}
+  }
 
   revalidatePath("/empleado/mesas");
   return { ok: true };
@@ -477,7 +509,6 @@ export async function actualizarCantidadItem(
 
   const adminClient = createAdminClient();
 
-  // Verificar acceso a través de la orden
   const { data: detalle } = await adminClient
     .from("ordenes_mesa_detalle")
     .select("fkeCodOrden")
@@ -593,11 +624,9 @@ export async function cobrarOrdenMesa(
     cargoBillar = Math.round(horasTranscurridas * negocio.costo_hora_billar * 100) / 100;
   }
 
-  // Sin productos y sin cargo de tiempo → no hay nada que cobrar
   if (!detalle?.length && cargoBillar === 0)
     return { error: "La orden no tiene productos" };
 
-  // Construir items en el formato que espera crearVenta
   const items = (detalle ?? []).map((d) => ({
     eCodProduct:      d.fkeCodProduct,
     eCodPresentacion: d.fkeCodPresentacion ?? undefined,
@@ -626,6 +655,113 @@ export async function cobrarOrdenMesa(
 }
 
 // ─────────────────────────────────────────────────────────────
+// MÓDULO COCINA: OBTENER ITEMS LISTOS PARA ENTREGAR
+// Usada por el modal de entrega en el POS
+// ─────────────────────────────────────────────────────────────
+
+export async function obtenerItemsListos(
+  eCodOrden: string
+): Promise<ItemListoCocina[]> {
+  const perfil = await getPerfilActual();
+  if (!perfil?.fkeCodCompany) return [];
+
+  const adminClient = createAdminClient();
+
+  // Verificar acceso
+  const { data: orden } = await adminClient
+    .from("ordenes_mesa")
+    .select("fkeCodCompany")
+    .eq("eCodOrden", eCodOrden)
+    .single();
+
+  if (!orden || orden.fkeCodCompany !== perfil.fkeCodCompany) return [];
+
+  const { data: detalles } = await adminClient
+    .from("ordenes_mesa_detalle")
+    .select("eCodDetalle, fkeCodProduct, fkeCodPresentacion, eCantidad, fhAgregado")
+    .eq("fkeCodOrden", eCodOrden)
+    .eq("tEstadoCocina", "listo")
+    .order("fhAgregado");
+
+  if (!detalles?.length) return [];
+
+  const productIds      = [...new Set(detalles.map((d) => d.fkeCodProduct))];
+  const presentacionIds = detalles
+    .filter((d) => d.fkeCodPresentacion)
+    .map((d) => d.fkeCodPresentacion as string);
+
+  const [productosRes, presentacionesRes] = await Promise.all([
+    adminClient
+      .from("productos")
+      .select("eCodProduct, tNameProduct")
+      .in("eCodProduct", productIds),
+    presentacionIds.length > 0
+      ? adminClient
+          .from("presentaciones")
+          .select("eCodPresentacion, tNombre")
+          .in("eCodPresentacion", [...new Set(presentacionIds)])
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const productosMap     = new Map((productosRes.data     ?? []).map((p) => [p.eCodProduct,      p.tNameProduct]));
+  const presentacionesMap = new Map((presentacionesRes.data ?? []).map((p) => [p.eCodPresentacion, p.tNombre]));
+
+  return detalles.map((d) => ({
+    eCodDetalle:         d.eCodDetalle,
+    tNameProduct:        productosMap.get(d.fkeCodProduct) ?? "Producto",
+    tNombrePresentacion: d.fkeCodPresentacion
+      ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null)
+      : null,
+    eCantidad:  d.eCantidad,
+    fhAgregado: d.fhAgregado,
+  }));
+}
+
+// ─────────────────────────────────────────────────────────────
+// MÓDULO COCINA: MARCAR ITEM COMO ENTREGADO
+// Llamada por el empleado desde el modal de entrega en el POS
+// ─────────────────────────────────────────────────────────────
+
+export async function marcarItemEntregado(
+  eCodDetalle: string
+): Promise<{ ok: true } | { error: string }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+
+  const adminClient = createAdminClient();
+
+  const { data: detalle } = await adminClient
+    .from("ordenes_mesa_detalle")
+    .select("fkeCodOrden")
+    .eq("eCodDetalle", eCodDetalle)
+    .single();
+
+  if (!detalle) return { error: "Item no encontrado" };
+
+  const { data: orden } = await adminClient
+    .from("ordenes_mesa")
+    .select("fkeCodCompany, tEstado")
+    .eq("eCodOrden", detalle.fkeCodOrden)
+    .single();
+
+  if (!orden || orden.fkeCodCompany !== perfil.fkeCodCompany) {
+    return { error: "Sin acceso" };
+  }
+  if (orden.tEstado !== "abierta") return { error: "La orden ya no está abierta" };
+
+  const { error } = await adminClient
+    .from("ordenes_mesa_detalle")
+    .update({ tEstadoCocina: "entregado" })
+    .eq("eCodDetalle", eCodDetalle)
+    .eq("tEstadoCocina", "listo"); // guard: solo si sigue listo
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/empleado/mesas");
+  return { ok: true };
+}
+
+// ─────────────────────────────────────────────────────────────
 // ADMIN: GESTIÓN DE MESAS
 // ─────────────────────────────────────────────────────────────
 
@@ -637,7 +773,6 @@ export async function crearMesa(
   if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
 
   const adminClient = createAdminClient();
-
   const ctx = await getSucursalContext();
   if (!ctx.fkeCodSucursal) return { error: "Selecciona una sucursal antes de crear mesas" };
 
@@ -645,7 +780,7 @@ export async function crearMesa(
     .from("mesas")
     .insert({
       fkeCodCompany:  perfil.fkeCodCompany,
-      fkeCodSucursal: ctx.fkeCodSucursal,   // ← nueva
+      fkeCodSucursal: ctx.fkeCodSucursal,
       tNombre:        tNombre.trim(),
       bStateMesa:     true,
       fhCreateMesa:   new Date().toISOString(),

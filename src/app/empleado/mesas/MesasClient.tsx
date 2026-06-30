@@ -1,9 +1,6 @@
 "use client";
 
 // src/app/empleado/mesas/MesasClient.tsx
-// Cambio principal: vista "mesas" ahora muestra el floor plan con las
-// posiciones que el admin configuró, en lugar de un grid auto-fill.
-// La lógica de órdenes, pedido directo y billar es idéntica a la versión anterior.
 
 import { useState, useTransition, useEffect, useCallback } from "react";
 import toast                         from "react-hot-toast";
@@ -13,6 +10,7 @@ import { CategoriaCarrusel } from "@/components/ui/CategoriaCarrusel/CategoriaCa
 import { ProductoGrid }      from "@/components/ui/ProductoGrid/ProductoGrid";
 import { PedidoPanel }       from "@/components/ui/PedidoPanel/PedidoPanel";
 import { ModalVentaExitosa } from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
+import { ModalEntregaCocina } from "./ModalEntregaCocina";
 import {
   obtenerMesasConEstado,
   obtenerOrdenAbierta,
@@ -36,7 +34,7 @@ import type {
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./mesas.module.css";
 
-// ── Constantes del grid (deben coincidir con LayoutEditorMesas) ───────────────
+// ── Constantes del grid ───────────────────────────────────────────────────────
 const COLS = 10;
 const ROWS = 6;
 
@@ -54,9 +52,7 @@ interface Props {
   onCerrarCaja?:     () => void;
 }
 
-// ── Floor plan de mesas (read-only) ──────────────────────────────────────────
-// Renderiza las mesas en sus posiciones reales del grid configurado por el admin.
-// Sin drag — solo tap/click para abrir una orden.
+// ── Floor plan de mesas ───────────────────────────────────────────────────────
 
 function MesaFloorPlan({
   mesas,
@@ -67,6 +63,7 @@ function MesaFloorPlan({
   calcCosto,
   costo_hora_billar,
   onClick,
+  onBadgeClick,
 }: {
   mesas:             MesaConEstado[];
   disabled:          boolean;
@@ -76,6 +73,7 @@ function MesaFloorPlan({
   calcCosto:         (fh: string) => number;
   costo_hora_billar: number | null;
   onClick:           (mesa: MesaConEstado) => void;
+  onBadgeClick:      (mesa: MesaConEstado) => void;
 }) {
   return (
     <div
@@ -85,7 +83,7 @@ function MesaFloorPlan({
         gridTemplateRows:    `repeat(${ROWS}, 1fr)`,
       }}
     >
-      {/* Celdas con posición explícita — sin esto, auto-placement las desplaza al saltarse mesas */}
+      {/* Celdas de fondo */}
       {Array.from({ length: COLS * ROWS }).map((_, i) => {
         const col = i % COLS;
         const row = Math.floor(i / COLS);
@@ -98,47 +96,65 @@ function MesaFloorPlan({
         );
       })}
 
-      {/* Mesas en sus posiciones reales */}
+      {/* Mesas — envueltas en div para poder anidar el badge como botón hermano */}
       {mesas.map((mesa) => {
-        const ocupada   = !!mesa.ordenAbierta;
-        const fhAbierta = mesa.ordenAbierta?.fhAbierta;
+        const ocupada    = !!mesa.ordenAbierta;
+        const fhAbierta  = mesa.ordenAbierta?.fhAbierta;
+        const hayListos  = (mesa.itemsListos ?? 0) > 0;
 
         return (
-          <button
+          <div
             key={mesa.eCodMesa}
-            className={[
-              styles.floorMesa,
-              mesa.t_shape === "circle" ? styles.floorMesaCircle   : "",
-              ocupada                   ? styles.floorMesaOcupada  : styles.floorMesaLibre,
-            ]
-              .filter(Boolean)
-              .join(" ")}
+            className={styles.floorMesaWrapper}
             style={{
               gridColumn: `${(mesa.e_grid_col ?? 0) + 1} / span ${mesa.e_grid_w ?? 1}`,
               gridRow:    `${(mesa.e_grid_row ?? 0) + 1} / span ${mesa.e_grid_h ?? 1}`,
             }}
-            onClick={() => onClick(mesa)}
-            disabled={disabled}
           >
-            <span className={styles.floorMesaNombre}>{mesa.tNombre}</span>
-            <span className={styles.floorMesaEstado}>
-              {ocupada ? "Ocupada" : "Libre"}
-            </span>
+            <button
+              className={[
+                styles.floorMesa,
+                mesa.t_shape === "circle" ? styles.floorMesaCircle  : "",
+                ocupada                   ? styles.floorMesaOcupada : styles.floorMesaLibre,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => onClick(mesa)}
+              disabled={disabled}
+            >
+              <span className={styles.floorMesaNombre}>{mesa.tNombre}</span>
+              <span className={styles.floorMesaEstado}>
+                {ocupada ? "Ocupada" : "Libre"}
+              </span>
 
-            {/* Timer de billar — solo si aplica */}
-            {esBillar && ocupada && fhAbierta && ahora && (
-              <>
-                <span className={styles.floorMesaTimer}>
-                  {formatTiempo(fhAbierta)}
-                </span>
-                {costo_hora_billar != null && (
-                  <span className={styles.floorMesaCosto}>
-                    ${calcCosto(fhAbierta).toFixed(2)}
+              {esBillar && ocupada && fhAbierta && ahora && (
+                <>
+                  <span className={styles.floorMesaTimer}>
+                    {formatTiempo(fhAbierta)}
                   </span>
-                )}
-              </>
+                  {costo_hora_billar != null && (
+                    <span className={styles.floorMesaCosto}>
+                      ${calcCosto(fhAbierta).toFixed(2)}
+                    </span>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Badge de cocina — aparece cuando hay items listos */}
+            {hayListos && (
+              <button
+                className={styles.badgeCocina}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBadgeClick(mesa);
+                }}
+                title="Items listos para entregar"
+              >
+                {mesa.itemsListos}
+              </button>
             )}
-          </button>
+          </div>
         );
       })}
     </div>
@@ -206,6 +222,12 @@ export function MesasClient({
   const [errorDirecto,    setErrorDirecto]    = useState<string | null>(null);
   const [ventaDirectaOk,  setVentaDirectaOk]  = useState<string | null>(null);
 
+  // ── Modal de entrega de cocina ────────────────────────────────────────────
+  const [modalCocina, setModalCocina] = useState<{
+    eCodOrden:   string;
+    tNombreMesa: string;
+  } | null>(null);
+
   // ── Timer para billar ─────────────────────────────────────────────────────
   const esBillar = tipo_negocio === "billar";
   const [ahora,          setAhora]     = useState<Date | null>(null);
@@ -270,6 +292,14 @@ export function MesasClient({
     setCategoriaActiva("todas");
   }
 
+  // ── Polling de mesas (para el badge de cocina) ────────────────────────────
+  useEffect(() => {
+    if (vista !== "mesas") return;
+    recargarMesas();                          // inmediato al entrar a la vista
+    const id = setInterval(recargarMesas, 5000); // cada 5s en lugar de 8s
+    return () => clearInterval(id);
+  }, [vista]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Click en mesa del floor plan ──────────────────────────────────────────
   async function handleClickMesa(mesa: MesaConEstado) {
     if (!tieneTurno) {
@@ -297,6 +327,15 @@ export function MesasClient({
       setItems([]);
       setVista("orden");
       await recargarMesas();
+    });
+  }
+
+  // ── Click en badge de cocina ──────────────────────────────────────────────
+  function handleBadgeClick(mesa: MesaConEstado) {
+    if (!mesa.ordenAbierta) return;
+    setModalCocina({
+      eCodOrden:   mesa.ordenAbierta.eCodOrden,
+      tNombreMesa: mesa.tNombre,
     });
   }
 
@@ -475,6 +514,17 @@ export function MesasClient({
             calcCosto={calcCosto}
             costo_hora_billar={costo_hora_billar}
             onClick={handleClickMesa}
+            onBadgeClick={handleBadgeClick}
+          />
+        )}
+
+        {/* Modal de entrega de cocina */}
+        {modalCocina && (
+          <ModalEntregaCocina
+            eCodOrden={modalCocina.eCodOrden}
+            tNombreMesa={modalCocina.tNombreMesa}
+            onCerrar={() => setModalCocina(null)}
+            onEntregado={recargarMesas}
           />
         )}
       </div>

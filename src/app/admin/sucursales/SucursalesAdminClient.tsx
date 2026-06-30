@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo }  from "react";
 import toast                                  from "react-hot-toast";
-import { Pencil, Trash2 }                     from "lucide-react";
+import { Pencil, Trash2, Copy, Check }        from "lucide-react";
 import { PageHeader }                         from "@/components/ui/PageHeader";
 import { StatCards }                          from "@/components/ui/Statscards";
 import { DataTable, type ColumnaTabla }       from "@/components/ui/DataTable";
@@ -19,8 +19,13 @@ import {
 import type { Sucursal }                      from "@/types";
 import styles                                 from "./sucursales.module.css";
 
+// Tipo extendido con el token (viene de la BD pero no está en el type base)
+interface SucursalConToken extends Sucursal {
+  tTokenCocina?: string | null;
+}
+
 interface Props {
-  sucursalesIniciales: Sucursal[];
+  sucursalesIniciales: SucursalConToken[];
 }
 
 const OPCIONES_ESTADO = [
@@ -29,10 +34,60 @@ const OPCIONES_ESTADO = [
   { value: "inactiva", label: "Inactivas" },
 ];
 
+// ── Botón copiar URL de cocina ────────────────────────────────────────────────
+
+function BtnCopiarUrl({ token }: { token: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  const url = typeof window !== "undefined"
+    ? `${window.location.origin}/cocina/${token}`
+    : `/cocina/${token}`;
+
+  async function handleCopiar() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopiar}
+      title="Copiar URL de pantalla de cocina"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "5px 10px",
+        border: copiado
+          ? "1px solid var(--color-primary)"
+          : "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        background: copiado ? "var(--color-primary-50)" : "var(--white)",
+        color: copiado ? "var(--color-primary)" : "var(--gray)",
+        fontSize: 12,
+        fontWeight: 600,
+        fontFamily: "var(--font-family)",
+        cursor: "pointer",
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {copiado ? <Check size={12} /> : <Copy size={12} />}
+      {copiado ? "¡Copiada!" : "URL cocina"}
+    </button>
+  );
+}
+
+// ── Componente principal ──────────────────────────────────────────────────────
+
 export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
   const [sucursales,   setSucursales]   = useState(sucursalesIniciales);
   const [modalCrear,   setModalCrear]   = useState(false);
-  const [sucursalEdit, setSucursalEdit] = useState<Sucursal | null>(null);
+  const [sucursalEdit, setSucursalEdit] = useState<SucursalConToken | null>(null);
   const [form,         setForm]         = useState({ tNombre: "", tDireccion: "" });
   const [toggleando,   setToggleando]   = useState<string | null>(null);
   const [isPending,    startTransition] = useTransition();
@@ -47,7 +102,7 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     categorias: [],
   });
 
-  // ── Filtrado ─────────────────────────────────────────────────────────────────
+  // ── Filtrado ──────────────────────────────────────────────────────────────
   const filtradas = useMemo(() => sucursales.filter((s) => {
     const txt = filtros.busqueda.toLowerCase().trim();
     const coincideTexto =
@@ -64,13 +119,13 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     return coincideTexto && coincideEstado;
   }), [sucursales, filtros]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
   function handleAbrirCrear() {
     setForm({ tNombre: "", tDireccion: "" });
     setModalCrear(true);
   }
 
-  function handleAbrirEditar(s: Sucursal) {
+  function handleAbrirEditar(s: SucursalConToken) {
     setForm({ tNombre: s.tNombre, tDireccion: s.tDireccion ?? "" });
     setSucursalEdit(s);
   }
@@ -80,7 +135,7 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     startTransition(async () => {
       const result = await crearSucursal(form.tNombre, form.tDireccion || undefined);
       if ("error" in result) { toast.error(result.error); return; }
-      setSucursales((prev) => [...prev, result.sucursal]);
+      setSucursales((prev) => [...prev, result.sucursal as SucursalConToken]);
       setModalCrear(false);
       toast.success("Sucursal creada");
     });
@@ -107,7 +162,7 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     });
   }
 
-  async function handleToggle(s: Sucursal) {
+  async function handleToggle(s: SucursalConToken) {
     setToggleando(s.eCodSucursal);
     const result = await toggleSucursal(s.eCodSucursal, !s.bStateSucursal);
     if ("error" in result) {
@@ -125,7 +180,7 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     setToggleando(null);
   }
 
-  function handleEliminar(s: Sucursal) {
+  function handleEliminar(s: SucursalConToken) {
     toast((t) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>
@@ -171,12 +226,12 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
     ), { duration: Infinity });
   }
 
-  // ── Stats ─────────────────────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
   const activas   = sucursales.filter((s) =>  s.bStateSucursal).length;
   const inactivas = sucursales.filter((s) => !s.bStateSucursal).length;
 
-  // ── Columnas ──────────────────────────────────────────────────────────────────
-  const columnas: ColumnaTabla<Sucursal>[] = [
+  // ── Columnas ──────────────────────────────────────────────────────────────
+  const columnas: ColumnaTabla<SucursalConToken>[] = [
     {
       key: "tNombre",
       label: "Nombre",
@@ -192,6 +247,16 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
           {s.tDireccion ?? "—"}
         </span>
       ),
+    },
+    {
+      key: "cocina" as any,
+      label: "Pantalla cocina",
+      render: (s) =>
+        s.tTokenCocina ? (
+          <BtnCopiarUrl token={s.tTokenCocina} />
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--gray)" }}>—</span>
+        ),
     },
     {
       key: "fhCreateSucursal",

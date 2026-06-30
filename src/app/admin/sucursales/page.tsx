@@ -21,7 +21,7 @@ export default async function SucursalesPage() {
 
   const { data: sucursales } = await adminClient
     .from("sucursales")
-    .select("*")
+    .select("eCodSucursal, fkeCodCompany, tNombre, tDireccion, bStateSucursal, fhCreateSucursal, tTokenCocina")
     .eq("fkeCodCompany", perfil.fkeCodCompany)
     .order("fhCreateSucursal");
 

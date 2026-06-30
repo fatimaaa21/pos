@@ -318,3 +318,50 @@
   border-color: var(--color-error);
   color: var(--color-error);
 }
+
+/* Wrapper para cada mesa en el floor plan — permite anidar el badge */
+.floorMesaWrapper {
+  position: relative;
+}
+
+/* El botón de mesa dentro del wrapper ocupa todo el espacio */
+.floorMesa {
+  width: 100%;
+  height: 100%;
+}
+
+/* Badge de cocina — items listos para entregar */
+.badgeCocina {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  z-index: 10;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  background: var(--color-success);
+  color: #fff;
+  border: 2px solid var(--white);
+  border-radius: var(--radius-full);
+  font-family: var(--font-family);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  transition: transform 0.1s, background 0.15s;
+  animation: badgePop 0.2s ease-out;
+}
+
+.badgeCocina:hover {
+  background: var(--color-primary-dark);
+  transform: scale(1.15);
+}
+
+@keyframes badgePop {
+  from { transform: scale(0.5); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}

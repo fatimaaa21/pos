@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
 import { Modal, ModalField, ModalInput, ModalSelect } from "@/components/ui/Modal";
 import { editarProducto } from "@/lib/actions/productos";
@@ -40,6 +40,7 @@ function toFila(p: Presentacion): FilaEditable {
 }
 
 export function ModalEditarProducto({ producto, categorias, onClose, onEditado }: Props) {
+  const checkboxId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
 
@@ -53,6 +54,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
         ? (producto.fkeCodCategory as any).eCodCategory
         : producto.fkeCodCategory
       : "",
+    bCocina: producto.bCocina ?? false,
   });
 
   // ── Presentaciones ────────────────────────────────────────────────────────
@@ -64,15 +66,12 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
   });
   const [guardandoNueva, setGuardandoNueva] = useState(false);
 
-  // Carga inicial — usa server action (admin client, bypasea RLS)
   useEffect(() => {
     let cancelled = false;
-
     async function cargar() {
       setCargandoPres(true);
       const result = await obtenerPresentaciones(producto.eCodProduct);
       if (cancelled) return;
-
       if (result.error) {
         setErrorPres(result.error);
       } else {
@@ -80,7 +79,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
       }
       setCargandoPres(false);
     }
-
     cargar();
     return () => { cancelled = true; };
   }, [producto.eCodProduct]);
@@ -130,7 +128,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
     }
   }
 
-  // ── Agregar nueva ─────────────────────────────────────────────────────────
   async function handleAgregarPresentacion() {
     if (!nuevaPres.tNombre.trim() || !nuevaPres.ePricePresentacion) return;
     setGuardandoNueva(true);
@@ -154,7 +151,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
     setGuardandoNueva(false);
   }
 
-  // ── Eliminar ──────────────────────────────────────────────────────────────
   async function handleEliminarPresentacion(id: string) {
     setErrorPres(null);
     const result = await eliminarPresentacion(id);
@@ -174,6 +170,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
     formData.append("ePriceProduct",  form.ePriceProduct);
     formData.append("eCostProduct",   form.eCostProduct);
     formData.append("fkeCodCategory", form.fkeCodCategory);
+    formData.append("bCocina",        form.bCocina ? "true" : "false");
 
     const result = await editarProducto(formData);
 
@@ -194,7 +191,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
   const filaPresentacionValida =
     nuevaPres.tNombre.trim() !== "" && nuevaPres.ePricePresentacion !== "";
 
-  // ── Estilos de tabla reutilizables ────────────────────────────────────────
   const cellStyle = {
     padding: "8px 10px", fontSize: 12, fontWeight: 600,
     color: "var(--dark)", fontFamily: "var(--font-family)",
@@ -264,10 +260,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
       </ModalField>
 
       {/* Precio */}
-      <ModalField
-        label= "Precio al público"
-        required
-      >
+      <ModalField label="Precio al público" required>
         <ModalInput
           type="number"
           value={form.ePriceProduct}
@@ -276,10 +269,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
       </ModalField>
 
       {/* Costo */}
-      <ModalField
-        label= "Costo de producción"
-        required
-      >
+      <ModalField label="Costo de producción" required>
         <ModalInput
           type="number"
           value={form.eCostProduct}
@@ -287,7 +277,42 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
         />
       </ModalField>
 
-      {/* ── Sección presentaciones ── */}
+      {/* ── Cocina ── */}
+      <ModalField label="Cocina">
+        <label
+          htmlFor={checkboxId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            cursor: "pointer",
+            padding: "10px 12px",
+            border: "1px solid",
+            borderRadius: "var(--radius-md)",
+            background: form.bCocina ? "var(--color-primary-50)" : "var(--white)",
+            borderColor: form.bCocina ? "var(--color-primary)" : "var(--border-default)",
+            transition: "background 0.15s, border-color 0.15s",
+          }}
+        >
+          <input
+            id={checkboxId}
+            type="checkbox"
+            checked={form.bCocina}
+            onChange={(e) => setForm({ ...form, bCocina: e.target.checked })}
+            style={{ width: 16, height: 16, accentColor: "var(--color-primary)", cursor: "pointer" }}
+          />
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)", display: "block" }}>
+              Requiere preparación en cocina
+            </span>
+            <span style={{ fontSize: 11, color: "var(--gray)" }}>
+              El pedido aparece en la pantalla de cocina al agregarlo a una orden
+            </span>
+          </div>
+        </label>
+      </ModalField>
+
+      {/* ── Presentaciones ── */}
       <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
         <p style={{ margin: "0 0 var(--space-3)", fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
           Presentaciones
@@ -297,7 +322,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
           <p style={{ fontSize: 12, color: "var(--gray)" }}>Cargando presentaciones…</p>
         ) : (
           <>
-            {/* Tabla de presentaciones existentes */}
             {presentaciones.length > 0 && (
               <div style={{
                 border: "1px solid var(--border-light)",
@@ -305,7 +329,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
                 overflow: "hidden",
                 marginBottom: "var(--space-3)",
               }}>
-                {/* Header */}
                 <div style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 90px 90px 60px",
@@ -424,7 +447,6 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
               </div>
             )}
 
-            {/* Fila para agregar nueva presentación */}
             <div style={{
               display: "grid",
               gridTemplateColumns: "1fr 90px 90px 36px",
@@ -456,9 +478,7 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado }
                 title="Agregar presentación"
                 style={{
                   width: 36, height: 36, border: "none",
-                  background: filaPresentacionValida
-                    ? "var(--color-primary)"
-                    : "var(--border-default)",
+                  background: filaPresentacionValida ? "var(--color-primary)" : "var(--border-default)",
                   color: "white", borderRadius: "var(--radius-md)",
                   cursor: filaPresentacionValida ? "pointer" : "not-allowed",
                   display: "flex", alignItems: "center", justifyContent: "center",
