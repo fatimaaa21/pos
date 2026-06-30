@@ -366,13 +366,26 @@ export async function abrirOrdenMesa(
 
   const { data: mesa } = await adminClient
     .from("mesas")
-    .select("eCodMesa, fkeCodCompany, fkeCodSucursal, bStateMesa")
+    .select("eCodMesa, fkeCodCompany, fkeCodSucursal, bStateMesa, fkeCodConcepto")
     .eq("eCodMesa", eCodMesa)
     .single();
 
   if (!mesa) return { error: "Mesa no encontrada" };
   if (mesa.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (!mesa.bStateMesa) return { error: "Mesa inactiva" };
+
+  // Negocios billar: no se puede abrir una mesa sin tarifa asignada.
+  // Esta validación vive aquí (no solo en el panel del admin) porque el
+  // empleado abre mesas desde su propia pantalla, sin pasar por ese panel.
+  const { data: negocioMesa } = await adminClient
+    .from("negocios")
+    .select("tipo_negocio")
+    .eq("eCodCompany", perfil.fkeCodCompany)
+    .single();
+
+  if (negocioMesa?.tipo_negocio === "billar" && !mesa.fkeCodConcepto) {
+    return { error: "Esta mesa no tiene tarifa asignada. Pide al admin que la configure." };
+  }
 
   const { data: ordenExistente } = await adminClient
     .from("ordenes_mesa")
@@ -610,18 +623,40 @@ export async function cobrarOrdenMesa(
     .eq("fkeCodOrden", eCodOrden);
 
   // ── Cargo por tiempo de mesa (solo negocios tipo billar) ──────────────────
+  // El costo por hora ya NO viene de negocios.costo_hora_billar (legado).
+  // Cada mesa tiene su propio concepto de tarifa (billar, dominó, etc.)
+  // vía mesas.fkeCodConcepto → conceptos_billar.eCostoHora.
   let cargoBillar = 0;
 
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("tipo_negocio, costo_hora_billar")
+    .select("tipo_negocio")
     .eq("eCodCompany", perfil.fkeCodCompany)
     .single();
 
-  if (negocio?.tipo_negocio === "billar" && negocio.costo_hora_billar) {
-    const horasTranscurridas =
-      (new Date().getTime() - new Date(orden.fhAbierta).getTime()) / (1000 * 60 * 60);
-    cargoBillar = Math.round(horasTranscurridas * negocio.costo_hora_billar * 100) / 100;
+  if (negocio?.tipo_negocio === "billar") {
+    const { data: mesa } = await adminClient
+      .from("mesas")
+      .select("fkeCodConcepto")
+      .eq("eCodMesa", orden.fkeCodMesa)
+      .single();
+
+    if (mesa?.fkeCodConcepto) {
+      const { data: concepto } = await adminClient
+        .from("conceptos_billar")
+        .select("eCostoHora")
+        .eq("eCodConcepto", mesa.fkeCodConcepto)
+        .single();
+
+      if (concepto?.eCostoHora) {
+        const horasTranscurridas =
+          (new Date().getTime() - new Date(orden.fhAbierta).getTime()) / (1000 * 60 * 60);
+        cargoBillar = Math.round(horasTranscurridas * concepto.eCostoHora * 100) / 100;
+      }
+    }
+    // Si la mesa no tiene concepto asignado (no debería pasar tras la
+    // migración, pero por seguridad), no se cobra tiempo — es preferible
+    // cobrar $0 de tiempo a cobrar con una tarifa equivocada.
   }
 
   if (!detalle?.length && cargoBillar === 0)

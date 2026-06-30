@@ -5,6 +5,14 @@ import { X, Check } from "lucide-react";
 import * as Icons from "lucide-react";
 import { guardarConfigNegocio, type ConfigNegocio } from "@/lib/actions/configuracion";
 import { guardarMetodosNegocio, type MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import {
+  listarConceptosBillar,
+  crearConceptoBillar,
+  actualizarConceptoBillar,
+  eliminarConceptoBillar,
+} from "@/lib/actions/conceptos-billar";
+import type { ConceptoBillar } from "@/types";
+import { Trash2, Pencil } from "lucide-react";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 import styles from "./ModalConfiguracion.module.css";
 import { Spinner } from "@/components/ui/Spinner/Spinner";
@@ -34,7 +42,7 @@ type Tab = "general" | "pagos" | "billar";
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General"         },
   { id: "pagos",   label: "Métodos de pago" },
-  { id: "billar",  label: "Billar"          },
+  { id: "billar",  label: "Costos"          },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -95,6 +103,222 @@ function Toggle({
   );
 }
 
+// ── Tab de conceptos de billar (CRUD inmediato) ────────────────────────────────
+// A diferencia de "General" y "Métodos de pago", cada acción aquí pega
+// directo a la DB (no se batchea con "Guardar cambios"). Esto es intencional:
+// los conceptos se referencian desde las mesas (mesas.fkeCodConcepto), así que
+// dejarlos en un estado "pendiente de guardar" sería confuso si el admin
+// cierra el modal sin darle a Guardar.
+
+function ConceptosBillarTab({ codCompany }: { codCompany: string }) {
+  const [conceptos, setConceptos]   = useState<ConceptoBillar[] | null>(null);
+  const [nombreNuevo, setNombreNuevo] = useState("");
+  const [costoNuevo,  setCostoNuevo]  = useState("");
+  const [creando,     setCreando]     = useState(false);
+  const [editandoId,  setEditandoId]  = useState<string | null>(null);
+  const [nombreEdit,  setNombreEdit]  = useState("");
+  const [costoEdit,   setCostoEdit]   = useState("");
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listarConceptosBillar().then(setConceptos);
+  }, []);
+
+  async function handleCrear() {
+    setError(null);
+    const costo = parseFloat(costoNuevo);
+    if (!nombreNuevo.trim()) { setError("Dale un nombre al concepto (ej. Billar, Dominó)"); return; }
+    if (!Number.isFinite(costo) || costo <= 0) { setError("Costo por hora inválido"); return; }
+
+    setCreando(true);
+    const r = await crearConceptoBillar(nombreNuevo, costo);
+    setCreando(false);
+    if ("error" in r) { setError(r.error); return; }
+    setConceptos((prev) => [...(prev ?? []), r]);
+    setNombreNuevo("");
+    setCostoNuevo("");
+  }
+
+  function empezarEdicion(c: ConceptoBillar) {
+    setEditandoId(c.eCodConcepto);
+    setNombreEdit(c.tNombre);
+    setCostoEdit(String(c.eCostoHora));
+    setError(null);
+  }
+
+  async function handleGuardarEdicion(eCodConcepto: string) {
+    setError(null);
+    const costo = parseFloat(costoEdit);
+    if (!nombreEdit.trim()) { setError("El nombre no puede quedar vacío"); return; }
+    if (!Number.isFinite(costo) || costo <= 0) { setError("Costo por hora inválido"); return; }
+
+    setGuardandoEdit(true);
+    const r = await actualizarConceptoBillar(eCodConcepto, nombreEdit, costo);
+    setGuardandoEdit(false);
+    if ("error" in r) { setError(r.error); return; }
+    setConceptos((prev) =>
+      (prev ?? []).map((c) =>
+        c.eCodConcepto === eCodConcepto ? { ...c, tNombre: nombreEdit.trim(), eCostoHora: costo } : c
+      )
+    );
+    setEditandoId(null);
+  }
+
+  async function handleEliminar(c: ConceptoBillar) {
+    setError(null);
+    setEliminandoId(c.eCodConcepto);
+    const r = await eliminarConceptoBillar(c.eCodConcepto);
+    setEliminandoId(null);
+    if ("error" in r) { setError(r.error); return; }
+    setConceptos((prev) => (prev ?? []).filter((x) => x.eCodConcepto !== c.eCodConcepto));
+  }
+
+  return (
+    <>
+      <p className={styles.tabDesc}>
+        Cada concepto define un costo por hora distinto.
+        Cada mesa se asigna a uno de estos conceptos desde el editor de Mesas, 
+        ahí se decide con cuál tarifa se cobra cada mesa.
+      </p>
+
+      {conceptos === null ? (
+        <Spinner />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          {conceptos.length === 0 && (
+            <p style={{ fontSize: 12, color: "var(--gray)" }}>
+              Todavía no hay conceptos configurados.
+            </p>
+          )}
+
+          {conceptos.map((c) => (
+            <div
+              key={c.eCodConcepto}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)",
+                padding: "8px 10px",
+              }}
+            >
+              {editandoId === c.eCodConcepto ? (
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+                  <input
+                    className={styles.input}
+                    style={{ width: "100%" }}
+                    value={nombreEdit}
+                    onChange={(e) => setNombreEdit(e.target.value)}
+                    placeholder="Nombre del concepto"
+                    autoFocus
+                  />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                      <span style={{
+                        position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+                        fontSize: 13, fontWeight: 600, color: "var(--gray)", pointerEvents: "none",
+                      }}>$</span>
+                      <input
+                        className={styles.input}
+                        style={{ width: "100%", paddingLeft: 22 }}
+                        type="number" min="0" step="0.01"
+                        value={costoEdit}
+                        onChange={(e) => setCostoEdit(e.target.value)}
+                        placeholder="Costo por hora"
+                      />
+                    </div>
+                    <button
+                      className={styles.btnGuardar}
+                      style={{ padding: "6px 14px", whiteSpace: "nowrap" }}
+                      onClick={() => handleGuardarEdicion(c.eCodConcepto)}
+                      disabled={guardandoEdit}
+                    >
+                      {guardandoEdit ? <Spinner /> : "Guardar"}
+                    </button>
+                    <button
+                      className={styles.btnCancelar}
+                      style={{ padding: "6px 14px", whiteSpace: "nowrap" }}
+                      onClick={() => setEditandoId(null)}
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: 13, margin: 0 }}>{c.tNombre}</p>
+                    <p style={{ fontSize: 12, color: "var(--gray)", margin: 0 }}>
+                      ${c.eCostoHora.toFixed(2)} / hora
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => empezarEdicion(c)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gray)", padding: 6 }}
+                    aria-label={`Editar ${c.tNombre}`}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleEliminar(c)}
+                    disabled={eliminandoId === c.eCodConcepto}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-error)", padding: 6 }}
+                    aria-label={`Eliminar ${c.tNombre}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.field}>
+        <label className={styles.fieldLabel}>Nuevo concepto</label>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            className={styles.input}
+            style={{ flex: 1 }}
+            placeholder="Ej. Dominó"
+            value={nombreNuevo}
+            onChange={(e) => setNombreNuevo(e.target.value)}
+            maxLength={30}
+          />
+          <div style={{ position: "relative", width: 110 }}>
+            <span style={{
+              position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
+              fontSize: 13, fontWeight: 600, color: "var(--gray)", pointerEvents: "none",
+            }}>$</span>
+            <input
+              className={styles.input}
+              type="number" min="0" step="0.01"
+              placeholder="60.00"
+              value={costoNuevo}
+              onChange={(e) => setCostoNuevo(e.target.value)}
+              style={{ paddingLeft: 24 }}
+            />
+          </div>
+          <button className={styles.btnGuardar} onClick={handleCrear} disabled={creando}>
+            {creando ? <Spinner /> : "Agregar"}
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--gray)", margin: "4px 0 0" }}>
+          Precio final (IVA incluido). Se calcula proporcionalmente al tiempo que la mesa estuvo abierta.
+        </p>
+      </div>
+
+      {error && <div className={styles.errorBox}>⚠ {error}</div>}
+
+      <div className={styles.infoBox}>
+        Eliminar un concepto solo es posible si ninguna mesa lo tiene asignado.
+      </div>
+    </>
+  );
+}
+
 // ── Componente ────────────────────────────────────────────────────────────────
 
 export function ModalConfiguracion({
@@ -116,9 +340,6 @@ export function ModalConfiguracion({
     moneda:            config.moneda            ?? "MXN",
     zona_horaria:      config.zona_horaria      ?? "America/Mexico_City",
     aplicarIva:        config.aplicarIva        ?? true,
-    costo_hora_billar: config.costo_hora_billar != null
-      ? String(config.costo_hora_billar)
-      : "",
   });
   const [form, setForm] = useState(savedForm);
 
@@ -163,7 +384,6 @@ export function ModalConfiguracion({
     fd.append("moneda",            form.moneda);
     fd.append("zona_horaria",      form.zona_horaria);
     fd.append("aplicarIva",        String(form.aplicarIva));
-    fd.append("costo_hora_billar", form.costo_hora_billar);
 
     const [resConfig, resMetodos] = await Promise.all([
       guardarConfigNegocio(fd),
@@ -190,13 +410,11 @@ export function ModalConfiguracion({
     form.zona_horaria      !== savedForm.zona_horaria      ||
     form.aplicarIva        !== savedForm.aplicarIva;
 
-  const hayChangesBillar  = form.costo_hora_billar !== savedForm.costo_hora_billar;
-
   const hayChangesPagos =
     JSON.stringify([...metodosPago].sort()) !==
     JSON.stringify([...savedMetodos].sort());
 
-  const hayChanges = hayChangesGeneral || hayChangesPagos || hayChangesBillar;
+  const hayChanges = hayChangesGeneral || hayChangesPagos;
 
   const inicialesNegocio = (form.tNameCompany || config.tNameCompany)
     .split(" ")
@@ -250,7 +468,6 @@ export function ModalConfiguracion({
               {t.label}
               {t.id === "general" && hayChangesGeneral && <span className={styles.tabDot} />}
               {t.id === "pagos"   && hayChangesPagos   && <span className={styles.tabDot} />}
-              {t.id === "billar"  && hayChangesBillar  && <span className={styles.tabDot} />}
             </button>
           ))}
         </div>
@@ -404,48 +621,7 @@ export function ModalConfiguracion({
 
           {/* Tab: Billar */}
           {tab === "billar" && esBillar && (
-            <>
-              <p className={styles.tabDesc}>
-                Configura el costo por hora de uso de mesa. Este monto se calcula
-                proporcionalmente al tiempo que la mesa estuvo abierta y se suma
-                automáticamente al total al cobrar.
-              </p>
-
-              <div className={styles.field}>
-                <label className={styles.fieldLabel}>
-                  Costo por hora de mesa
-                  <span className={styles.fieldRequired}>*</span>
-                </label>
-                <div style={{ position: "relative" }}>
-                  <span style={{
-                    position: "absolute", left: 12, top: "50%",
-                    transform: "translateY(-50%)",
-                    fontSize: 13, fontWeight: 600, color: "var(--gray)",
-                    pointerEvents: "none",
-                  }}>$</span>
-                  <input
-                    className={styles.input}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Ej. 60.00"
-                    value={form.costo_hora_billar}
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, costo_hora_billar: e.target.value }))
-                    }
-                    style={{ paddingLeft: 28 }}
-                  />
-                </div>
-                <p style={{ fontSize: 11, color: "var(--gray)", margin: "4px 0 0" }}>
-                  Precio final (IVA incluido). Si la mesa estuvo 45 min a $60/hr, se cobrarán $45.
-                </p>
-              </div>
-
-              <div className={styles.infoBox}>
-                El cargo por tiempo se muestra en el desglose al cobrar y queda
-                registrado en el historial de ventas.
-              </div>
-            </>
+            <ConceptosBillarTab codCompany={codCompany} />
           )}
 
           {error && <div className={styles.errorBox}>⚠ {error}</div>}
