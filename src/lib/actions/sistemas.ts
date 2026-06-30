@@ -247,7 +247,7 @@ export async function eliminarNegocio(eCodCompany: string) {
 
 // ── Módulos por negocio ───────────────────────────────────────────────────────
 
-const MODULOS_DISPONIBLES = ["mesas"] as const;
+const MODULOS_DISPONIBLES = ["mesas", "cocina"] as const;
 export type ModuloDisponible = typeof MODULOS_DISPONIBLES[number];
 
 export async function obtenerModulosNegocio(
