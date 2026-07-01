@@ -277,6 +277,16 @@ export interface Mesa {
   e_grid_w:      number;
   e_grid_h:      number;
   t_shape:       "rect" | "circle";
+  fkeCodConcepto?: string | null;
+}
+
+export interface ConceptoBillar {
+  eCodConcepto:  string;
+  fkeCodCompany: string;
+  tNombre:       string;
+  eCostoHora:    number;
+  bActivo:       boolean;
+  fhCreate:      string;
 }
 
 export type EstadoOrdenMesa = "abierta" | "cerrada" | "cancelada";

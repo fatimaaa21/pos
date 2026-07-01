@@ -5,7 +5,7 @@ import { MesasClient }       from "./MesasClient";
 import { verificarModuloMesas, obtenerMesasConEstado } from "@/lib/actions/mesas";
 import type {
   Categoria, ProductoConStock,
-  PresentacionConStock, MesaConEstado,
+  PresentacionConStock, MesaConEstado, ConceptoBillar,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
@@ -57,13 +57,23 @@ export default async function MesasPage() {
   // ── Métodos de pago ───────────────────────────────────────────────────────
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("metodosPago, aplicarIva, tipo_negocio, costo_hora_billar")
+    .select("metodosPago, aplicarIva, tipo_negocio")
     .eq("eCodCompany", fkeCodCompany)
     .single();
 
-  const aplicarIva        = negocio?.aplicarIva             ?? true;
-  const tipo_negocio      = (negocio?.tipo_negocio          ?? "general") as "general" | "impresion" | "billar";
-  const costo_hora_billar = (negocio?.costo_hora_billar     ?? null) as number | null;
+  const aplicarIva   = negocio?.aplicarIva    ?? true;
+  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
+
+  let conceptos: ConceptoBillar[] = [];
+  if (tipo_negocio === "billar") {
+    const { data: conceptosData } = await adminClient
+      .from("conceptos_billar")
+      .select("*")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bActivo", true)
+      .order("fhCreate");
+    conceptos = conceptosData ?? [];
+  }
   let metodosPago: MetodoPagoGlobal[] = [];
 
   const idsSeleccionados: string[] = negocio?.metodosPago ?? [];
@@ -186,7 +196,7 @@ export default async function MesasPage() {
       tieneTurno={tieneTurno}
       aplicarIva={aplicarIva}
       tipo_negocio={tipo_negocio}
-      costo_hora_billar={costo_hora_billar}
+      conceptos={conceptos}
     />
   );
 }

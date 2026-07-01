@@ -11,5 +11,6 @@ export type MesaEditorData = {
   e_grid_h:     number;
   t_shape:      "rect" | "circle";
   bStateMesa:   boolean;
+  fkeCodConcepto?: string | null;
   ordenAbierta?: { eCodOrden: string; fhAbierta: string } | null;
 };
