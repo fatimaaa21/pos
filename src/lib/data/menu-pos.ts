@@ -4,7 +4,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Categoria, ProductoConStock,
-  PresentacionConStock, CorteCaja, VentasDelTurno,
+  PresentacionConStock, CorteCaja, VentasDelTurno, ConceptoBillar,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
@@ -25,7 +25,7 @@ export interface DatosMesasPOS {
   metodosPago:       MetodoPagoGlobal[];
   aplicarIva:        boolean;
   tipo_negocio:      "general" | "impresion" | "billar";
-  costo_hora_billar: number | null;
+  conceptos:         ConceptoBillar[];
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -408,7 +408,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
   const [negocioRes, categoriasRes, lotesRes] = await Promise.all([
     adminClient
       .from("negocios")
-      .select("metodosPago, aplicarIva, tipo_negocio, costo_hora_billar")
+      .select("metodosPago, aplicarIva, tipo_negocio")
       .eq("eCodCompany", fkeCodCompany)
       .single(),
     supabase
@@ -431,7 +431,17 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
 
   const aplicarIva: boolean             = negocio?.aplicarIva             ?? true;
   const tipo_negocio                    = (negocio?.tipo_negocio          ?? "general") as "general" | "impresion" | "billar";
-  const costo_hora_billar: number | null = negocio?.costo_hora_billar     ?? null;
+
+  let conceptos: ConceptoBillar[] = [];
+  if (tipo_negocio === "billar") {
+    const { data: conceptosData } = await adminClient
+      .from("conceptos_billar")
+      .select("*")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .eq("bActivo", true)
+      .order("fhCreate");
+    conceptos = conceptosData ?? [];
+  }
 
   // ── Métodos de pago (depende de negocio.metodosPago) ─────────────────────
   let metodosPago: MetodoPagoGlobal[] = [];
@@ -539,6 +549,6 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
     metodosPago,
     aplicarIva,
     tipo_negocio,
-    costo_hora_billar,
+    conceptos,
   };
 }

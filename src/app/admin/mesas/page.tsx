@@ -4,6 +4,7 @@ import { redirect }           from "next/navigation";
 import { getSucursalContext }  from "@/lib/utils/sucursal";
 import { LayoutEditorMesas }    from "./LayoutEditorMesas";
 import type { MesaEditorData } from "./mesas-editor-types";
+import type { ConceptoBillar } from "@/types";
 
 export default async function AdminMesasPage() {
   const supabase    = await createClient();
@@ -35,21 +36,32 @@ export default async function AdminMesasPage() {
 
   const q = adminClient
     .from("mesas")
-    .select("eCodMesa, tNombre, bStateMesa, e_grid_col, e_grid_row, e_grid_w, e_grid_h, t_shape")
+    .select("eCodMesa, tNombre, bStateMesa, e_grid_col, e_grid_row, e_grid_w, e_grid_h, t_shape, fkeCodConcepto")
     .eq("fkeCodCompany", perfil.fkeCodCompany)
     .order("tNombre");
 
   if (ctx.fkeCodSucursal) q.eq("fkeCodSucursal", ctx.fkeCodSucursal);
 
-  // Negocio (tipo y costo de billar)
+  // Negocio (tipo de negocio y métodos de pago)
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("tipo_negocio, costo_hora_billar, metodosPago")
+    .select("tipo_negocio, metodosPago")
     .eq("eCodCompany", perfil.fkeCodCompany)
     .single();
 
-  const tipo_negocio      = (negocio?.tipo_negocio      ?? "general") as "general" | "impresion" | "billar";
-  const costo_hora_billar = (negocio?.costo_hora_billar ?? null) as number | null;
+  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
+
+  // Conceptos de tarifa (solo aplica a negocios billar)
+  let conceptos: ConceptoBillar[] = [];
+  if (tipo_negocio === "billar") {
+    const { data: conceptosData } = await adminClient
+      .from("conceptos_billar")
+      .select("*")
+      .eq("fkeCodCompany", perfil.fkeCodCompany)
+      .eq("bActivo", true)
+      .order("fhCreate");
+    conceptos = conceptosData ?? [];
+  }
 
   // Métodos de pago activos
   const idsMetodos: string[] = negocio?.metodosPago ?? [];
@@ -86,6 +98,7 @@ export default async function AdminMesasPage() {
     e_grid_h:    m.e_grid_h   ?? 1,
     t_shape:     (m.t_shape   ?? "rect") as "rect" | "circle",
     bStateMesa:  m.bStateMesa ?? true,
+    fkeCodConcepto: m.fkeCodConcepto ?? null,
     ordenAbierta: ordenPorMesa.get(m.eCodMesa) ?? null,
   }));
 
@@ -109,7 +122,7 @@ export default async function AdminMesasPage() {
           mesasIniciales={mesasEditor}
           pathRevalidar="/admin/mesas"
           tipo_negocio={tipo_negocio}
-          costo_hora_billar={costo_hora_billar}
+          conceptos={conceptos}
         />
       </div>
     </div>

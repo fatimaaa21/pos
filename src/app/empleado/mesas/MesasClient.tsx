@@ -30,6 +30,7 @@ import type {
   OrdenMesaDetalleConProducto,
   ItemCarritoMenu,
   MetodoPago,
+  ConceptoBillar,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./mesas.module.css";
@@ -48,7 +49,7 @@ interface Props {
   tieneTurno:        boolean;
   aplicarIva:        boolean;
   tipo_negocio:      "general" | "impresion" | "billar";
-  costo_hora_billar: number | null;
+  conceptos:         ConceptoBillar[];
   onCerrarCaja?:     () => void;
 }
 
@@ -61,7 +62,7 @@ function MesaFloorPlan({
   esBillar,
   formatTiempo,
   calcCosto,
-  costo_hora_billar,
+  costoHoraDeMesa,
   onClick,
   onBadgeClick,
 }: {
@@ -70,8 +71,8 @@ function MesaFloorPlan({
   ahora:             Date | null;
   esBillar:          boolean;
   formatTiempo:      (fh: string) => string;
-  calcCosto:         (fh: string) => number;
-  costo_hora_billar: number | null;
+  calcCosto:         (mesa: MesaConEstado, fh: string) => number;
+  costoHoraDeMesa:   (mesa: MesaConEstado) => number | null;
   onClick:           (mesa: MesaConEstado) => void;
   onBadgeClick:      (mesa: MesaConEstado) => void;
 }) {
@@ -132,9 +133,9 @@ function MesaFloorPlan({
                   <span className={styles.floorMesaTimer}>
                     {formatTiempo(fhAbierta)}
                   </span>
-                  {costo_hora_billar != null && (
+                  {costoHoraDeMesa(mesa) != null && (
                     <span className={styles.floorMesaCosto}>
-                      ${calcCosto(fhAbierta).toFixed(2)}
+                      ${calcCosto(mesa, fhAbierta).toFixed(2)}
                     </span>
                   )}
                 </>
@@ -203,7 +204,7 @@ export function MesasClient({
   tieneTurno,
   aplicarIva,
   tipo_negocio,
-  costo_hora_billar,
+  conceptos,
   onCerrarCaja,
 }: Props) {
   const [vista,           setVista]           = useState<Vista>("mesas");
@@ -252,12 +253,20 @@ export function MesasClient({
     return `${String(min).padStart(2,"0")}:${String(seg).padStart(2,"0")}`;
   }, [ahoraEfectivo]);
 
-  const calcCosto = useCallback((fhAbierta: string): number => {
-    if (!costo_hora_billar || !ahoraEfectivo) return 0;
+  const conceptoPorId = new Map(conceptos.map(c => [c.eCodConcepto, c]));
+
+  const costoHoraDeMesa = useCallback((mesa: MesaConEstado): number | null => {
+    if (!mesa.fkeCodConcepto) return null;
+    return conceptoPorId.get(mesa.fkeCodConcepto)?.eCostoHora ?? null;
+  }, [conceptoPorId]);
+
+  const calcCosto = useCallback((mesa: MesaConEstado, fhAbierta: string): number => {
+    const costoHora = costoHoraDeMesa(mesa);
+    if (!costoHora || !ahoraEfectivo) return 0;
     const diff  = Math.max(0, ahoraEfectivo.getTime() - new Date(fhAbierta).getTime());
     const horas = diff / (1000 * 60 * 60);
-    return Math.round(horas * costo_hora_billar * 100) / 100;
-  }, [ahoraEfectivo, costo_hora_billar]);
+    return Math.round(horas * costoHora * 100) / 100;
+  }, [ahoraEfectivo, costoHoraDeMesa]);
 
   // ── Filtros de catálogo ───────────────────────────────────────────────────
   const productosFiltrados = productos.filter((p) => {
@@ -512,7 +521,7 @@ export function MesasClient({
             esBillar={esBillar}
             formatTiempo={formatTiempo}
             calcCosto={calcCosto}
-            costo_hora_billar={costo_hora_billar}
+            costoHoraDeMesa={costoHoraDeMesa}
             onClick={handleClickMesa}
             onBadgeClick={handleBadgeClick}
           />
@@ -606,8 +615,8 @@ export function MesasClient({
         error={errorVenta}
         aplicarIva={aplicarIva}
         cargoExtra={
-          esBillar && fhOrdenActiva
-            ? { label: `Tiempo de mesa (${formatTiempo(fhOrdenActiva)})`, monto: calcCosto(fhOrdenActiva) }
+          esBillar && fhOrdenActiva && mesaActiva
+            ? { label: `Tiempo de mesa (${formatTiempo(fhOrdenActiva)})`, monto: calcCosto(mesaActiva, fhOrdenActiva) }
             : null
         }
       />

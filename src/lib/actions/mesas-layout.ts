@@ -31,6 +31,7 @@ type CrearMesaLayoutInput = {
   e_grid_row: number;
   e_grid_w:   number;
   e_grid_h:   number;
+  fkeCodConcepto?: string | null;
 };
 
 export async function crearMesaLayout(
@@ -58,6 +59,7 @@ export async function crearMesaLayout(
       e_grid_h:       data.e_grid_h,
       bStateMesa:     true,
       fhCreateMesa:   new Date().toISOString(),
+      fkeCodConcepto: data.fkeCodConcepto ?? null,
     })
     .select("eCodMesa")
     .single();
@@ -78,6 +80,7 @@ type PosicionMesa = {
   e_grid_row: number;
   e_grid_w:   number;
   e_grid_h:   number;
+  fkeCodConcepto?: string | null;
 };
 
 export async function guardarLayoutMesas(
@@ -103,6 +106,7 @@ export async function guardarLayoutMesas(
           e_grid_row: m.e_grid_row,
           e_grid_w:   m.e_grid_w,
           e_grid_h:   m.e_grid_h,
+          ...(m.fkeCodConcepto !== undefined ? { fkeCodConcepto: m.fkeCodConcepto } : {}),
         })
         .eq("eCodMesa", m.eCodMesa)
         .eq("fkeCodCompany", perfil.fkeCodCompany)
@@ -198,12 +202,22 @@ export async function abrirMesaLayout(
 
   const { data: mesa } = await adminClient
     .from("mesas")
-    .select("fkeCodCompany, fkeCodSucursal, bStateMesa")
+    .select("fkeCodCompany, fkeCodSucursal, bStateMesa, fkeCodConcepto")
     .eq("eCodMesa", eCodMesa)
     .single();
 
   if (!mesa || mesa.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (!mesa.bStateMesa) return { error: "Activa la mesa antes de abrirla" };
+
+  const { data: negocioMesa } = await adminClient
+    .from("negocios")
+    .select("tipo_negocio")
+    .eq("eCodCompany", perfil.fkeCodCompany)
+    .single();
+
+  if (negocioMesa?.tipo_negocio === "billar" && !mesa.fkeCodConcepto) {
+    return { error: "Asigna un concepto de tarifa a la mesa antes de abrirla" };
+  }
 
   const { data: yaAbierta } = await adminClient
     .from("ordenes_mesa")

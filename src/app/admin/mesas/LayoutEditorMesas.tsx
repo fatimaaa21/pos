@@ -13,9 +13,10 @@ import {
 } from "@/lib/actions/mesas-layout";
 import styles from "./LayoutEditorMesas.module.css";
 import type { MesaEditorData } from "./mesas-editor-types";
+import type { ConceptoBillar } from "@/types";
 
 const COLS = 10;
-const ROWS = 8;
+const ROWS = 6;
 
 // MesaEditorData imported from ./mesas-editor-types
 
@@ -23,10 +24,10 @@ interface Props {
   mesasIniciales:   MesaEditorData[];
   pathRevalidar:    string;
   tipo_negocio:     "general" | "impresion" | "billar";
-  costo_hora_billar: number | null;
+  conceptos:        ConceptoBillar[];
 }
 
-export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio, costo_hora_billar }: Props) {
+export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio, conceptos }: Props) {
   const [mesas,      setMesas]      = useState<MesaEditorData[]>(mesasIniciales);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -41,6 +42,13 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
 
   const esBillar = tipo_negocio === "billar";
   const [ahora, setAhora] = useState<Date | null>(null);
+
+  const conceptoPorId = new Map(conceptos.map(c => [c.eCodConcepto, c]));
+
+  function costoHoraDeMesa(mesa: MesaEditorData): number | null {
+    if (!mesa.fkeCodConcepto) return null;
+    return conceptoPorId.get(mesa.fkeCodConcepto)?.eCostoHora ?? null;
+  }
 
   useEffect(() => {
     setAhora(new Date());
@@ -58,10 +66,11 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
     return [h, min, seg].map(n => String(n).padStart(2, "0")).join(":");
   }
 
-  function calcCosto(fhAbierta: string): number {
-    if (!costo_hora_billar || !ahora) return 0;
+  function calcCosto(mesa: MesaEditorData, fhAbierta: string): number {
+    const costoHora = costoHoraDeMesa(mesa);
+    if (!costoHora || !ahora) return 0;
     const diff  = Math.max(0, ahora.getTime() - new Date(fhAbierta).getTime());
-    return Math.round((diff / 3600000) * costo_hora_billar * 100) / 100;
+    return Math.round((diff / 3600000) * costoHora * 100) / 100;
   }
 
   const canvasRef  = useRef<HTMLDivElement>(null);
@@ -310,9 +319,13 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
     if (!pos) { toast.error("No hay espacio disponible"); return; }
     setAgregando(true);
     const tNombre = `M${mesas.length + 1}`;
+    // En negocios billar la mesa nace sin concepto asignado — se elige en
+    // "Mesa seleccionada". El toggle "Mesa abierta" queda bloqueado hasta
+    // que se asigne, para no cobrar con una tarifa adivinada.
     const result  = await crearMesaLayout({
       tNombre, t_shape: shape,
       e_grid_col: pos.col, e_grid_row: pos.row, e_grid_w: 1, e_grid_h: 1,
+      fkeCodConcepto: null,
     });
     setAgregando(false);
     if ("error" in result) { toast.error(result.error); return; }
@@ -325,10 +338,17 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
       e_grid_w:    1,
       e_grid_h:    1,
       bStateMesa:  true,
+      fkeCodConcepto: null,
       ordenAbierta: null,
     }]);
     setSelectedId(result.eCodMesa);
-    toast.success("Mesa creada");
+    if (esBillar) {
+      toast.success(conceptos.length
+        ? "Mesa creada — asigna su tarifa en el panel"
+        : "Mesa creada — primero configura un concepto de tarifa en Configuración");
+    } else {
+      toast.success("Mesa creada");
+    }
   }
 
   // ── Redimensionar ─────────────────────────────────────────────────────────
@@ -380,6 +400,13 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
     );
   }
 
+  // ── Cambiar concepto de tarifa (solo billar) ────────────────────────────────
+
+  function cambiarConcepto(fkeCodConcepto: string) {
+    setMesas(prev => prev.map(m => m.eCodMesa === selectedId ? { ...m, fkeCodConcepto } : m));
+    setHayCambios(true);
+  }
+
   // ── Guardar ───────────────────────────────────────────────────────────────
 
   async function guardar() {
@@ -390,6 +417,7 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
         eCodMesa: m.eCodMesa, tNombre: m.tNombre,
         e_grid_col: m.e_grid_col, e_grid_row: m.e_grid_row,
         e_grid_w: m.e_grid_w,    e_grid_h: m.e_grid_h,
+        fkeCodConcepto: esBillar ? (m.fkeCodConcepto ?? null) : undefined,
       })),
       pathRevalidar
     );
@@ -482,9 +510,9 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
                   {formatTiempo(mesa.ordenAbierta.fhAbierta)}
                 </span>
               )}
-              {mesa.ordenAbierta && esBillar && costo_hora_billar && (
+              {mesa.ordenAbierta && esBillar && costoHoraDeMesa(mesa) && (
                 <span className={styles.mesaCostoCard}>
-                  ${calcCosto(mesa.ordenAbierta.fhAbierta).toFixed(2)}
+                  ${calcCosto(mesa, mesa.ordenAbierta.fhAbierta).toFixed(2)}
                 </span>
               )}
             </div>
@@ -520,6 +548,37 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
                 <span className={styles.sizeVal}>{mesaSeleccionada.e_grid_h}</span>
                 <button className={styles.btnSize} onClick={() => cambiarTamano("e_grid_h", 1)}><Plus size={12} /></button>
               </div>
+
+              {esBillar && (
+                <div style={{ marginTop: 10 }}>
+                  <span className={styles.sizeLabel} style={{ display: "block", marginBottom: 4 }}>
+                    Se cobra como
+                  </span>
+                  {conceptos.length === 0 ? (
+                    <p style={{ fontSize: 11, color: "var(--color-error)", margin: 0 }}>
+                      No hay conceptos configurados. Ve a Configuración → Costos.
+                    </p>
+                  ) : (
+                    <select
+                      className={styles.nameInput}
+                      value={mesaSeleccionada.fkeCodConcepto ?? ""}
+                      onChange={e => cambiarConcepto(e.target.value)}
+                    >
+                      <option value="" disabled>Selecciona un concepto</option>
+                      {conceptos.map(c => (
+                        <option key={c.eCodConcepto} value={c.eCodConcepto}>
+                          {c.tNombre} - ${c.eCostoHora.toFixed(2)}/hr
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {!mesaSeleccionada.fkeCodConcepto && conceptos.length > 0 && (
+                    <p style={{ fontSize: 11, color: "var(--gray)", margin: "4px 0 0" }}>
+                      Sin tarifa asignada — no se puede abrir hasta elegir una.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Acciones */}
@@ -548,7 +607,13 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
                 <div>
                   <p className={styles.switchLabel}>Mesa abierta</p>
                   <p className={styles.switchDesc}>
-                    {mesaSeleccionada.ordenAbierta ? "En curso" : "Inicia el tiempo al abrir"}
+                    {mesaSeleccionada.ordenAbierta
+                      ? "En curso"
+                      : esBillar && !mesaSeleccionada.fkeCodConcepto
+                        ? "Asigna y guarda un concepto primero"
+                        : esBillar && hayCambios
+                          ? "Guarda el layout antes de abrir"
+                          : "Inicia el tiempo al abrir"}
                   </p>
                 </div>
                 <button
@@ -565,7 +630,11 @@ export function LayoutEditorMesas({ mesasIniciales, pathRevalidar, tipo_negocio,
                       abrirMesa(mesaSeleccionada.eCodMesa);
                     }
                   }}
-                  disabled={abriendo || cerrando || !mesaSeleccionada.bStateMesa}
+                  disabled={
+                    abriendo || cerrando || !mesaSeleccionada.bStateMesa ||
+                    (esBillar && !mesaSeleccionada.ordenAbierta &&
+                      (!mesaSeleccionada.fkeCodConcepto || hayCambios))
+                  }
                 />
               </div>
 
