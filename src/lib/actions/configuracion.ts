@@ -14,8 +14,10 @@ export interface ConfigNegocio {
   zona_horaria:     string;
   aplicarIva:       boolean;
   tipo_negocio:     "general" | "impresion" | "billar";
-  costo_hora_billar: number | null;
   // metodosPago se gestiona por separado en metodos-pago.ts
+  // El precio por hora de billar/dominó/etc. se gestiona en conceptos_billar,
+  // no aquí — costo_hora_billar era un campo legacy de un solo precio global
+  // que no distinguía entre conceptos y ya no se lee en ningún cálculo.
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -36,7 +38,7 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
 
     const { data: negocio } = await supabase
       .from("negocios")
-      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria, aplicarIva, tipo_negocio, costo_hora_billar")
+      .select("eCodCompany, tNameCompany, imgCompany, moneda, zona_horaria, aplicarIva, tipo_negocio")
       .eq("eCodCompany", perfil.fkeCodCompany)
       .single();
 
@@ -51,7 +53,6 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
       // Si la columna no existe aún en DB, el valor vendrá como null → default true
       aplicarIva:        negocio.aplicarIva        ?? true,
       tipo_negocio:      (negocio.tipo_negocio     ?? "general") as "general" | "impresion" | "billar",
-      costo_hora_billar: negocio.costo_hora_billar ?? null,
     };
   } catch {
     return null;
@@ -77,23 +78,20 @@ export async function guardarConfigNegocio(formData: FormData) {
 
     if (!perfil?.fkeCodCompany) return { error: "Negocio no encontrado" };
 
-    const tNameCompany     = formData.get("tNameCompany")     as string;
-    const imgCompany       = formData.get("imgCompany")       as string;
-    const moneda           = formData.get("moneda")           as string;
-    const zona_horaria     = formData.get("zona_horaria")     as string;
-    const aplicarIva       = formData.get("aplicarIva") === "true";
-    const costoHoraRaw     = formData.get("costo_hora_billar") as string | null;
-    const costo_hora_billar = costoHoraRaw ? parseFloat(costoHoraRaw) : null;
+    const tNameCompany = formData.get("tNameCompany") as string;
+    const imgCompany   = formData.get("imgCompany")   as string;
+    const moneda       = formData.get("moneda")       as string;
+    const zona_horaria = formData.get("zona_horaria") as string;
+    const aplicarIva   = formData.get("aplicarIva") === "true";
 
     const { error } = await adminClient
       .from("negocios")
       .update({
         tNameCompany,
-        imgCompany:        imgCompany || null,
+        imgCompany: imgCompany || null,
         moneda,
         zona_horaria,
         aplicarIva,
-        costo_hora_billar: costo_hora_billar ?? null,
       })
       .eq("eCodCompany", perfil.fkeCodCompany);
 

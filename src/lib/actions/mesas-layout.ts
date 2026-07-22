@@ -31,7 +31,6 @@ type CrearMesaLayoutInput = {
   e_grid_row: number;
   e_grid_w:   number;
   e_grid_h:   number;
-  fkeCodConcepto?: string | null;
 };
 
 export async function crearMesaLayout(
@@ -59,7 +58,6 @@ export async function crearMesaLayout(
       e_grid_h:       data.e_grid_h,
       bStateMesa:     true,
       fhCreateMesa:   new Date().toISOString(),
-      fkeCodConcepto: data.fkeCodConcepto ?? null,
     })
     .select("eCodMesa")
     .single();
@@ -80,7 +78,6 @@ type PosicionMesa = {
   e_grid_row: number;
   e_grid_w:   number;
   e_grid_h:   number;
-  fkeCodConcepto?: string | null;
 };
 
 export async function guardarLayoutMesas(
@@ -106,7 +103,6 @@ export async function guardarLayoutMesas(
           e_grid_row: m.e_grid_row,
           e_grid_w:   m.e_grid_w,
           e_grid_h:   m.e_grid_h,
-          ...(m.fkeCodConcepto !== undefined ? { fkeCodConcepto: m.fkeCodConcepto } : {}),
         })
         .eq("eCodMesa", m.eCodMesa)
         .eq("fkeCodCompany", perfil.fkeCodCompany)
@@ -188,6 +184,48 @@ export async function toggleMesaLayout(
   return { ok: true };
 }
 
+// ── Cambiar el concepto de cobro de una mesa ──────────────────────────────────
+// Se guarda de inmediato, igual que toggleMesaLayout — no se acumula con los
+// cambios de posición/tamaño que espera al botón "Guardar layout".
+// NOTA: no afecta segmentos_tiempo ya creados (cada segmento copia el concepto
+// de la mesa al momento en que se abre, no lo referencia en vivo) — pero si la
+// mesa está abierta ahora mismo y se cambia el concepto, el segmento actual
+// sigue cobrando con el concepto viejo hasta que se cierre o se abra uno nuevo
+// (ej. vía "+ Agregar jugador"). No se bloquea el cambio mientras está abierta,
+// pero puede ser confuso para el admin si no lo sabe.
+
+export async function actualizarConceptoMesaLayout(
+  eCodMesa: string,
+  fkeCodConcepto: string | null
+): Promise<{ error: string } | { ok: true }> {
+  const perfil = await getPerfilActual();
+  if (!perfil) return { error: "No autenticado" };
+  if (perfil.tRolUser !== "admin") return { error: "No autorizado" };
+
+  const adminClient = createAdminClient();
+
+  if (fkeCodConcepto) {
+    const { data: concepto } = await adminClient
+      .from("conceptos_billar")
+      .select("fkeCodCompany")
+      .eq("eCodConcepto", fkeCodConcepto)
+      .single();
+
+    if (!concepto || concepto.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "Concepto no encontrado o sin acceso" };
+    }
+  }
+
+  const { error } = await adminClient
+    .from("mesas")
+    .update({ fkeCodConcepto })
+    .eq("eCodMesa", eCodMesa)
+    .eq("fkeCodCompany", perfil.fkeCodCompany);
+
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
 // ── Abrir mesa desde el editor de layout ─────────────────────────────────────
 // Misma lógica que abrirOrdenMesa del empleado, accesible para el admin.
 
@@ -202,22 +240,12 @@ export async function abrirMesaLayout(
 
   const { data: mesa } = await adminClient
     .from("mesas")
-    .select("fkeCodCompany, fkeCodSucursal, bStateMesa, fkeCodConcepto")
+    .select("fkeCodCompany, fkeCodSucursal, bStateMesa")
     .eq("eCodMesa", eCodMesa)
     .single();
 
   if (!mesa || mesa.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (!mesa.bStateMesa) return { error: "Activa la mesa antes de abrirla" };
-
-  const { data: negocioMesa } = await adminClient
-    .from("negocios")
-    .select("tipo_negocio")
-    .eq("eCodCompany", perfil.fkeCodCompany)
-    .single();
-
-  if (negocioMesa?.tipo_negocio === "billar" && !mesa.fkeCodConcepto) {
-    return { error: "Asigna un concepto de tarifa a la mesa antes de abrirla" };
-  }
 
   const { data: yaAbierta } = await adminClient
     .from("ordenes_mesa")
