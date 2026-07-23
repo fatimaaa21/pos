@@ -7,7 +7,8 @@ import { obtenerModulosNegocio, toggleModuloNegocio } from "@/lib/actions/sistem
 import type { NegocioConAdmin } from "./NegociosClient";
 
 const LABEL: Record<string, string> = {
-  mesas: "Layout de mesas",
+  mesas:  "Layout de mesas",
+  cocina: "Cocina",
 };
 
 interface Props {
