@@ -42,7 +42,7 @@ export default async function AdminMesasPage() {
 
   if (ctx.fkeCodSucursal) q.eq("fkeCodSucursal", ctx.fkeCodSucursal);
 
-  // Negocio (tipo de negocio y métodos de pago)
+  // Negocio (tipo de negocio; el costo de billar ya no vive aquí, ver conceptos_billar)
   const { data: negocio } = await adminClient
     .from("negocios")
     .select("tipo_negocio, metodosPago")
@@ -51,7 +51,6 @@ export default async function AdminMesasPage() {
 
   const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
 
-  // Conceptos de tarifa (solo aplica a negocios billar)
   let conceptos: ConceptoBillar[] = [];
   if (tipo_negocio === "billar") {
     const { data: conceptosData } = await adminClient

@@ -26,6 +26,10 @@ interface SucursalConToken extends Sucursal {
 
 interface Props {
   sucursalesIniciales: SucursalConToken[];
+  // Si el módulo "cocina" está desactivado para este negocio, la URL no se
+  // muestra aquí — antes esta pantalla mostraba el botón solo con base en
+  // si existía tTokenCocina, ignorando por completo modulos_tenant.
+  moduloCocinaActivo: boolean;
 }
 
 const OPCIONES_ESTADO = [
@@ -84,7 +88,7 @@ function BtnCopiarUrl({ token }: { token: string }) {
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
+export function SucursalesAdminClient({ sucursalesIniciales, moduloCocinaActivo }: Props) {
   const [sucursales,   setSucursales]   = useState(sucursalesIniciales);
   const [modalCrear,   setModalCrear]   = useState(false);
   const [sucursalEdit, setSucursalEdit] = useState<SucursalConToken | null>(null);
@@ -252,7 +256,11 @@ export function SucursalesAdminClient({ sucursalesIniciales }: Props) {
       key: "cocina" as any,
       label: "Pantalla cocina",
       render: (s) =>
-        s.tTokenCocina ? (
+        !moduloCocinaActivo ? (
+          <span style={{ fontSize: 12, color: "var(--gray)" }} title="Activa el módulo de cocina desde Sistemas → Negocios">
+            Módulo desactivado
+          </span>
+        ) : s.tTokenCocina ? (
           <BtnCopiarUrl token={s.tTokenCocina} />
         ) : (
           <span style={{ fontSize: 12, color: "var(--gray)" }}>—</span>

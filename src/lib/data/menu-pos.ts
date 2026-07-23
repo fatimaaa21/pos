@@ -4,7 +4,8 @@ import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type {
   Categoria, ProductoConStock,
-  PresentacionConStock, CorteCaja, VentasDelTurno, ConceptoBillar,
+  PresentacionConStock, CorteCaja, VentasDelTurno,
+  ConceptoBillar,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 
@@ -429,8 +430,8 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
   const categorias     = categoriasRes.data;
   const lotes          = lotesRes.data;
 
-  const aplicarIva: boolean             = negocio?.aplicarIva             ?? true;
-  const tipo_negocio                    = (negocio?.tipo_negocio          ?? "general") as "general" | "impresion" | "billar";
+  const aplicarIva: boolean = negocio?.aplicarIva    ?? true;
+  const tipo_negocio        = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
 
   let conceptos: ConceptoBillar[] = [];
   if (tipo_negocio === "billar") {

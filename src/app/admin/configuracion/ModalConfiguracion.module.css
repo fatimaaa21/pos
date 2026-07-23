@@ -322,6 +322,25 @@
   line-height: 1.5;
 }
 
+/* ── Botones de acción ── */
+.actionBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--gray);
+}
+
+.actionBtnDanger {
+  color: var(--color-error);
+}
+
 /* ── Feedback ── */
 .errorBox {
   display: flex;

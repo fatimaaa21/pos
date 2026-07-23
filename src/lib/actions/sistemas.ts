@@ -246,7 +246,12 @@ export async function eliminarNegocio(eCodCompany: string) {
 }
 
 // ── Módulos por negocio ───────────────────────────────────────────────────────
-
+// "cocina" es un módulo independiente de "mesas" — un pedido puede mandarse
+// a cocina sin que el negocio tenga layout de mesas activo. Estuvo ausente
+// de este arreglo (causa desconocida, sin evidencia de cuándo ni por qué se
+// quitó) — se restaura aquí porque el usuario confirma que existía y que es
+// independiente, no porque se haya podido verificar con certeza el motivo
+// original de su ausencia.
 const MODULOS_DISPONIBLES = ["mesas", "cocina"] as const;
 export type ModuloDisponible = typeof MODULOS_DISPONIBLES[number];
 

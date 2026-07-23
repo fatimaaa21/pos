@@ -176,8 +176,8 @@ export function MenuClient({
       aplicarIva,
     );
 
-    if (result.error) { setErrorVenta(result.error); return; }
-    setVentaExitosa(result.eCodVenta!);
+    if ("error" in result) { setErrorVenta(result.error ?? "Error desconocido"); return; }
+    setVentaExitosa(result.eCodVenta);
   }
 
   function handleNuevoPedido() {

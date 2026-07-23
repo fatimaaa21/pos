@@ -15,6 +15,22 @@ async function validarToken(token: string) {
     .single()
 
   if (error || !data) return null
+
+  // Mismo chequeo que ya se aplica en /cocina/[token]/page.tsx (la vista),
+  // pero aquí — porque el navegador de cocina sigue haciendo polling directo
+  // contra esta API cada 8s aunque la pestaña ya esté abierta desde antes de
+  // que se apague el módulo. Sin esto, alguien con la pantalla ya cargada
+  // seguiría viendo pedidos en tiempo real después de desactivar el módulo,
+  // sin importar que la página en sí ya esté bloqueada para cargas nuevas.
+  const { data: modulo } = await supabase
+    .from('modulos_tenant')
+    .select('bStateModulo')
+    .eq('fkeCodCompany', data.fkeCodCompany)
+    .eq('tModulo', 'cocina')
+    .maybeSingle()
+
+  if (modulo?.bStateModulo !== true) return null
+
   return data
 }
 

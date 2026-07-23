@@ -320,6 +320,10 @@ export interface MesaConEstado extends Mesa {
   ordenAbierta?: OrdenMesa | null;
   /** Número de items con tEstadoCocina = 'listo' en la orden abierta */
   itemsListos?:  number;
+  /** Segmento de tiempo más reciente de la orden abierta — null si fhFin
+   * está definido significa que el timer está congelado ahí (ej. tras
+   * "Terminar de jugar"), no que siga corriendo. */
+  segmentoActivo?: { fhInicio: string; fhFin: string | null } | null;
 }
 
 // Vista enriquecida para el detalle de una orden
