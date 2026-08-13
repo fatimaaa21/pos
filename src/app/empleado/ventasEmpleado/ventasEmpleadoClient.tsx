@@ -14,6 +14,13 @@ import styles from "./ventasEmpleado.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+interface CargoTiempoVenta {
+  eCodCargo:   string;
+  fkeCodVenta: string;
+  tConcepto:   string;
+  eMonto:      number;
+}
+
 interface Venta {
   eCodVenta:            string;
   eTotal:               number;
@@ -21,6 +28,8 @@ interface Venta {
   fhCreateVenta:        string;
   bCancelada?:          boolean;
   tMotivoCancelacion?:  string | null;
+  eCostoTiempoMesa?:    number | null;
+  cargos_tiempo:        CargoTiempoVenta[];
   detalle_venta:        DetalleVentaConProducto[];
 }
 
@@ -261,6 +270,24 @@ export function VentasEmpleadoClient({
                       <div className={styles.masProductos}>
                         +{venta.detalle_venta.length - 4} más...
                       </div>
+                    )}
+
+                    {venta.cargos_tiempo.length > 0 ? (
+                      venta.cargos_tiempo.map((c) => (
+                        <div key={c.eCodCargo} className={styles.cardDetalleRow}>
+                          <span className={styles.cantidad}>—</span>
+                          <span className={styles.nombre}>Tiempo {c.tConcepto}</span>
+                          <span className={styles.precio}>${c.eMonto.toFixed(2)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      !!venta.eCostoTiempoMesa && (
+                        <div className={styles.cardDetalleRow}>
+                          <span className={styles.cantidad}>—</span>
+                          <span className={styles.nombre}>Tiempo</span>
+                          <span className={styles.precio}>${venta.eCostoTiempoMesa.toFixed(2)}</span>
+                        </div>
+                      )
                     )}
                   </div>
                 )}

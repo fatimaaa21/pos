@@ -105,6 +105,24 @@ export function ModalVerVenta({ venta, metodosPago, aplicarIva, onClose }: Props
             <span className={styles.modalPrecio}>${d.ePrecioUnitario.toFixed(2)}</span>
           </div>
         ))}
+
+        {venta.cargos_tiempo.length > 0 ? (
+          venta.cargos_tiempo.map((c) => (
+            <div key={c.eCodCargo} className={styles.modalDetalleRow}>
+              <span className={styles.modalCantidad}>—</span>
+              <span className={styles.modalNombre}>Tiempo {c.tConcepto}</span>
+              <span className={styles.modalPrecio}>${c.eMonto.toFixed(2)}</span>
+            </div>
+          ))
+        ) : (
+          !!venta.eCostoTiempoMesa && (
+            <div className={styles.modalDetalleRow}>
+              <span className={styles.modalCantidad}>—</span>
+              <span className={styles.modalNombre}>Tiempo</span>
+              <span className={styles.modalPrecio}>${venta.eCostoTiempoMesa.toFixed(2)}</span>
+            </div>
+          )
+        )}
       </div>
 
       {/* Totales */}

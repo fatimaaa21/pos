@@ -24,13 +24,21 @@ interface Detalle {
   presentacion:      { tNombre: string }      | null;
 }
 
+interface CargoTiempo {
+  eCodCargo: string;
+  tConcepto: string;
+  eMonto:    number;
+}
+
 interface Props {
   venta: {
-    eCodVenta:     string;
-    eTotal:        number;
-    fhCreateVenta: string;
+    eCodVenta:        string;
+    eTotal:           number;
+    fhCreateVenta:    string;
+    eCostoTiempoMesa: number | null;
   };
   detalles:       Detalle[];
+  cargosTiempo:   CargoTiempo[];
   negocio: {
     tNameCompany: string;
     imgCompany:   string | null;
@@ -53,6 +61,7 @@ function Sep({ doble = false }: { doble?: boolean }) {
 export function TicketClient({
   venta,
   detalles,
+  cargosTiempo,
   negocio,
   metodoPago,
   empleadoNombre,
@@ -198,6 +207,26 @@ export function TicketClient({
             </div>
           );
         })}
+
+        {cargosTiempo.length > 0 ? (
+          cargosTiempo.map((c) => (
+            <div key={c.eCodCargo} className={styles.item}>
+              <div className={styles.itemNombreFila}>
+                <div className={styles.itemNombre}>Tiempo {c.tConcepto}</div>
+                <span className={styles.itemSubtotal}>{fmt(c.eMonto)}</span>
+              </div>
+            </div>
+          ))
+        ) : (
+          !!venta.eCostoTiempoMesa && (
+            <div className={styles.item}>
+              <div className={styles.itemNombreFila}>
+                <div className={styles.itemNombre}>Tiempo</div>
+                <span className={styles.itemSubtotal}>{fmt(venta.eCostoTiempoMesa)}</span>
+              </div>
+            </div>
+          )
+        )}
 
         <Sep />
 

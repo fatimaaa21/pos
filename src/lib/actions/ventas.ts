@@ -17,12 +17,18 @@ interface ItemVenta {
   eLargoCm?:         number;
 }
 
+/** Cargo de tiempo de un concepto (billar, dominó, etc). Monto ya incluye IVA si aplica. */
+export interface CargoTiempo {
+  tConcepto: string;
+  eMonto:    number;
+}
+
 export async function crearVenta(
   items: ItemVenta[],
   fkeMetodoPago: MetodoPago,
   aplicarIva: boolean = true,
-  /** Cargo adicional por tiempo de mesa (billar). Ya incluye IVA si aplica. */
-  extraCharge: number = 0,
+  /** Cargos por tiempo de mesa, uno por concepto (billar, dominó, etc). */
+  cargosTiempo: CargoTiempo[] = [],
 ) {
   try {
     const supabase    = await createClient();
@@ -199,7 +205,8 @@ export async function crearVenta(
 
     // ── Total ─────────────────────────────────────────────────────────────────
     const eTotalProductos = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
-    const eTotal          = eTotalProductos + extraCharge;
+    const extraCharge     = cargosTiempo.reduce((acc, c) => acc + c.eMonto, 0);
+    const eTotal           = eTotalProductos + extraCharge;
 
     // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient
@@ -241,6 +248,29 @@ export async function crearVenta(
     if (detalleError) {
       await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
       return { error: `Error al guardar detalle: ${detalleError.message}` };
+    }
+
+    // ── Cargos de tiempo por concepto (billar, dominó, etc) ────────────────────
+    if (cargosTiempo.length > 0) {
+      const filasCargos = cargosTiempo
+        .filter((c) => c.eMonto > 0)
+        .map((c) => ({
+          fkeCodVenta: venta.eCodVenta,
+          tConcepto:   c.tConcepto,
+          eMonto:      c.eMonto,
+        }));
+
+      if (filasCargos.length > 0) {
+        const { error: cargosError } = await adminClient
+          .from("venta_cargos_tiempo")
+          .insert(filasCargos);
+
+        if (cargosError) {
+          await adminClient.from("detalle_venta").delete().eq("fkeCodVenta", venta.eCodVenta);
+          await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
+          return { error: `Error al guardar cargo de tiempo: ${cargosError.message}` };
+        }
+      }
     }
 
     // ── Fase 2: actualizar inventario (solo productos por unidad) ─────────────
