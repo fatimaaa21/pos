@@ -252,7 +252,7 @@ export async function eliminarNegocio(eCodCompany: string) {
 // quitó) — se restaura aquí porque el usuario confirma que existía y que es
 // independiente, no porque se haya podido verificar con certeza el motivo
 // original de su ausencia.
-const MODULOS_DISPONIBLES = ["mesas", "cocina"] as const;
+const MODULOS_DISPONIBLES = ["mesas", "cocina", "insumos"] as const;
 export type ModuloDisponible = typeof MODULOS_DISPONIBLES[number];
 
 export async function obtenerModulosNegocio(

@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { LayoutGrid, ChefHat } from "lucide-react";
+import { LayoutGrid, ChefHat, ShoppingBasket } from "lucide-react";
 import { Modal }         from "@/components/ui/Modal";
 import { obtenerModulosNegocio, toggleModuloNegocio } from "@/lib/actions/sistemas";
 import type { NegocioConAdmin } from "./NegociosClient";
-
+ 
 const LABEL: Record<string, string> = {
-  mesas: "Layout de mesas",
+  mesas:   "Layout de mesas",
   cocina:  "Pantalla de cocina",
+  insumos: "Insumos y recetas",
 };
 
 interface Props {
@@ -67,8 +68,10 @@ export function ModalModulosNegocio({ negocio, onClose }: Props) {
             >
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
                 {m.tModulo === "cocina"
-                  ? <ChefHat   size={16} color={m.bStateModulo ? "var(--color-primary)" : "var(--gray)"} />
-                  : <LayoutGrid size={16} color={m.bStateModulo ? "var(--color-primary)" : "var(--gray)"} />
+                  ? <ChefHat        size={16} color={m.bStateModulo ? "var(--color-primary)" : "var(--gray)"} />
+                  : m.tModulo === "insumos"
+                  ? <ShoppingBasket  size={16} color={m.bStateModulo ? "var(--color-primary)" : "var(--gray)"} />
+                  : <LayoutGrid      size={16} color={m.bStateModulo ? "var(--color-primary)" : "var(--gray)"} />
                 }
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)", margin: 0 }}>

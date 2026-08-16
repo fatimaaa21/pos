@@ -14,6 +14,8 @@ import {
   Users, LogOut, ClipboardList, ClipboardPenLine,
   Building2, Settings, ChevronUp, CircleDollarSign,
   Calculator, Menu, X, LayoutGrid, MapPin, ChevronDown,
+  ShoppingBasket,
+  ChefHat,
 } from "lucide-react";
 
 function buildNavAdmin(modulosActivos: string[]) {
@@ -27,10 +29,14 @@ function buildNavAdmin(modulosActivos: string[]) {
     { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
     { icon: MapPin,           label: "Sucursales",      href: "/admin/sucursales" },
     { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
-
+ 
   ];
   if (modulosActivos.includes("mesas")) {
     nav.push({ icon: LayoutGrid, label: "Mesas", href: "/admin/mesas" });
+  }
+  if (modulosActivos.includes("insumos")) {
+    nav.push({ icon: ShoppingBasket, label: "Insumos", href: "/admin/insumos" });
+    nav.push({ icon: ChefHat,        label: "Recetas", href: "/admin/insumos/recetas" });
   }
   return nav;
 }

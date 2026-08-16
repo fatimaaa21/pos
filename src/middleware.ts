@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
-import { NextResponse, type NextRequest } from "next/server";
+  import { createAdminClient } from "@/lib/supabase/admin";
+  import { NextResponse, type NextRequest } from "next/server";
 
 const RUTAS_PUBLICAS = ["/auth", "/conoce-kivi", "/cocina", "/api/cocina"];
 
@@ -11,6 +12,7 @@ function esRutaPublica(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
 
   let supabaseResponse = NextResponse.next({ request });
 
@@ -54,8 +56,22 @@ export async function middleware(request: NextRequest) {
 
   if (user && pathname.startsWith("/admin")) {
     const { data: perfil } = await supabase
-      .from("perfiles").select("tRolUser").eq("eCodUser", user.id).single();
+      .from("perfiles").select("tRolUser, fkeCodCompany").eq("eCodUser", user.id).single();
     if (perfil?.tRolUser !== "admin") return NextResponse.redirect(new URL("/empleado/menu", request.url));
+ 
+    if (pathname.startsWith("/admin/insumos") && perfil.fkeCodCompany) {
+      const adminClient = createAdminClient();
+      const { data: modulo } = await adminClient
+        .from("modulos_tenant")
+        .select("bStateModulo")
+        .eq("fkeCodCompany", perfil.fkeCodCompany)
+        .eq("tModulo", "insumos")
+        .maybeSingle();
+ 
+      if (!modulo?.bStateModulo) {
+        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+      }
+    }
   }
 
   return supabaseResponse;

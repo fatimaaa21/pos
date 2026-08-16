@@ -1,0 +1,42 @@
+/* Botones de acción — mismas clases que productos.module.css */
+.actionBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--gray);
+}
+
+.actionBtnDanger {
+  color: var(--color-error);
+}
+
+/* Texto de conversión en la tabla */
+.conversion {
+  font-size: 13px;
+  color: var(--gray);
+}
+
+/* Link secundario para "agregar insumo existente" — menos prominente
+   a propósito que el botón principal de PageHeader */
+.linkAgregarExistente {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--color-primary, #628321);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 0 16px 0;
+}
+
+.linkAgregarExistente:hover {
+  text-decoration: underline;
+}
