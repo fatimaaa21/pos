@@ -17,10 +17,13 @@ export default async function InsumosPage() {
 
   const fkeCodCompany = perfilActual?.fkeCodCompany;
 
-  const [ctx, sucursalesData, insumos] = await Promise.all([
+  const [ctx, sucursalesData, insumos, negocioData] = await Promise.all([
     getSucursalContext(),
     obtenerSucursales(),
     getInsumos(),
+    fkeCodCompany
+      ? supabase.from("negocios").select("tNameCompany, imgCompany").eq("eCodCompany", fkeCodCompany).single()
+      : Promise.resolve({ data: null }),
   ]);
 
   const sucursales = sucursalesData.map((s: Sucursal) => ({
@@ -34,6 +37,8 @@ export default async function InsumosPage() {
       fkeCodCompany={fkeCodCompany}
       fkeCodSucursal={ctx.fkeCodSucursal} // null = admin viendo "todas las sucursales"
       sucursales={sucursales}
+      negocioNombre={negocioData.data?.tNameCompany ?? "Negocio"}
+      negocioLogoUrl={negocioData.data?.imgCompany ?? null}
     />
   );
 }

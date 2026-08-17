@@ -280,20 +280,28 @@ export async function editarInsumo(formData: FormData) {
 
 // ── AJUSTE MANUAL DE STOCK ───────────────────────────────────────────────────
 // Solo toca insumos_stock — el maestro no participa en cantidades.
+// tMotivo es obligatorio: sin él, el historial de ajustes no sirve para
+// auditoría, solo son números sueltos sin explicación.
 
 export async function ajustarStockInsumo(formData: FormData) {
   try {
+    const supabase    = await createClient();
     const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
 
     const eCodInsumoStock = formData.get("eCodInsumoStock") as string;
     const eCantAgregar    = parseFloat(formData.get("eCantAgregar") as string);
+    const tMotivo         = (formData.get("tMotivo") as string)?.trim();
 
     if (!eCodInsumoStock) return { error: "Insumo no especificado" };
-    if (isNaN(eCantAgregar)) return { error: "Cantidad inválida" };
+    if (isNaN(eCantAgregar) || eCantAgregar === 0) return { error: "Cantidad inválida" };
+    if (!tMotivo) return { error: "El motivo del ajuste es obligatorio" };
 
     const { data: actual, error: errorLectura } = await adminClient
       .from("insumos_stock")
-      .select("eCantidadStock, fkeCodInsumoMaestro")
+      .select("eCantidadStock, fkeCodInsumoMaestro, fkeCodSucursal, insumos_maestro(tNombre, tUnidadReceta)")
       .eq("eCodInsumoStock", eCodInsumoStock)
       .single();
 
@@ -314,6 +322,20 @@ export async function ajustarStockInsumo(formData: FormData) {
 
     if (error) return { error: `Error al ajustar stock: ${error.message}` };
 
+    const maestroInfo = (actual as any).insumos_maestro;
+
+    await adminClient.from("historial_ajustes_insumos").insert({
+      fkeCodInsumoStock:      eCodInsumoStock,
+      fkeCodSucursal:         actual.fkeCodSucursal,
+      tNombreInsumoSnapshot:  maestroInfo?.tNombre ?? "insumo",
+      eCantidadAjuste:        eCantAgregar,
+      eCantidadAntes:         actual.eCantidadStock,
+      eCantidadDespues:       nuevaCantidad,
+      tUnidadRecetaSnapshot:  maestroInfo?.tUnidadReceta ?? "",
+      tMotivo,
+      fkeCodUser:             user.id,
+    });
+
     const { data: maestro } = await adminClient
       .from("insumos_maestro")
       .select("*")
@@ -327,7 +349,264 @@ export async function ajustarStockInsumo(formData: FormData) {
   }
 }
 
-// ── TOGGLE ESTADO ─────────────────────────────────────────────────────────────
+// ── LISTA DE COMPRA ────────────────────────────────────────────────────────
+// Insumos con stock por debajo del mínimo. alcance='actual' filtra por una
+// sucursal específica; alcance='todas' trae todas las de la compañía con
+// el nombre de sucursal incluido (para distinguir filas en la tabla/export).
+
+export async function obtenerInsumosParaListaCompra(
+  alcance: "actual" | "todas",
+  fkeCodSucursal?: string
+): Promise<{
+  eCodInsumoStock: string;
+  tNombre: string;
+  tUnidadCompra: string;
+  tUnidadReceta: string;
+  eFactorConversion: number;
+  eCantidadStock: number;
+  eStockMinimo: number;
+  tNombreSucursal: string;
+}[]> {
+  try {
+    const supabase    = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return [];
+
+    let query = adminClient
+      .from("insumos_stock")
+      .select(`
+        eCodInsumoStock, eCantidadStock, eStockMinimo,
+        insumos_maestro!inner ( tNombre, tUnidadCompra, tUnidadReceta, eFactorConversion, fkeCodCompany ),
+        sucursales!inner ( tNombre )
+      `)
+      .eq("insumos_maestro.fkeCodCompany", perfil.fkeCodCompany)
+      .eq("bStateInsumoStock", true);
+
+    if (alcance === "actual" && fkeCodSucursal) {
+      query = query.eq("fkeCodSucursal", fkeCodSucursal);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) { console.error(error); return []; }
+
+    return (data as any[])
+      .filter((row) => row.eCantidadStock <= row.eStockMinimo)
+      .map((row) => ({
+        eCodInsumoStock:   row.eCodInsumoStock,
+        tNombre:           row.insumos_maestro.tNombre,
+        tUnidadCompra:     row.insumos_maestro.tUnidadCompra,
+        tUnidadReceta:     row.insumos_maestro.tUnidadReceta,
+        eFactorConversion: row.insumos_maestro.eFactorConversion,
+        eCantidadStock:    row.eCantidadStock,
+        eStockMinimo:      row.eStockMinimo,
+        tNombreSucursal:   row.sucursales.tNombre,
+      }))
+      .sort((a, b) => a.tNombre.localeCompare(b.tNombre));
+  } catch {
+    return [];
+  }
+}
+
+// ── CONFIRMAR COMPRA (Nivel B) ────────────────────────────────────────────────
+// Se llama DESPUÉS de haber comprado físicamente, no al generar la lista.
+// Actualiza stock + escribe una fila de historial por insumo. Sin retry de
+// conflicto de versión (a diferencia del flujo de venta) porque esta acción
+// la ejecuta un admin manualmente, uno a la vez — el riesgo de concurrencia
+// real es mucho menor que en una venta.
+
+export async function confirmarCompraInsumos(
+  items: { eCodInsumoStock: string; eCantidadComprada: number }[]
+): Promise<{ ok: true; actualizados: number; errores: string[] } | { error: string }> {
+  try {
+    const supabase    = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    let actualizados = 0;
+    const errores: string[] = [];
+
+    for (const item of items) {
+      if (!item.eCantidadComprada || item.eCantidadComprada <= 0) continue;
+
+      const { data: stock, error: errStock } = await adminClient
+        .from("insumos_stock")
+        .select("eCantidadStock, version, fkeCodSucursal, insumos_maestro(tNombre, tUnidadCompra, tUnidadReceta, eFactorConversion)")
+        .eq("eCodInsumoStock", item.eCodInsumoStock)
+        .single();
+
+      if (errStock || !stock) {
+        errores.push(`No se encontró un insumo (id: ${item.eCodInsumoStock})`);
+        continue;
+      }
+
+      const maestro = (stock as any).insumos_maestro;
+      const cantidadEnReceta = item.eCantidadComprada * maestro.eFactorConversion;
+
+      const { data: actualizado, error: errUpdate } = await adminClient
+        .from("insumos_stock")
+        .update({
+          eCantidadStock:      stock.eCantidadStock + cantidadEnReceta,
+          version:             stock.version + 1,
+          fhUpdateInsumoStock: new Date().toISOString(),
+        })
+        .eq("eCodInsumoStock", item.eCodInsumoStock)
+        .eq("version", stock.version)
+        .select("eCodInsumoStock");
+
+      if (errUpdate || !actualizado || actualizado.length === 0) {
+        errores.push(`"${maestro.tNombre}": otra sesión lo modificó al mismo tiempo, no se actualizó`);
+        continue;
+      }
+
+      await adminClient.from("historial_compras_insumos").insert({
+        fkeCodInsumoStock:      item.eCodInsumoStock,
+        fkeCodSucursal:         stock.fkeCodSucursal,
+        tNombreInsumoSnapshot:  maestro.tNombre,
+        eCantidadComprada:      item.eCantidadComprada,
+        tUnidadCompraSnapshot:  maestro.tUnidadCompra,
+        eCantidadAgregadaStock: cantidadEnReceta,
+        tUnidadRecetaSnapshot:  maestro.tUnidadReceta,
+        fkeCodUser:             user.id,
+      });
+
+      actualizados++;
+    }
+
+    revalidatePath("/admin/insumos");
+    return { ok: true, actualizados, errores };
+  } catch (e: any) {
+    return { error: `Error inesperado: ${e?.message ?? e}` };
+  }
+}
+
+// ── HISTORIAL DE COMPRAS ──────────────────────────────────────────────────────
+
+export async function obtenerHistorialCompras(): Promise<
+  {
+    eCodCompra: string;
+    tNombreInsumoSnapshot: string;
+    eCantidadComprada: number;
+    tUnidadCompraSnapshot: string;
+    fhCreateCompra: string;
+    tNombreSucursal: string;
+  }[]
+> {
+  try {
+    const supabase    = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return [];
+
+    const { data: sucursalesCompania } = await adminClient
+      .from("sucursales")
+      .select("eCodSucursal")
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
+
+    const idsSucursales = (sucursalesCompania ?? []).map((s) => s.eCodSucursal);
+    if (idsSucursales.length === 0) return [];
+
+    const { data, error } = await adminClient
+      .from("historial_compras_insumos")
+      .select("eCodCompra, tNombreInsumoSnapshot, eCantidadComprada, tUnidadCompraSnapshot, fhCreateCompra, sucursales(tNombre)")
+      .in("fkeCodSucursal", idsSucursales)
+      .order("fhCreateCompra", { ascending: false })
+      .limit(50);
+
+    if (error || !data) return [];
+
+    return (data as any[]).map((row) => ({
+      eCodCompra:             row.eCodCompra,
+      tNombreInsumoSnapshot:  row.tNombreInsumoSnapshot,
+      eCantidadComprada:      row.eCantidadComprada,
+      tUnidadCompraSnapshot:  row.tUnidadCompraSnapshot,
+      fhCreateCompra:         row.fhCreateCompra,
+      tNombreSucursal:        row.sucursales?.tNombre ?? "—",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ── HISTORIAL DE AJUSTES MANUALES ────────────────────────────────────────────
+
+export async function obtenerHistorialAjustes(): Promise<
+  {
+    eCodAjuste: string;
+    tNombreInsumoSnapshot: string;
+    eCantidadAjuste: number;
+    tUnidadRecetaSnapshot: string;
+    tMotivo: string;
+    fhCreateAjuste: string;
+    tNombreSucursal: string;
+  }[]
+> {
+  try {
+    const supabase    = await createClient();
+    const adminClient = createAdminClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return [];
+
+    const { data: sucursalesCompania } = await adminClient
+      .from("sucursales")
+      .select("eCodSucursal")
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
+
+    const idsSucursales = (sucursalesCompania ?? []).map((s) => s.eCodSucursal);
+    if (idsSucursales.length === 0) return [];
+
+    const { data, error } = await adminClient
+      .from("historial_ajustes_insumos")
+      .select("eCodAjuste, tNombreInsumoSnapshot, eCantidadAjuste, tUnidadRecetaSnapshot, tMotivo, fhCreateAjuste, sucursales(tNombre)")
+      .in("fkeCodSucursal", idsSucursales)
+      .order("fhCreateAjuste", { ascending: false })
+      .limit(50);
+
+    if (error || !data) return [];
+
+    return (data as any[]).map((row) => ({
+      eCodAjuste:             row.eCodAjuste,
+      tNombreInsumoSnapshot:  row.tNombreInsumoSnapshot,
+      eCantidadAjuste:        row.eCantidadAjuste,
+      tUnidadRecetaSnapshot:  row.tUnidadRecetaSnapshot,
+      tMotivo:                row.tMotivo,
+      fhCreateAjuste:         row.fhCreateAjuste,
+      tNombreSucursal:        row.sucursales?.tNombre ?? "—",
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // Afecta solo el stock de esta sucursal — el maestro sigue disponible para
 // que otras sucursales lo usen (o esta misma, vía "agregar existente", si se reactiva).
 

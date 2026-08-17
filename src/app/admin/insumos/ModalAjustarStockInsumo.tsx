@@ -13,11 +13,14 @@ interface Props {
 
 // Ajuste manual: positivo para compra nueva, negativo para merma o
 // corrección de conteo. Toca solo insumos_stock — el maestro no participa.
+// El motivo es obligatorio: queda en historial_ajustes_insumos para poder
+// auditar después por qué cambió el número.
 
 export function ModalAjustarStockInsumo({ insumo, onClose, onAjustado }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [eCantAgregar, setECantAgregar] = useState("");
+  const [tMotivo, setTMotivo] = useState("");
 
   const cantidadNum = parseFloat(eCantAgregar);
   const resultante = isNaN(cantidadNum) ? insumo.eCantidadStock : insumo.eCantidadStock + cantidadNum;
@@ -29,6 +32,7 @@ export function ModalAjustarStockInsumo({ insumo, onClose, onAjustado }: Props) 
     const fd = new FormData();
     fd.append("eCodInsumoStock", insumo.eCodInsumoStock);
     fd.append("eCantAgregar", eCantAgregar);
+    fd.append("tMotivo", tMotivo.trim());
 
     const result = await ajustarStockInsumo(fd);
 
@@ -40,7 +44,8 @@ export function ModalAjustarStockInsumo({ insumo, onClose, onAjustado }: Props) 
     }
   }
 
-  const deshabilitado = !eCantAgregar.trim() || isNaN(cantidadNum) || resultante < 0;
+  const deshabilitado =
+    !eCantAgregar.trim() || isNaN(cantidadNum) || cantidadNum === 0 || resultante < 0 || !tMotivo.trim();
 
   return (
     <Modal
@@ -74,6 +79,15 @@ export function ModalAjustarStockInsumo({ insumo, onClose, onAjustado }: Props) 
           {resultante < 0 && " — no puede quedar en negativo"}
         </ModalInfo>
       )}
+
+      <ModalField label="Motivo del ajuste" required>
+        <ModalInput
+          type="text"
+          placeholder="Ej. Merma por producto vencido, corrección de conteo físico..."
+          value={tMotivo}
+          onChange={(e) => setTMotivo(e.target.value)}
+        />
+      </ModalField>
     </Modal>
   );
 }
