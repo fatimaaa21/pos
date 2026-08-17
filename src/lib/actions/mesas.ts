@@ -783,6 +783,7 @@ export async function cobrarOrdenMesa(
   // Usa el concepto asignado a LA MESA (conceptos_billar), no el campo legacy
   // negocios.costo_hora_billar — ese campo ya no es fuente de verdad.
   let cargoBillar = 0;
+  let cargosTiempo: { tConcepto: string; eMonto: number }[] = [];
 
   const { data: negocio } = await adminClient
     .from("negocios")
@@ -800,7 +801,7 @@ export async function cobrarOrdenMesa(
     if (mesa?.fkeCodConcepto) {
       const { data: concepto } = await adminClient
         .from("conceptos_billar")
-        .select("eCostoHora")
+        .select("eCostoHora, tNombre")
         .eq("eCodConcepto", mesa.fkeCodConcepto)
         .single();
 
@@ -808,6 +809,9 @@ export async function cobrarOrdenMesa(
         const horasTranscurridas =
           (new Date().getTime() - new Date(orden.fhAbierta).getTime()) / (1000 * 60 * 60);
         cargoBillar = Math.round(horasTranscurridas * concepto.eCostoHora * 100) / 100;
+        if (cargoBillar > 0) {
+          cargosTiempo = [{ tConcepto: concepto.tNombre ?? "Tiempo", eMonto: cargoBillar }];
+        }
       }
     }
   }
@@ -822,7 +826,7 @@ export async function cobrarOrdenMesa(
     precioUnitario:   d.ePrecio,
   }));
 
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
 
   if ("error" in resultado) return resultado;
 
@@ -1106,16 +1110,18 @@ export async function cobrarCuenta(
 
   // ── 3. Calcular cargo de tiempo, ponderado por el % de ESTA cuenta ────────
   const conceptoIds = [...new Set(segmentos.map((s: any) => s.segmentos_tiempo?.fkeCodConcepto).filter(Boolean))];
-  let costoPorConcepto = new Map<string, number>();
+  let costoPorConcepto  = new Map<string, number>();
+  let nombrePorConcepto = new Map<string, string>();
   if (conceptoIds.length > 0) {
     const { data: conceptos } = await adminClient
       .from("conceptos_billar")
-      .select("eCodConcepto, eCostoHora")
+      .select("eCodConcepto, eCostoHora, tNombre")
       .in("eCodConcepto", conceptoIds);
-    costoPorConcepto = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.eCostoHora]));
+    costoPorConcepto  = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.eCostoHora]));
+    nombrePorConcepto = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.tNombre]));
   }
 
-  let cargoBillar = 0;
+  const cargoPorConcepto = new Map<string, number>();
   for (const s of segmentos as any[]) {
     const st = s.segmentos_tiempo;
     if (!st) continue;
@@ -1123,9 +1129,18 @@ export async function cobrarCuenta(
     const repartoDeEstaCuenta = splitDelSegmento?.repartos.find((r) => r.eCodCuenta === eCodCuenta);
     const porcentaje = repartoDeEstaCuenta?.ePorcentaje ?? s.ePorcentaje ?? 0;
     const horas = Math.max(0, (new Date(st.fhFin ?? new Date()).getTime() - new Date(st.fhInicio).getTime()) / 3600000);
-    cargoBillar += horas * (costoPorConcepto.get(st.fkeCodConcepto) ?? 0) * (porcentaje / 100);
+    const previo = cargoPorConcepto.get(st.fkeCodConcepto) ?? 0;
+    cargoPorConcepto.set(st.fkeCodConcepto, previo + horas * (costoPorConcepto.get(st.fkeCodConcepto) ?? 0) * (porcentaje / 100));
   }
-  cargoBillar = Math.round(cargoBillar * 100) / 100;
+
+  const cargosTiempo = [...cargoPorConcepto.entries()]
+    .map(([eCodConcepto, monto]) => ({
+      tConcepto: nombrePorConcepto.get(eCodConcepto) ?? "Tiempo",
+      eMonto:    Math.round(monto * 100) / 100,
+    }))
+    .filter((c) => c.eMonto > 0);
+
+  const cargoBillar = cargosTiempo.reduce((acc, c) => acc + c.eMonto, 0);
 
   // ── 4. Productos de esta cuenta ────────────────────────────────────────────
   const { data: productos, error: errProd } = await adminClient
@@ -1146,7 +1161,7 @@ export async function cobrarCuenta(
   }
 
   // ── 5. Delegar en crearVenta — inventario, IVA y material se manejan ahí ──
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
   if ("error" in resultado) return resultado;
 
   // ── 6. Cerrar la cuenta ─────────────────────────────────────────────────

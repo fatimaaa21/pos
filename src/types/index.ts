@@ -349,3 +349,55 @@ export interface ItemListoCocina {
   eCantidad:           number;
   fhAgregado:          string;
 }
+
+export interface InsumoMaestro {
+  eCodInsumoMaestro:      string;
+  fkeCodCompany:          string;
+  tNombre:                string;
+  tUnidadCompra:          string;  // 'kg' | 'l' | 'pza' | 'paquete'
+  tUnidadReceta:          string;  // 'g' | 'ml' | 'pza'
+  eFactorConversion:      number;
+  bStateInsumoMaestro:    boolean;
+  fhCreateInsumoMaestro:  string;
+  fhUpdateInsumoMaestro?: string;
+}
+ 
+export interface InsumoStock {
+  eCodInsumoStock:      string;
+  fkeCodInsumoMaestro:  string;
+  fkeCodSucursal:       string;
+  eCantidadStock:       number;  // en unidad de receta
+  eStockMinimo:         number;
+  eCostoUnitario:       number;  // por unidad de compra
+  version:              number;
+  bStateInsumoStock:    boolean;
+  fhCreateInsumoStock:  string;
+  fhUpdateInsumoStock?: string;
+}
+ 
+// Vista combinada usada en la tabla y en los modales — resultado del join
+// entre insumos_maestro e insumos_stock para la sucursal actual.
+export interface InsumoConStock extends InsumoMaestro, InsumoStock {}
+
+// ── Módulo: Receta de insumos ────────────────────────────────────────────────
+// Pegar al final de src/types/index.ts, después del bloque de Insumos
+// (reemplaza el snippet anterior si ya lo habías pegado)
+
+export interface RecetaInsumoConDatos {
+  eCodReceta:          string;
+  fkeCodPresentacion:  string;
+  fkeCodInsumoMaestro: string;
+  eCantidadNecesaria:  number;
+  tNombreInsumo:        string;  // resuelto vía join, no columna propia
+  tUnidadReceta:        string;  // resuelto vía join, no columna propia
+}
+
+// Fila de la vista /admin/insumos/recetas — una por presentación, con el
+// nombre del producto dueño y cuántos insumos tiene su receta (0 = sin receta).
+export interface PresentacionConReceta {
+  eCodPresentacion: string;
+  tNombre:          string;  // nombre de la presentación
+  eCodProduct:      string;
+  tNameProduct:     string;  // nombre del producto dueño
+  cantidadInsumos:  number;
+}

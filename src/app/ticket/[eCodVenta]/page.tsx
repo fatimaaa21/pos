@@ -35,7 +35,7 @@ export default async function TicketPage({
   // Solo se puede ver el ticket de ventas del propio negocio
   const { data: venta } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, fhCreateVenta, fkeMetodoPago, fkeCodUser")
+    .select("eCodVenta, eTotal, fhCreateVenta, fkeMetodoPago, fkeCodUser, eCostoTiempoMesa")
     .eq("eCodVenta", eCodVenta)
     .eq("fkeCodCompany", fkeCodCompany)
     .single();
@@ -80,6 +80,12 @@ export default async function TicketPage({
           .in("eCodPresentacion", presIds)
       : { data: [] };
 
+  // ── Cargos de tiempo (billar, dominó, etc) ─────────────────────────────────
+  const { data: cargosTiempo } = await adminClient
+    .from("venta_cargos_tiempo")
+    .select("eCodCargo, tConcepto, eMonto")
+    .eq("fkeCodVenta", eCodVenta);
+
   // ── Método de pago ────────────────────────────────────────────────────────
   const { data: metodo } = await adminClient
     .from("metodos_pago")
@@ -120,11 +126,13 @@ export default async function TicketPage({
   return (
     <TicketClient
       venta={{
-        eCodVenta:     venta.eCodVenta,
-        eTotal:        venta.eTotal,
-        fhCreateVenta: venta.fhCreateVenta,
+        eCodVenta:        venta.eCodVenta,
+        eTotal:           venta.eTotal,
+        fhCreateVenta:    venta.fhCreateVenta,
+        eCostoTiempoMesa: venta.eCostoTiempoMesa ?? null,
       }}
       detalles={detalles}
+      cargosTiempo={cargosTiempo ?? []}
       negocio={{
         tNameCompany: negocio?.tNameCompany ?? "Mi negocio",
         imgCompany:   negocio?.imgCompany   ?? null,

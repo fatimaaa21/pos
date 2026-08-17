@@ -90,17 +90,19 @@ export async function cobrarCuenta(
   // 3. Calcular cargo de tiempo (equivalente al `cargoBillar` de cobrarOrdenMesa,
   //    pero por segmento y ponderado por el porcentaje de esta cuenta)
   const conceptoIds = [...new Set(segmentos.map((s: any) => s.segmentos_tiempo?.fkeCodConcepto).filter(Boolean))];
-  let costoPorConcepto = new Map<string, number>();
+  let costoPorConcepto  = new Map<string, number>();
+  let nombrePorConcepto = new Map<string, string>();
   if (conceptoIds.length > 0) {
     const { data: conceptos, error: errConceptos } = await adminClient
       .from("conceptos_billar")
-      .select("eCodConcepto, eCostoHora")
+      .select("eCodConcepto, eCostoHora, tNombre")
       .in("eCodConcepto", conceptoIds);
     if (errConceptos) return { error: errConceptos.message };
-    costoPorConcepto = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.eCostoHora]));
+    costoPorConcepto  = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.eCostoHora]));
+    nombrePorConcepto = new Map((conceptos ?? []).map((c) => [c.eCodConcepto, c.tNombre]));
   }
 
-  let cargoBillar = 0;
+  const cargoPorConcepto = new Map<string, number>();
   for (const s of segmentos as any[]) {
     const st = s.segmentos_tiempo;
     if (!st) continue;
@@ -109,9 +111,18 @@ export async function cobrarCuenta(
     const fin = new Date(st.fhFin ?? new Date()).getTime();
     const horas = Math.max(0, (fin - inicio) / 1000 / 3600);
     const costoHora = costoPorConcepto.get(st.fkeCodConcepto) ?? 0;
-    cargoBillar += horas * costoHora * (porcentaje / 100);
+    const previo = cargoPorConcepto.get(st.fkeCodConcepto) ?? 0;
+    cargoPorConcepto.set(st.fkeCodConcepto, previo + horas * costoHora * (porcentaje / 100));
   }
-  cargoBillar = Math.round(cargoBillar * 100) / 100;
+
+  const cargosTiempo = [...cargoPorConcepto.entries()]
+    .map(([eCodConcepto, monto]) => ({
+      tConcepto: nombrePorConcepto.get(eCodConcepto) ?? "Tiempo",
+      eMonto:    Math.round(monto * 100) / 100,
+    }))
+    .filter((c) => c.eMonto > 0);
+
+  const cargoBillar = cargosTiempo.reduce((acc, c) => acc + c.eMonto, 0);
 
   // 4. Productos de esta cuenta -> mismo formato ItemVenta que espera crearVenta
   const { data: productos, error: errProd } = await adminClient
@@ -133,7 +144,7 @@ export async function cobrarCuenta(
 
   // 5. Delegar en crearVenta — aquí se valida/descuenta inventario, se aplica
   //    IVA, y se maneja material. No se reimplementa nada de eso aquí.
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
   if ("error" in resultado) return resultado;
 
   // 6. Cerrar la cuenta

@@ -35,7 +35,7 @@ export default async function VentasAdminPage() {
   // ── Ventas ────────────────────────────────────────────────────────────────
   let ventasQuery = adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser, bCancelada, tMotivoCancelacion, fhCancelacion")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, fkeCodUser, bCancelada, tMotivoCancelacion, fhCancelacion, eCostoTiempoMesa")
     .eq("fkeCodCompany", fkeCodCompany)
     .order("fhCreateVenta", { ascending: false });
 
@@ -109,6 +109,19 @@ export default async function VentasAdminPage() {
     }
   }
 
+  // ── Cargos de tiempo (billar, dominó, etc) ─────────────────────────────────
+  let cargosTiempo: any[] = [];
+
+  if (ids.length > 0) {
+    const { data: cargos, error: cargosError } = await adminClient
+      .from("venta_cargos_tiempo")
+      .select("eCodCargo, fkeCodVenta, tConcepto, eMonto")
+      .in("fkeCodVenta", ids);
+
+    if (cargosError) console.error("Error cargos de tiempo:", cargosError.message);
+    else cargosTiempo = cargos ?? [];
+  }
+
   // ── Perfiles de empleados ─────────────────────────────────────────────────
   const empleadoIds = [...new Set((ventas ?? []).map((v) => v.fkeCodUser))];
   let perfiles: any[] = [];
@@ -139,6 +152,7 @@ export default async function VentasAdminPage() {
     ...v,
     empleado:      perfilesMap.get(v.fkeCodUser) ?? null,
     detalle_venta: detallesConProducto.filter((d) => d.fkeCodVenta === v.eCodVenta),
+    cargos_tiempo: cargosTiempo.filter((c) => c.fkeCodVenta === v.eCodVenta),
   }));
 
   const empleadosFiltro = perfiles.map((p) => ({

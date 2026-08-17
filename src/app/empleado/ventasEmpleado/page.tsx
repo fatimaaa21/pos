@@ -13,7 +13,7 @@ export default async function VentasEmpleadoPage() {
   // ── Ventas del empleado ───────────────────────────────────────────────────
   const { data: ventas, error: ventasError } = await adminClient
     .from("ventas")
-    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, bCancelada, tMotivoCancelacion")
+    .select("eCodVenta, eTotal, fkeMetodoPago, fhCreateVenta, bCancelada, tMotivoCancelacion, eCostoTiempoMesa")
     .eq("fkeCodUser", user.id)
     .order("fhCreateVenta", { ascending: false });
 
@@ -78,6 +78,17 @@ export default async function VentasEmpleadoPage() {
     }
   }
 
+  // ── Cargos de tiempo (billar, dominó, etc) ─────────────────────────────────
+  let cargosTiempo: any[] = [];
+
+  if (ids.length > 0) {
+    const { data: cargos } = await adminClient
+      .from("venta_cargos_tiempo")
+      .select("eCodCargo, fkeCodVenta, tConcepto, eMonto")
+      .in("fkeCodVenta", ids);
+    cargosTiempo = cargos ?? [];
+  }
+
   // ── Combinar ──────────────────────────────────────────────────────────────
   const productosMap = new Map(productos.map((p) => [p.eCodProduct, p]));
 
@@ -92,6 +103,7 @@ export default async function VentasEmpleadoPage() {
   const ventasCompletas = (ventas ?? []).map((v) => ({
     ...v,
     detalle_venta: detallesConProducto.filter((d) => d.fkeCodVenta === v.eCodVenta),
+    cargos_tiempo: cargosTiempo.filter((c) => c.fkeCodVenta === v.eCodVenta),
   }));
 
   // ── Total del día ─────────────────────────────────────────────────────────

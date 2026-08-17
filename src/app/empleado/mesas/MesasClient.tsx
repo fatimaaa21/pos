@@ -462,6 +462,30 @@ export function MesasClient({
     setItems(orden?.detalle ?? []);
   }
 
+  // Vuelve a traer la orden abierta de la mesa activa y sus cuentas —
+  // usar esto (no handleClickMesa) después de mutaciones como
+  // agregarJugador/retirarJugador. handleClickMesa tiene guardas de
+  // navegación (tieneTurno, cuentaParaAbrirMesa) y una rama que ABRE una
+  // orden nueva si mesa.ordenAbierta viene en null; como mesaActiva nunca
+  // se actualiza después de abrir una mesa, volver a llamarlo como si
+  // fuera un refetch termina reabriendo la orden por error.
+  async function refrescarOrdenActiva(codMesa: string) {
+    const orden = await obtenerOrdenAbierta(codMesa);
+    setItems(orden?.detalle ?? []);
+
+    const cuentas = (orden as any)?.cuentasActivas ?? [];
+    setCuentasActivas(cuentas);
+
+    if (!esBillar) return;
+    if (cuentas.length === 1) {
+      setECodCuenta(cuentas[0].eCodCuenta);
+      await recargarConsumoCuenta(cuentas[0].eCodCuenta);
+    } else {
+      setECodCuenta(null);
+      await recargarConsumoCuenta(null);
+    }
+  }
+
   async function recargarConsumoCuenta(codCuenta: string | null) {
     if (!codCuenta) { setItemsCuenta([]); setSegmentosCuenta([]); return; }
     const [resultItems, resultSegmentos] = await Promise.all([
@@ -584,8 +608,7 @@ export function MesasClient({
           if ("error" in result) { toast.error(result.error); return; }
           toast.success("Jugador agregado");
           setModalCuenta(null);
-          if (mesaActiva) await handleClickMesa(mesaActiva);
-          if (eCodCuenta) await recargarConsumoCuenta(eCodCuenta);
+          if (mesaActiva) await refrescarOrdenActiva(mesaActiva.eCodMesa);
         });
       },
     });
@@ -644,11 +667,7 @@ export function MesasClient({
       const result = await retirarJugador(eCodOrden, eCodCuentaQueSeVa);
       if ("error" in result) { toast.error(result.error); return; }
       toast.success(`${tIdentificador} se retiró`);
-      if (mesaActiva) await handleClickMesa(mesaActiva);
-      if (eCodCuenta === eCodCuentaQueSeVa) {
-        const restantes = cuentasActivas.filter((c) => c.eCodCuenta !== eCodCuentaQueSeVa);
-        setECodCuenta(restantes[0]?.eCodCuenta ?? null);
-      }
+      if (mesaActiva) await refrescarOrdenActiva(mesaActiva.eCodMesa);
     });
   }
 
@@ -1356,39 +1375,47 @@ export function MesasClient({
         </div>
 
         {esBillar && cuentasActivas.length > 1 && (
-          <div style={{ display: "flex", gap: 8, padding: "0 var(--space-3)", flexWrap: "wrap" }}>
-            {cuentasActivas.map((c) => (
-              <div key={c.eCodCuenta} style={{ display: "flex", alignItems: "center" }}>
-                <button
-                  onClick={() => setECodCuenta(c.eCodCuenta)}
+          <div style={{ display: "flex", gap: 10, padding: "0 var(--space-3)", flexWrap: "wrap" }}>
+            {cuentasActivas.map((c) => {
+              const activa = c.eCodCuenta === eCodCuenta;
+              return (
+                <div
+                  key={c.eCodCuenta}
                   style={{
-                    padding: "6px 12px", borderRadius: "999px 0 0 999px", fontSize: 13, fontWeight: 600,
-                    borderTop:    c.eCodCuenta === eCodCuenta ? "2px solid var(--color-primary)" : "1px solid var(--border-default)",
-                    borderBottom: c.eCodCuenta === eCodCuenta ? "2px solid var(--color-primary)" : "1px solid var(--border-default)",
-                    borderLeft:   c.eCodCuenta === eCodCuenta ? "2px solid var(--color-primary)" : "1px solid var(--border-default)",
-                    borderRight:  "none",
-                    background: c.eCodCuenta === eCodCuenta ? "var(--color-primary-50)" : "white",
-                    color: c.eCodCuenta === eCodCuenta ? "var(--color-primary-dark)" : "var(--gray)",
-                    cursor: "pointer",
+                    display: "flex", alignItems: "center", borderRadius: 999,
+                    border: activa ? "2px solid var(--color-primary)" : "1px solid var(--border-default)",
+                    background: activa ? "var(--color-primary-50)" : "white",
+                    overflow: "hidden",
                   }}
                 >
-                  {c.tIdentificador}
-                </button>
-                <button
-                  onClick={() => handleRetirarJugador(c.eCodCuenta, c.tIdentificador)}
-                  title={`${c.tIdentificador} se retira`}
-                  style={{
-                    padding: "6px 8px", borderRadius: "0 999px 999px 0", fontSize: 13, fontWeight: 700,
-                    border: c.eCodCuenta === eCodCuenta ? "2px solid var(--color-primary)" : "1px solid var(--border-default)",
-                    background: c.eCodCuenta === eCodCuenta ? "var(--color-primary-50)" : "white",
-                    color: "var(--color-error)",
-                    cursor: "pointer",
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+                  <button
+                    onClick={() => setECodCuenta(c.eCodCuenta)}
+                    style={{
+                      padding: "8px 14px", fontSize: 13, fontWeight: 600, border: "none",
+                      background: "transparent",
+                      color: activa ? "var(--color-primary-dark)" : "var(--dark)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {c.tIdentificador}
+                  </button>
+                  <button
+                    onClick={() => handleRetirarJugador(c.eCodCuenta, c.tIdentificador)}
+                    title={`${c.tIdentificador} se retira`}
+                    aria-label={`${c.tIdentificador} se retira`}
+                    style={{
+                      width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                      marginRight: 4, borderRadius: "50%", border: "none",
+                      background: activa ? "rgba(0,0,0,0.04)" : "var(--background)",
+                      color: "var(--color-error)", fontSize: 14, fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 

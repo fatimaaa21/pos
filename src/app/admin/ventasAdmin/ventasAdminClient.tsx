@@ -18,12 +18,22 @@ import styles                        from "./ventasAdmin.module.css";
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
+export interface CargoTiempoVenta {
+  eCodCargo:   string;
+  fkeCodVenta: string;
+  tConcepto:   string;
+  eMonto:      number;
+}
+
 export interface VentaAdmin {
   eCodVenta:            string;
   eTotal:               number;
   fkeMetodoPago:        string;
   fhCreateVenta:        string;
   fkeCodUser:           string;
+  /** @deprecated usar cargos_tiempo — se conserva solo para ventas anteriores a este cambio */
+  eCostoTiempoMesa?:    number | null;
+  cargos_tiempo:        CargoTiempoVenta[];
   // Cancelación
   bCancelada?:          boolean;
   tMotivoCancelacion?:  string | null;

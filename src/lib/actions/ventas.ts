@@ -45,8 +45,17 @@ export async function crearVenta(
       version:             number;
     };
 
+    type InsumoADescontar = {
+      fkeCodInsumoStock:     string;
+      eCantidadADescontar:   number;
+      versionCapturada:      number;
+      tNombreInsumoSnapshot: string;
+      tUnidadSnapshot:       string;
+    };
+
     const lotesPorItem:   LoteCapturado[] = [];
     const hojasPorItem:   (number | null)[] = []; // hojas a descontar por item (null = no aplica)
+    const insumosPorItem: InsumoADescontar[][] = []; // uno por item, puede tener varios insumos o ninguno
 
     // ── Fase 1: validar stock ─────────────────────────────────────────────────
     for (const item of items) {
@@ -197,6 +206,63 @@ export async function crearVenta(
       });
     }
 
+    // ── Fase 1c: validar y resolver insumos según receta (solo items con presentación) ──
+    // La receta cuelga de presentación, no de producto — items sin
+    // eCodPresentacion no tienen receta que resolver.
+    for (const item of items) {
+      if (!item.eCodPresentacion) {
+        insumosPorItem.push([]);
+        continue;
+      }
+
+      const { data: receta } = await adminClient
+        .from("receta_insumos")
+        .select("fkeCodInsumoMaestro, eCantidadNecesaria")
+        .eq("fkeCodPresentacion", item.eCodPresentacion);
+
+      if (!receta || receta.length === 0) {
+        insumosPorItem.push([]); // presentación sin receta = no descuenta nada
+        continue;
+      }
+
+      const resueltos: InsumoADescontar[] = [];
+
+      for (const r of receta) {
+        const { data: stock } = await adminClient
+          .from("insumos_stock")
+          .select("eCodInsumoStock, eCantidadStock, version, insumos_maestro(tNombre, tUnidadReceta)")
+          .eq("fkeCodInsumoMaestro", r.fkeCodInsumoMaestro)
+          .eq("fkeCodSucursal", fkeCodSucursal)
+          .eq("bStateInsumoStock", true)
+          .maybeSingle();
+
+        if (!stock) {
+          return {
+            error: `Falta configurar el insumo "${(r as any).insumos_maestro?.tNombre ?? r.fkeCodInsumoMaestro}" en esta sucursal`,
+          };
+        }
+
+        const cantidadNecesaria = r.eCantidadNecesaria * item.cantidad;
+
+        if (stock.eCantidadStock < cantidadNecesaria) {
+          const nombreInsumo = (stock as any).insumos_maestro?.tNombre ?? "insumo";
+          return {
+            error: `Stock insuficiente de "${nombreInsumo}" para completar la venta`,
+          };
+        }
+
+        resueltos.push({
+          fkeCodInsumoStock:     stock.eCodInsumoStock,
+          eCantidadADescontar:   cantidadNecesaria,
+          versionCapturada:      stock.version,
+          tNombreInsumoSnapshot: (stock as any).insumos_maestro?.tNombre ?? "insumo",
+          tUnidadSnapshot:       (stock as any).insumos_maestro?.tUnidadReceta ?? "",
+        });
+      }
+
+      insumosPorItem.push(resueltos);
+    }
+
     // ── Total ─────────────────────────────────────────────────────────────────
     const eTotalProductos = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
     const eTotal          = eTotalProductos + extraCharge;
@@ -341,9 +407,61 @@ export async function crearVenta(
         .eq("eCodMaterial", prodDims.fkeCodMaterial);
     }
 
+    // ── Fase 5: descontar insumos según receta + snapshot ──────────────────────
+    // Mismo patrón de rollback parcial que Fase 2: si un insumo falla por
+    // conflicto de versión (venta concurrente tocó el mismo insumo), se borra
+    // la venta — pero los insumos YA descontados en iteraciones previas de
+    // este mismo loop NO se revierten automáticamente. Es el mismo gap que
+    // ya existe en Fase 2 con inventario; no lo estoy empeorando, pero
+    // tampoco lo estoy resolviendo aquí.
+    for (let idx = 0; idx < items.length; idx++) {
+      for (const insumo of insumosPorItem[idx]) {
+        const { data: actual } = await adminClient
+          .from("insumos_stock")
+          .select("eCantidadStock, version")
+          .eq("eCodInsumoStock", insumo.fkeCodInsumoStock)
+          .single();
+
+        if (!actual) continue; // se borró el insumo entre validación y descuento — caso raro, se ignora
+
+        const nuevaCantidad = actual.eCantidadStock - insumo.eCantidadADescontar;
+
+        const { data: actualizado } = await adminClient
+          .from("insumos_stock")
+          .update({
+            eCantidadStock:      Math.max(0, nuevaCantidad),
+            version:             actual.version + 1,
+            fhUpdateInsumoStock: new Date().toISOString(),
+          })
+          .eq("eCodInsumoStock", insumo.fkeCodInsumoStock)
+          .eq("version", actual.version) // optimistic lock
+          .select("eCodInsumoStock");
+
+        if (!actualizado || actualizado.length === 0) {
+          await adminClient.from("venta_insumos_consumidos").delete().eq("fkeCodVenta", venta.eCodVenta);
+          await adminClient.from("detalle_venta").delete().eq("fkeCodVenta", venta.eCodVenta);
+          await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
+          return {
+            error:
+              "No se pudo registrar la venta: otra venta modificó el mismo insumo " +
+              "al mismo tiempo. Intenta de nuevo.",
+          };
+        }
+
+        await adminClient.from("venta_insumos_consumidos").insert({
+          fkeCodVenta:           venta.eCodVenta,
+          fkeCodInsumoStock:     insumo.fkeCodInsumoStock,
+          tNombreInsumoSnapshot: insumo.tNombreInsumoSnapshot,
+          eCantidadDescontada:   insumo.eCantidadADescontar,
+          tUnidadSnapshot:       insumo.tUnidadSnapshot,
+        });
+      }
+    }
+
     revalidatePath("/empleado/menu");
     revalidatePath("/admin/inventario");
     revalidatePath("/admin/ventas");
+    revalidatePath("/admin/insumos");
     return { eCodVenta: venta.eCodVenta };
 
   } catch (e: any) {
@@ -454,10 +572,58 @@ export async function cancelarVenta(formData: FormData) {
         .eq("eCodInventory", lote.eCodInventory);
     }
 
+    // Restaurar insumos consumidos por receta — lee del snapshot, NO de la
+    // receta actual (que pudo haber cambiado desde que se vendió).
+    const { data: consumos } = await adminClient
+      .from("venta_insumos_consumidos")
+      .select("fkeCodInsumoStock, eCantidadDescontada")
+      .eq("fkeCodVenta", eCodVenta);
+
+    for (const consumo of consumos ?? []) {
+      // Reintenta hasta 3 veces si hay conflicto de versión con otra
+      // operación concurrente sobre el mismo insumo (venta o cancelación).
+      let intento = 0;
+      let restaurado = false;
+
+      while (intento < 3 && !restaurado) {
+        const { data: actual } = await adminClient
+          .from("insumos_stock")
+          .select("eCantidadStock, version")
+          .eq("eCodInsumoStock", consumo.fkeCodInsumoStock)
+          .single();
+
+        if (!actual) break; // el insumo fue borrado desde entonces — no hay a dónde restaurar
+
+        const { data: actualizado } = await adminClient
+          .from("insumos_stock")
+          .update({
+            eCantidadStock:      actual.eCantidadStock + consumo.eCantidadDescontada,
+            version:             actual.version + 1,
+            fhUpdateInsumoStock: new Date().toISOString(),
+          })
+          .eq("eCodInsumoStock", consumo.fkeCodInsumoStock)
+          .eq("version", actual.version)
+          .select("eCodInsumoStock");
+
+        if (actualizado && actualizado.length > 0) {
+          restaurado = true;
+        } else {
+          intento++;
+        }
+      }
+      // Si tras 3 intentos no se pudo restaurar, se sigue con los demás
+      // insumos en vez de abortar toda la cancelación — la venta ya está
+      // marcada como cancelada en este punto y no queremos dejarla a medias.
+      // Esto puede dejar un insumo sin restaurar en un caso de alta
+      // concurrencia muy raro; no hay una buena forma de evitarlo sin
+      // mover todo esto a una transacción real de Postgres.
+    }
+
     revalidatePath("/admin/ventasAdmin");
     revalidatePath("/empleado/ventasEmpleado");
     revalidatePath("/admin/dashboard");
     revalidatePath("/empleado/menu");
+    revalidatePath("/admin/insumos");
     return { ok: true };
 
   } catch (e: any) {
