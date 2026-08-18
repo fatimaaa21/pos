@@ -18,27 +18,29 @@ import {
   ChefHat,
 } from "lucide-react";
 
+// Orden fijo por usabilidad (uso diario primero, configuración al final).
+// Los ítems con `modulo` son opcionales: solo aparecen si ese módulo está
+// activo para el negocio, pero SIEMPRE en la posición que les corresponde
+// aquí — no se agregan al final por separado.
+const NAV_ADMIN_MASTER = [
+  { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"        },
+  { icon: ClipboardList,    label: "Menú",           href: "/admin/menu"             },
+  { icon: ReceiptText,      label: "Ventas",         href: "/admin/ventasAdmin"      },
+  { icon: Calculator,       label: "Cortes de caja", href: "/admin/cortes"           },
+  { icon: ClipboardPenLine, label: "Inventario",     href: "/admin/inventario"       },
+  { icon: ShoppingBasket,   label: "Insumos",        href: "/admin/insumos",         modulo: "insumos" },
+  { icon: ChefHat,          label: "Recetas",        href: "/admin/insumos/recetas", modulo: "insumos" },
+  { icon: Package,          label: "Productos",      href: "/admin/productos"        },
+  { icon: BookOpenText,     label: "Catálogo",       href: "/admin/catalogo"         },
+  { icon: LayoutGrid,       label: "Mesas",          href: "/admin/mesas",           modulo: "mesas"    },
+  { icon: MapPin,           label: "Sucursales",     href: "/admin/sucursales"       },
+  { icon: Users,            label: "Usuarios",       href: "/admin/usuarios"         },
+];
+
 function buildNavAdmin(modulosActivos: string[]) {
-  const nav = [
-    { icon: LayoutDashboard,  label: "Dashboard",       href: "/admin/dashboard"   },
-    { icon: ClipboardList,     label: "Menú",          href: "/admin/menu"      },
-    { icon: BookOpenText,     label: "Catálogo",        href: "/admin/catalogo"    },
-    { icon: Package,          label: "Productos",       href: "/admin/productos"   },
-    { icon: ClipboardPenLine, label: "Inventario",      href: "/admin/inventario"  },
-    { icon: ReceiptText,      label: "Ventas",          href: "/admin/ventasAdmin" },
-    { icon: Calculator,       label: "Cortes de caja",  href: "/admin/cortes"      },
-    { icon: MapPin,           label: "Sucursales",      href: "/admin/sucursales" },
-    { icon: Users,            label: "Usuarios",        href: "/admin/usuarios"    },
- 
-  ];
-  if (modulosActivos.includes("mesas")) {
-    nav.push({ icon: LayoutGrid, label: "Mesas", href: "/admin/mesas" });
-  }
-  if (modulosActivos.includes("insumos")) {
-    nav.push({ icon: ShoppingBasket, label: "Insumos", href: "/admin/insumos" });
-    nav.push({ icon: ChefHat,        label: "Recetas", href: "/admin/insumos/recetas" });
-  }
-  return nav;
+  return NAV_ADMIN_MASTER.filter(
+    (item) => !item.modulo || modulosActivos.includes(item.modulo)
+  );
 }
 
 function buildNavEmpleado(_modulosActivos: string[]) {

@@ -25,12 +25,18 @@ async function enviarEmailBienvenida(nombre: string, email: string, codigo: stri
   await resend.emails.send({
     from: "Kivi <no-reply@kivi.mx>",
     to: email,
-    subject: "Tu código de acceso 🥐",
+    subject: "Tu código de acceso a Kivi",
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px; background: #f8f7f4;">
+      <div style="font-family: Sora, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 24px; background: #f8f7f4;">
         <div style="background: white; border-radius: 20px; padding: 40px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
           <div style="text-align: center; margin-bottom: 32px;">
-            <div style="font-size: 48px; margin-bottom: 12px;">🥐</div>
+            <img
+              src="https://kivi.mx/icons/Isotipo-192.png"
+              alt="Kivi"
+              width="56"
+              height="56"
+              style="display: block; margin: 0 auto 12px; border-radius: 14px;"
+            />
             <h1 style="font-size: 22px; color: #1a1a1a; margin: 0 0 8px;">¡Bienvenido, ${nombre}!</h1>
             <p style="color: #7a6a5e; font-size: 14px; margin: 0;">Ya tienes acceso al sistema de gestión</p>
           </div>
@@ -42,7 +48,7 @@ async function enviarEmailBienvenida(nombre: string, email: string, codigo: stri
           <div style="background: #fef3e8; border-radius: 12px; padding: 16px; margin-bottom: 28px;">
             <p style="color: #a86530; font-size: 13px; margin: 0;">🔒 <strong>Mantén este código seguro.</strong> No lo compartas con nadie fuera de tu equipo.</p>
           </div>
-          <p style="color: #9a8a7e; font-size: 12px; text-align: center; margin: 0;">Sistema de gestión · Panadería</p>
+          <p style="color: #9a8a7e; font-size: 12px; text-align: center; margin: 0;">Kivi · Sistema de punto de venta</p>
         </div>
       </div>
     `,
