@@ -65,7 +65,10 @@ export async function crearUsuario(formData: FormData) {
 
     const eCodeUser = await generarCodigoUnico(adminClient);
 
-    const sufijo = process.env.PIN_SECRET_SUFFIX ?? "PAN_SECRET_2024";
+    const sufijo = process.env.PIN_SECRET_SUFFIX;
+    if (!sufijo) {
+      return { error: "Error de configuración del servidor" };
+    }
     const password = `${eCodeUser}${sufijo}`;
 
     const { data: authData, error: authError } = await adminClient.auth.admin.createUser({

@@ -21,7 +21,11 @@ export async function login(formData: FormData) {
   }
 
   // 2. Login con email encontrado + contraseña interna
-  const sufijo = process.env.PIN_SECRET_SUFFIX ?? "PAN_SECRET_2024";
+  const sufijo = process.env.PIN_SECRET_SUFFIX;
+  if (!sufijo) {
+    console.error("PIN_SECRET_SUFFIX no está configurado en el entorno");
+    return { error: "Error de configuración del servidor" };
+  }
   const passwordInterna = `${codigo}${sufijo}`;
 
   const { error: authError } = await supabase.auth.signInWithPassword({
