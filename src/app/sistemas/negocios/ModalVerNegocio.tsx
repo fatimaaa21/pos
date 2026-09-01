@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { Copy, Check } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { formatFechaHora } from "@/lib/utils/fecha";
@@ -10,6 +13,58 @@ interface Props {
   negocio: NegocioConAdmin;
   onClose: () => void;
 }
+
+// ── Botón copiar URL de acceso del negocio ─────────────────────────────────
+// Mismo patrón que BtnCopiarUrl de la pantalla de cocina (SucursalesAdminClient).
+
+function BtnCopiarUrlNegocio({ slug }: { slug: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  const url = typeof window !== "undefined"
+    ? `${window.location.origin}/auth/login/${slug}`
+    : `/auth/login/${slug}`;
+
+  async function handleCopiar() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar");
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopiar}
+      title="Copiar URL de acceso del negocio"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "5px 10px",
+        border: copiado
+          ? "1px solid var(--color-primary)"
+          : "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        background: copiado ? "var(--color-primary-50)" : "var(--white)",
+        color: copiado ? "var(--color-primary)" : "var(--gray)",
+        fontSize: 12,
+        fontWeight: 600,
+        fontFamily: "var(--font-family)",
+        cursor: "pointer",
+        transition: "all 0.15s",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {copiado ? <Check size={12} /> : <Copy size={12} />}
+      {copiado ? "¡Copiada!" : "URL de acceso"}
+    </button>
+  );
+}
+
+// ── Componente principal ────────────────────────────────────────────────────
 
 export function ModalVerNegocio({ negocio, onClose }: Props) {
   const iniciales = negocio.tNameCompany
@@ -46,6 +101,12 @@ export function ModalVerNegocio({ negocio, onClose }: Props) {
         <div className={styles.badges}>
           <Badge activo={negocio.bStateCompany === "activo"} />
         </div>
+      </div>
+
+      {/* URL de acceso fija del negocio */}
+      <div className={styles.campo} style={{ justifyContent: "space-between" }}>
+        <span className={styles.campoLabel}>URL de acceso</span>
+        <BtnCopiarUrlNegocio slug={negocio.tSlugCompany} />
       </div>
 
       {/* Campos del negocio */}
