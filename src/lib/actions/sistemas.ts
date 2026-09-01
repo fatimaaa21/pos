@@ -61,7 +61,11 @@ export async function crearNegocio(formData: FormData) {
     }
 
     const eCodeUser = await generarCodigoUnico(adminClient);
-    const sufijo    = process.env.PIN_SECRET_SUFFIX ?? "PAN_SECRET_2024";
+    const sufijo    = process.env.PIN_SECRET_SUFFIX;
+    if (!sufijo) {
+      await adminClient.from("negocios").delete().eq("eCodCompany", negocio.eCodCompany);
+      return { error: "Error de configuración del servidor" };
+    }
     const password  = `${eCodeUser}${sufijo}`;
 
     const { data: authData, error: authError } =
