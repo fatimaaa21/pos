@@ -5,21 +5,9 @@ import { Resend } from "resend";
 import type { Perfil } from "@/types";
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
+import { generarCodigoUnico } from "@/lib/utils/codigo";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
-async function generarCodigoUnico(adminClient: ReturnType<typeof createAdminClient>): Promise<string> {
-  for (let intentos = 0; intentos < 20; intentos++) {
-    const codigo = String(Math.floor(1000 + Math.random() * 9000));
-    const { data } = await adminClient
-      .from("perfiles")
-      .select("eCodeUser")
-      .eq("eCodeUser", codigo)
-      .single();
-    if (!data) return codigo;
-  }
-  throw new Error("No se pudo generar un código único");
-}
 
 async function enviarEmailBienvenida(nombre: string, email: string, codigo: string) {
   await resend.emails.send({
@@ -62,8 +50,25 @@ export async function crearUsuario(formData: FormData) {
     const tNameUser = formData.get("tNameUser") as string;
     const tEmailUser = formData.get("tEmailUser") as string;
     const tRolUser = formData.get("tRolUser") as string;
+    const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
 
-    const eCodeUser = await generarCodigoUnico(adminClient);
+    // Resolver primero el negocio del admin que está creando el usuario,
+    // ANTES de generar código o tocar Auth — así no queda un usuario
+    // huérfano en Auth si esto falla.
+    const supabase = await createClient();
+    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    const { data: perfilAdmin } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", adminUser!.id)
+      .single();
+
+    const fkeCodCompany = perfilAdmin?.fkeCodCompany;
+    if (!fkeCodCompany) {
+      return { error: "No se pudo determinar el negocio del administrador" };
+    }
+
+    const eCodeUser = await generarCodigoUnico(adminClient, fkeCodCompany);
 
     const sufijo = process.env.PIN_SECRET_SUFFIX;
     if (!sufijo) {
@@ -86,17 +91,6 @@ export async function crearUsuario(formData: FormData) {
     }
 
     const ahora = new Date().toISOString();
-
-    const supabase = await createClient(); // ya debes tener esto importado
-    const { data: { user: adminUser } } = await supabase.auth.getUser();
-    const { data: perfilAdmin } = await supabase
-      .from("perfiles")
-      .select("fkeCodCompany")
-      .eq("eCodUser", adminUser!.id)
-      .single();
-
-    const fkeCodCompany = perfilAdmin?.fkeCodCompany;
-    const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
 
     const { data: perfil, error: perfilError } = await adminClient
       .from("perfiles")

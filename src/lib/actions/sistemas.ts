@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import type { NegocioConAdmin } from "@/app/sistemas/negocios/NegociosClient";
 import type { Perfil } from "@/types";
+import { generarCodigoUnico } from "@/lib/utils/codigo";
 
 function generarSlug(nombre: string): string {
   return nombre
@@ -13,21 +14,6 @@ function generarSlug(nombre: string): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
-}
-
-async function generarCodigoUnico(
-  adminClient: ReturnType<typeof createAdminClient>
-): Promise<string> {
-  for (let i = 0; i < 20; i++) {
-    const codigo = String(Math.floor(1000 + Math.random() * 9000));
-    const { data } = await adminClient
-      .from("perfiles")
-      .select("eCodeUser")
-      .eq("eCodeUser", codigo)
-      .single();
-    if (!data) return codigo;
-  }
-  throw new Error("No se pudo generar un código único");
 }
 
 export async function crearNegocio(formData: FormData) {
@@ -60,7 +46,7 @@ export async function crearNegocio(formData: FormData) {
       return { error: `Error al crear negocio: ${negocioError.message}` };
     }
 
-    const eCodeUser = await generarCodigoUnico(adminClient);
+    const eCodeUser = await generarCodigoUnico(adminClient, negocio.eCodCompany);
     const sufijo    = process.env.PIN_SECRET_SUFFIX;
     if (!sufijo) {
       await adminClient.from("negocios").delete().eq("eCodCompany", negocio.eCodCompany);
