@@ -144,7 +144,7 @@ export async function cobrarCuenta(
 
   // 5. Delegar en crearVenta — aquí se valida/descuenta inventario, se aplica
   //    IVA, y se maneja material. No se reimplementa nada de eso aquí.
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
   if ("error" in resultado) return resultado;
 
   // 6. Cerrar la cuenta

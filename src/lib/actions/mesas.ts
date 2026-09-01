@@ -826,8 +826,7 @@ export async function cobrarOrdenMesa(
     precioUnitario:   d.ePrecio,
   }));
 
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
-
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
   if ("error" in resultado) return resultado;
 
   const { error: cierreError } = await adminClient
@@ -1161,7 +1160,7 @@ export async function cobrarCuenta(
   }
 
   // ── 5. Delegar en crearVenta — inventario, IVA y material se manejan ahí ──
-  const resultado = await crearVenta(items, fkeMetodoPago, true, cargosTiempo);
+  const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
   if ("error" in resultado) return resultado;
 
   // ── 6. Cerrar la cuenta ─────────────────────────────────────────────────
