@@ -1,14 +1,14 @@
 /* ══════════════════════════════════════════════════════
    ticket.module.css
    Estilos para la vista previa en pantalla y para
-   la impresión térmica de 80mm (72mm de contenido).
+   la impresión térmica de 58mm (48mm de contenido).
    ══════════════════════════════════════════════════════ */
 
 /* ── @page: instrucciones para la impresora ── */
 @media print {
   @page {
-    size: 72mm auto;   /* ancho fijo, alto automático según contenido */
-    margin: 3mm 4mm;   /* margen mínimo: térmicas tienen ~4mm de borde físico */
+    size: 48mm auto;
+    margin: 2mm 5mm;
   }
 }
 
@@ -39,12 +39,12 @@
   }
 
   /* Barra de herramientas */
-  .acciones {
-    display: flex;
-    gap: 8px;
-    width: 272px; /* 72mm × 3.78px/mm ≈ 272px */
-    flex-shrink: 0;
-  }
+.acciones {
+  display: flex;
+  gap: 8px;
+  width: 181px; /* 48mm × 3.78px/mm ≈ 181px */
+  flex-shrink: 0;
+}
 
   .label {
     font-family: 'Courier New', Courier, monospace;
@@ -101,7 +101,7 @@
 
   /* El ticket en pantalla: papel blanco con sombra */
   .ticket {
-    width: 272px;
+    width: 181px;
     background: white;
     padding: 6mm 5mm;
     box-shadow:
@@ -188,10 +188,9 @@
 /* ── Logo del negocio ── */
 .logo {
   display: block;
-  width: 28mm;
+  width: 18mm;
   height: auto;
   margin: 0 auto 3mm;
-  /* Las térmicas suelen imprimir imágenes en escala de grises */
   filter: grayscale(100%) contrast(1.4);
 }
 

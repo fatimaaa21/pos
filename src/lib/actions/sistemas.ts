@@ -336,3 +336,26 @@ export async function toggleModuloNegocio(
   revalidatePath("/sistemas/negocios");
   return { ok: true };
 }
+
+// ── Límite de sucursales por negocio ────────────────────────────────────────
+
+export async function actualizarMaxSucursales(
+  eCodCompany: string,
+  nuevoMax: number
+): Promise<{ ok: true; eMaxSucursales: number } | { error: string }> {
+  if (!Number.isInteger(nuevoMax) || nuevoMax < 1) {
+    return { error: "El número de sucursales debe ser un entero mayor o igual a 1" };
+  }
+
+  const adminClient = createAdminClient();
+
+  const { error } = await adminClient
+    .from("negocios")
+    .update({ eMaxSucursales: nuevoMax })
+    .eq("eCodCompany", eCodCompany);
+
+  if (error) return { error: `Error al actualizar: ${error.message}` };
+
+  revalidatePath("/sistemas/negocios");
+  return { ok: true, eMaxSucursales: nuevoMax };
+}

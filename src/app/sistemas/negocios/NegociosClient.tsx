@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil, Trash2, Store } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Buscador } from "@/components/ui/Buscador";
 import { StatCards } from "@/components/ui/Statscards";
@@ -14,6 +14,7 @@ import { ModalEditarNegocio } from "./ModalEditarNegocio";
 import { toggleEstadoNegocio, eliminarNegocio } from "@/lib/actions/sistemas";
 import { formatFechaHora } from "@/lib/utils/fecha";
 import { ModalModulosNegocio } from "./ModalModulosNegocio";
+import { ModalSucursalesNegocio } from "./ModalSucursalesNegocio";
 import { LayoutGrid } from "lucide-react";
 import styles from "./negocios.module.css";
 
@@ -27,6 +28,7 @@ export interface NegocioConAdmin {
   tipo_negocio:   "general" | "impresion" | "billar";
   bStateCompany:  string;
   fhCreateCompany: string;
+  eMaxSucursales: number;
   admin?: {
     eCodUser:      string;
     tNameUser:     string;
@@ -51,6 +53,7 @@ export function NegociosClient({ negocios: inicial }: Props) {
   });
   const [modalCrear, setModalCrear] = useState(false);
   const [negocioModulos, setNegocioModulos] = useState<NegocioConAdmin | null>(null);
+  const [negocioSucursales, setNegocioSucursales] = useState<NegocioConAdmin | null>(null);
   const [negocioVer, setNegocioVer] = useState<NegocioConAdmin | null>(null);
   const [negocioEditar, setNegocioEditar] = useState<NegocioConAdmin | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
@@ -204,6 +207,9 @@ export function NegociosClient({ negocios: inicial }: Props) {
           <ActionBtn title="Módulos" onClick={() => setNegocioModulos(n)}>
             <LayoutGrid size={18} />
           </ActionBtn>
+          <ActionBtn title="Límite de sucursales" onClick={() => setNegocioSucursales(n)}>
+            <Store size={18} />
+          </ActionBtn>
           <ActionBtn
             title="Eliminar"
             onClick={() => handleEliminar(n)}
@@ -280,6 +286,19 @@ export function NegociosClient({ negocios: inicial }: Props) {
         <ModalModulosNegocio
           negocio={negocioModulos}
           onClose={() => setNegocioModulos(null)}
+        />
+      )}
+
+      {negocioSucursales && (
+        <ModalSucursalesNegocio
+          negocio={negocioSucursales}
+          onClose={() => setNegocioSucursales(null)}
+          onActualizado={(actualizado) => {
+            setNegocios((prev) =>
+              prev.map((n) => (n.eCodCompany === actualizado.eCodCompany ? actualizado : n))
+            );
+            setNegocioSucursales(null);
+          }}
         />
       )}
 

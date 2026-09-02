@@ -56,10 +56,10 @@ export default async function SistemasNegociosPage() {
   tipo_negocio:    n.tipo_negocio ?? "general",
   bStateCompany:   n.bStateCompany,
   fhCreateCompany: n.fhCreateCompany,
+  eMaxSucursales:  n.eMaxSucursales ?? 2,
   admin:           adminsPorNegocio[n.eCodCompany] ?? null,
   totalUsuarios:   totalesPorNegocio[n.eCodCompany] ?? 0,
 }));
-console.log("columnas DB:", Object.keys(negocios?.[0] ?? {}));
 
   return <NegociosClient negocios={negociosConDatos} />;
 }

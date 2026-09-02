@@ -83,15 +83,24 @@ export async function crearSucursal(
 
   const adminClient = createAdminClient();
 
-  // Restricción: máximo 2 sucursales por defecto
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("eMaxSucursales")
+    .eq("eCodCompany", perfil.fkeCodCompany)
+    .single();
+
+  const maxSucursales = negocio?.eMaxSucursales ?? 2;
+
   const { count } = await adminClient
     .from("sucursales")
     .select("eCodSucursal", { count: "exact", head: true })
     .eq("fkeCodCompany", perfil.fkeCodCompany)
     .eq("bStateSucursal", true);
 
-  if ((count ?? 0) >= 2) {
-    return { error: "Tu plan incluye máximo 2 sucursales. Contacta a Kivi para agregar más." };
+  if ((count ?? 0) >= maxSucursales) {
+    return {
+      error: `Tu plan incluye máximo ${maxSucursales} sucursal${maxSucursales === 1 ? "" : "es"}. Contacta a Kivi para agregar más.`,
+    };
   }
 
   const { data, error } = await adminClient

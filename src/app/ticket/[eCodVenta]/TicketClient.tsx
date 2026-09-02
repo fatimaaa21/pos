@@ -53,7 +53,7 @@ interface Props {
 
 function Sep({ doble = false }: { doble?: boolean }) {
   const char = doble ? "═" : "─";
-  return <span className={styles.sep}>{char.repeat(32)}</span>;
+  return <span className={styles.sep}>{char.repeat(20)}</span>;
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ export function TicketClient({
       </div>
 
       <span className={styles.label}>
-        Vista previa · 72mm térmica
+        Vista previa · 58mm térmica
       </span>
 
       {/* ══════════════════════════════
