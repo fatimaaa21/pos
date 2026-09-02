@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { buscarYRedirigirNegocio } from "@/lib/actions/negocioLookup";
+import { recuperarUrlPorCorreo } from "@/lib/actions/recuperarUrl";
 import { Spinner } from "@/components/ui/Spinner/Spinner";
 import styles from "@/components/auth/PinLoginForm.module.css";
 import modal from "@/components/ui/Modal.module.css";
 
-export default function BuscarNegocioPage() {
-  const [valor, setValor] = useState("");
+export default function RecuperarUrlPage() {
+  const [email, setEmail] = useState("");
+  const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -15,12 +16,14 @@ export default function BuscarNegocioPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await buscarYRedirigirNegocio(valor);
-    if (result?.error) {
+    setMensaje(null);
+    const result = await recuperarUrlPorCorreo(email);
+    setLoading(false);
+    if (result.error) {
       setError(result.error);
-      setLoading(false);
+    } else {
+      setMensaje(result.mensaje ?? null);
     }
-    // Si no hay error, la acción ya redirigió.
   }
 
   return (
@@ -31,9 +34,9 @@ export default function BuscarNegocioPage() {
             <div className={styles.logo}>
               <img src="/kivi-logo.svg" alt="Kivi" />
             </div>
-            <h1 className={modal.title}>¿Cuál es tu negocio?</h1>
+            <h1 className={modal.title}>Recuperar URL de acceso</h1>
             <p className={styles.subtitulo}>
-              Escribe el nombre de tu negocio
+              Escribe el correo con el que te registraste como administrador
             </p>
           </div>
 
@@ -42,10 +45,11 @@ export default function BuscarNegocioPage() {
             style={{ display: "flex", flexDirection: "column", gap: 16, padding: "24px" }}
           >
             <input
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              placeholder="Nombre de tu negocio"
-              disabled={loading}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tucorreo@ejemplo.com"
+              disabled={loading || !!mensaje}
               style={{
                 padding: "12px 16px",
                 borderRadius: "var(--radius-md)",
@@ -57,21 +61,18 @@ export default function BuscarNegocioPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !!mensaje}
               className={`${modal.btnAccion} ${modal.btnPrimario}`}
               style={{ width: "100%", minHeight: 40 }}
             >
-              {loading ? <Spinner size={18} /> : "Continuar"}
+              {loading ? <Spinner size={18} /> : "Enviar"}
             </button>
 
+            {mensaje && (
+              <p style={{ color: "var(--color-primary)", fontSize: 13, textAlign: "center" }}>{mensaje}</p>
+            )}
             {error && <div className={styles.error}>⚠️ {error}</div>}
           </form>
-
-          <p style={{ textAlign: "center", fontSize: 13, paddingBottom: 24 }}>
-            <a href="/auth/recuperar" style={{ color: "var(--gray)" }}>
-              ¿No recuerdas el nombre? Recupéralo por correo
-            </a>
-          </p>
         </div>
       </div>
     </div>

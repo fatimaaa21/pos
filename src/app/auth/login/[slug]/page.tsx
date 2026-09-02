@@ -12,7 +12,7 @@ export default async function LoginNegocioPage({
   const adminClient = createAdminClient();
   const { data: negocio } = await adminClient
     .from("negocios")
-    .select("tNameCompany, bStateCompany")
+    .select("tNameCompany, bStateCompany, imgCompany")
     .eq("tSlugCompany", slug)
     .maybeSingle();
 
@@ -38,13 +38,13 @@ export default async function LoginNegocioPage({
     );
   }
 
-  // Server Action con el slug ya vinculado — PinLoginForm solo necesita pasar el código.
   const accion = loginNegocio.bind(null, slug);
 
   return (
     <PinLoginForm
       titulo={`Bienvenido a ${negocio.tNameCompany}`}
       subtitulo="Ingresa tu código de acceso"
+      logoSrc={negocio.imgCompany ?? undefined}
       accion={accion}
     />
   );

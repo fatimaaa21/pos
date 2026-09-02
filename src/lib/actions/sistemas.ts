@@ -5,15 +5,52 @@ import { revalidatePath } from "next/cache";
 import type { NegocioConAdmin } from "@/app/sistemas/negocios/NegociosClient";
 import type { Perfil } from "@/types";
 import { generarCodigoUnico } from "@/lib/utils/codigo";
+import { mensajeError } from "@/lib/utils/error";
+import { enviarEmailBienvenida } from "@/lib/utils/emailBienvenida";
 
-function generarSlug(nombre: string): string {
-  return nombre
+function generarSlugBase(nombre: string): string {
+  const MAX_LARGO = 30;
+  let slug = nombre
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
+
+  // Corta nombres largos, pero en un límite de palabra si es razonable,
+  // para no dejar el slug cortado a media palabra.
+  if (slug.length > MAX_LARGO) {
+    slug = slug.slice(0, MAX_LARGO);
+    const ultimoGuion = slug.lastIndexOf("-");
+    if (ultimoGuion > 10) slug = slug.slice(0, ultimoGuion);
+  }
+
+  return slug || "negocio"; // fallback si el nombre no deja nada alfanumérico
+}
+
+/**
+ * Genera un slug único agregando un sufijo numérico en colisión,
+ * en vez de bloquear la creación del negocio. Nombres de negocio
+ * genéricos (ej. "Fonda Doña Rosa") pueden repetirse legítimamente
+ * entre negocios sin relación.
+ */
+async function generarSlugUnico(
+  adminClient: ReturnType<typeof createAdminClient>,
+  nombre: string
+): Promise<string> {
+  const base = generarSlugBase(nombre);
+
+  for (let intento = 1; intento <= 50; intento++) {
+    const candidato = intento === 1 ? base : `${base}-${intento}`;
+    const { data } = await adminClient
+      .from("negocios")
+      .select("eCodCompany")
+      .eq("tSlugCompany", candidato)
+      .maybeSingle();
+    if (!data) return candidato;
+  }
+  throw new Error("No se pudo generar un slug único para este negocio");
 }
 
 export async function crearNegocio(formData: FormData) {
@@ -23,7 +60,7 @@ export async function crearNegocio(formData: FormData) {
     const nombreAdmin   = formData.get("nombreAdmin")   as string;
     const emailAdmin    = formData.get("emailAdmin")    as string;
 
-    const slug = generarSlug(nombreNegocio);
+    const slug = await generarSlugUnico(adminClient, nombreNegocio);
 
     const tipo_negocio = (formData.get("tipo_negocio") as string) || "general";
 
@@ -93,6 +130,17 @@ export async function crearNegocio(formData: FormData) {
       return { error: `Error al crear perfil: ${perfilError.message}` };
     }
 
+    try {
+      await enviarEmailBienvenida({
+        nombre: nombreAdmin,
+        email: emailAdmin,
+        codigo: eCodeUser,
+        url: `https://kivi.mx/auth/login/${slug}`,
+      });
+    } catch (emailError) {
+      console.error("Error enviando email de bienvenida:", emailError);
+    }
+
     revalidatePath("/sistemas/dashboard");
     revalidatePath("/sistemas/negocios");
 
@@ -121,8 +169,8 @@ export async function crearNegocio(formData: FormData) {
       } as Perfil,
       codigo: eCodeUser,
     };
-  } catch (e: any) {
-    return { error: `Error inesperado: ${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { error: `Error inesperado: ${mensajeError(e)}` };
   }
 }
 
@@ -170,8 +218,8 @@ export async function editarNegocio(formData: FormData) {
         fhCreateCompany: negocio.fhCreateCompany,
       } as NegocioConAdmin,
     };
-  } catch (e: any) {
-    return { error: `Error inesperado: ${e?.message ?? e}` };
+  } catch (e: unknown) {
+    return { error: `Error inesperado: ${mensajeError(e)}` };
   }
 }
 
@@ -191,8 +239,8 @@ export async function toggleEstadoNegocio(
     revalidatePath("/sistemas/dashboard");
     revalidatePath("/sistemas/negocios");
     return { ok: true };
-  } catch (e: any) {
-    return { error: e?.message };
+  } catch (e: unknown) {
+    return { error: mensajeError(e) };
   }
 }
 
@@ -230,8 +278,8 @@ export async function eliminarNegocio(eCodCompany: string) {
     revalidatePath("/sistemas/negocios");
     revalidatePath("/sistemas/dashboard");
     return { ok: true };
-  } catch (e: any) {
-    return { error: `Error inesperado: ${e?.message}` };
+  } catch (e: unknown) {
+    return { error: `Error inesperado: ${mensajeError(e)}` };
   }
 }
 

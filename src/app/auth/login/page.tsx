@@ -10,7 +10,7 @@ export default function LoginSistemasPage() {
         subtitulo="Acceso de sistemas"
         accion={loginSistemas}
       />
-      <p style={{ textAlign: "center", marginTop: -16, fontSize: 13 }}>
+      <p style={{ textAlign: "center", marginTop: -48, fontSize: 13 }}>
         <Link href="/auth/negocio" style={{ color: "var(--gray)" }}>
           ¿Eres parte de un negocio? Búscalo aquí
         </Link>
