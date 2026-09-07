@@ -297,6 +297,7 @@ export function MenuClient({
           cargando={loadingTurno}
           deshabilitado={fondoInicial === ""}
           error={errorTurno}
+          ancho="sm"
         >
           <ModalField label="Fondo inicial en efectivo" required>
             <ModalInput

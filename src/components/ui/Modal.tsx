@@ -44,7 +44,7 @@ export function Modal({
   cargando = false,
   deshabilitado = false,
   error,
-  ancho = "md",
+  ancho = "sm",
   children,
 }: ModalProps) {
 

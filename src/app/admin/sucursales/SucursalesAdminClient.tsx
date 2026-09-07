@@ -252,20 +252,20 @@ export function SucursalesAdminClient({ sucursalesIniciales, moduloCocinaActivo 
         </span>
       ),
     },
-    {
-      key: "cocina" as any,
-      label: "Pantalla cocina",
-      render: (s) =>
-        !moduloCocinaActivo ? (
-          <span style={{ fontSize: 12, color: "var(--gray)" }} title="Activa el módulo de cocina desde Sistemas → Negocios">
-            Módulo desactivado
-          </span>
-        ) : s.tTokenCocina ? (
-          <BtnCopiarUrl token={s.tTokenCocina} />
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--gray)" }}>—</span>
-        ),
-    },
+    ...(moduloCocinaActivo
+      ? [
+          {
+            key: "cocina" as any,
+            label: "Pantalla cocina",
+            render: (s: SucursalConToken) =>
+              s.tTokenCocina ? (
+                <BtnCopiarUrl token={s.tTokenCocina} />
+              ) : (
+                <span style={{ fontSize: 12, color: "var(--gray)" }}>—</span>
+              ),
+          },
+        ]
+      : []),
     {
       key: "fhCreateSucursal",
       label: "Creada",

@@ -18,9 +18,10 @@ interface Props {
   onClose: () => void;
   onCreado: (producto: Producto) => void;
   categorias: Categoria[];
+  moduloCocinaActivo: boolean;
 }
 
-export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
+export function ModalCrearProducto({ onClose, onCreado, categorias, moduloCocinaActivo }: Props) {
   const checkboxId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,7 +165,7 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
         />
       </ModalField>
 
-      <ModalField label="Costo de producción" required>
+      <ModalField label="Costo de producción">
         <ModalInput
           type="number"
           placeholder="0.00"
@@ -174,39 +175,41 @@ export function ModalCrearProducto({ onClose, onCreado, categorias }: Props) {
       </ModalField>
 
       {/* ── Cocina ── */}
-      <ModalField label="Cocina">
-        <label
-          htmlFor={checkboxId}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            cursor: "pointer",
-            padding: "10px 12px",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            background: form.bCocina ? "var(--color-primary-50)" : "var(--white)",
-            transition: "background 0.15s, border-color 0.15s",
-            borderColor: form.bCocina ? "var(--color-primary)" : "var(--border-default)",
-          }}
-        >
-          <input
-            id={checkboxId}
-            type="checkbox"
-            checked={form.bCocina}
-            onChange={(e) => setForm({ ...form, bCocina: e.target.checked })}
-            style={{ width: 16, height: 16, accentColor: "var(--color-primary)", cursor: "pointer" }}
-          />
-          <div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)", display: "block" }}>
-              Requiere preparación en cocina
-            </span>
-            <span style={{ fontSize: 11, color: "var(--gray)" }}>
-              El pedido aparece en la pantalla de cocina al agregarlo a una orden
-            </span>
-          </div>
-        </label>
-      </ModalField>
+      {moduloCocinaActivo && (
+        <ModalField label="Cocina">
+          <label
+            htmlFor={checkboxId}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              cursor: "pointer",
+              padding: "10px 12px",
+              border: "1px solid var(--border-default)",
+              borderRadius: "var(--radius-md)",
+              background: form.bCocina ? "var(--color-primary-50)" : "var(--white)",
+              transition: "background 0.15s, border-color 0.15s",
+              borderColor: form.bCocina ? "var(--color-primary)" : "var(--border-default)",
+            }}
+          >
+            <input
+              id={checkboxId}
+              type="checkbox"
+              checked={form.bCocina}
+              onChange={(e) => setForm({ ...form, bCocina: e.target.checked })}
+              style={{ width: 16, height: 16, accentColor: "var(--color-primary)", cursor: "pointer" }}
+            />
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--dark)", display: "block" }}>
+                Requiere preparación en cocina
+              </span>
+              <span style={{ fontSize: 11, color: "var(--gray)" }}>
+                El pedido aparece en la pantalla de cocina al agregarlo a una orden
+              </span>
+            </div>
+          </label>
+        </ModalField>
+      )}
 
       {/* ── Presentaciones ── */}
       <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>

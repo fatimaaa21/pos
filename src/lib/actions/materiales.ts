@@ -5,6 +5,22 @@ import { createClient }      from "@/lib/supabase/server";
 import { revalidatePath }    from "next/cache";
 import type { Material }     from "@/types";
 
+async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany) return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
+
 export async function getMateriales(): Promise<Material[]> {
   try {
     const supabase    = await createClient();
@@ -101,6 +117,9 @@ export async function crearMaterial(formData: FormData) {
 
 export async function editarMaterial(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodMaterial    = formData.get("eCodMaterial")    as string;
@@ -123,6 +142,15 @@ export async function editarMaterial(formData: FormData) {
       return { error: "El ancho de la hoja es requerido" };
     if (tipo_material === "hoja" && (!eAltoCm || isNaN(eAltoCm) || eAltoCm <= 0))
       return { error: "El alto de la hoja es requerido" };
+
+    const { data: materialActual, error: errorLectura } = await adminClient
+      .from("materiales")
+      .select("fkeCodCompany")
+      .eq("eCodMaterial", eCodMaterial)
+      .single();
+
+    if (errorLectura || !materialActual) return { error: "Material no encontrado" };
+    if (materialActual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data, error } = await adminClient
       .from("materiales")
@@ -150,11 +178,24 @@ export async function editarMaterial(formData: FormData) {
 
 export async function toggleEstadoMaterial(eCodMaterial: string, nuevoEstado: boolean) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: materialActual, error: errorLectura } = await adminClient
+      .from("materiales")
+      .select("fkeCodCompany")
+      .eq("eCodMaterial", eCodMaterial)
+      .single();
+
+    if (errorLectura || !materialActual) return { error: "Material no encontrado" };
+    if (materialActual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { error } = await adminClient
       .from("materiales")
       .update({
-        bStateMateria:    nuevoEstado,
+        bStateMaterial:   nuevoEstado,
         fhUpdateMaterial: new Date().toISOString(),
       })
       .eq("eCodMaterial", eCodMaterial);
@@ -170,7 +211,20 @@ export async function toggleEstadoMaterial(eCodMaterial: string, nuevoEstado: bo
 
 export async function eliminarMaterial(eCodMaterial: string) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: materialActual, error: errorLectura } = await adminClient
+      .from("materiales")
+      .select("fkeCodCompany")
+      .eq("eCodMaterial", eCodMaterial)
+      .single();
+
+    if (errorLectura || !materialActual) return { error: "Material no encontrado" };
+    if (materialActual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { error } = await adminClient
       .from("materiales")
       .delete()

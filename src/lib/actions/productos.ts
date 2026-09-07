@@ -5,6 +5,25 @@ import { createClient } from "@/lib/supabase/server";
 import type { Producto } from "@/types";
 import { revalidatePath } from "next/cache";
 
+// ─────────────────────────────────────────────────────────────
+// HELPER: verificar si un módulo está activo para un negocio
+// (mismo patrón/tabla que verificarModuloMesas en mesas.ts)
+// ─────────────────────────────────────────────────────────────
+
+async function verificarModuloActivo(
+  adminClient: ReturnType<typeof createAdminClient>,
+  fkeCodCompany: string,
+  modulo: string
+): Promise<boolean> {
+  const { data } = await adminClient
+    .from("modulos_tenant")
+    .select("bStateModulo")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("tModulo", modulo)
+    .maybeSingle();
+
+  return data?.bStateModulo === true;
+}
 
 export async function crearProducto(formData: FormData) {
   try {
@@ -21,6 +40,16 @@ export async function crearProducto(formData: FormData) {
       .single();
 
     if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const moduloCocinaActivo = await verificarModuloActivo(
+      adminClient,
+      perfil.fkeCodCompany,
+      "cocina"
+    );
+
+    // Si el módulo de cocina no está activo, un producto nuevo no puede
+    // nacer con bCocina=true — no hay valor previo que proteger aquí.
+    const bCocina = moduloCocinaActivo && formData.get("bCocina") === "true";
 
     const tNameProduct   = formData.get("tNameProduct") as string;
     const ImgProduct     = formData.get("ImgProduct") as string;
@@ -42,7 +71,7 @@ export async function crearProducto(formData: FormData) {
         eAnchoCm:        formData.get("eAnchoCm") ? parseFloat(formData.get("eAnchoCm") as string) : null,
         eAltoCm:         formData.get("eAltoCm")  ? parseFloat(formData.get("eAltoCm")  as string) : null,
         fkeCodMaterial:  formData.get("fkeCodMaterial") || null,
-        bCocina:         formData.get("bCocina") === "true",
+        bCocina,
         bStateProduct:   true,
         fhCreateProduct: new Date().toISOString(),
       })
@@ -64,8 +93,50 @@ export async function crearProducto(formData: FormData) {
 export async function editarProducto(formData: FormData) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
 
-    const eCodProduct    = formData.get("eCodProduct") as string;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const eCodProduct = formData.get("eCodProduct") as string;
+
+    // Verificar que el producto pertenece al negocio del usuario autenticado
+    // antes de tocarlo — eCodProduct viene del cliente y no es confiable por sí solo.
+    const { data: productoActual, error: errorLectura } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany, bCocina")
+      .eq("eCodProduct", eCodProduct)
+      .single();
+
+    if (errorLectura || !productoActual) {
+      return { error: "Producto no encontrado" };
+    }
+
+    if (productoActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
+    const moduloCocinaActivo = await verificarModuloActivo(
+      adminClient,
+      perfil.fkeCodCompany,
+      "cocina"
+    );
+
+    // Si el módulo está inactivo, no se toca bCocina — se conserva el valor
+    // existente en vez de forzarlo a false, para no alterar un campo que el
+    // usuario ni siquiera ve al editar otra cosa (precio, nombre, etc.).
+    const bCocina = moduloCocinaActivo
+      ? formData.get("bCocina") === "true"
+      : productoActual.bCocina;
+
     const tNameProduct   = formData.get("tNameProduct") as string;
     const ImgProduct     = formData.get("ImgProduct") as string;
     const ePriceProduct  = parseFloat(formData.get("ePriceProduct") as string);
@@ -85,10 +156,11 @@ export async function editarProducto(formData: FormData) {
         eAnchoCm:        formData.get("eAnchoCm") ? parseFloat(formData.get("eAnchoCm") as string) : null,
         eAltoCm:         formData.get("eAltoCm")  ? parseFloat(formData.get("eAltoCm")  as string) : null,
         fkeCodMaterial:  formData.get("fkeCodMaterial") || null,
-        bCocina:         formData.get("bCocina") === "true",
+        bCocina,
         fhUpdateProduct: new Date().toISOString(),
       })
       .eq("eCodProduct", eCodProduct)
+      .eq("fkeCodCompany", perfil.fkeCodCompany)
       .select()
       .single();
 
@@ -105,6 +177,32 @@ export async function editarProducto(formData: FormData) {
 export async function toggleEstadoProducto(eCodProduct: string, nuevoEstado: boolean) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const { data: productoActual, error: errorLectura } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany")
+      .eq("eCodProduct", eCodProduct)
+      .single();
+
+    if (errorLectura || !productoActual) {
+      return { error: "Producto no encontrado" };
+    }
+
+    if (productoActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { error } = await adminClient
       .from("productos")
@@ -112,7 +210,8 @@ export async function toggleEstadoProducto(eCodProduct: string, nuevoEstado: boo
         bStateProduct: nuevoEstado,
         fhUpdateProduct: new Date().toISOString(),
       })
-      .eq("eCodProduct", eCodProduct);
+      .eq("eCodProduct", eCodProduct)
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
 
     if (error) return { error: `Error al actualizar estado: ${error.message}` };
 
@@ -127,15 +226,31 @@ export async function toggleEstadoProducto(eCodProduct: string, nuevoEstado: boo
 export async function eliminarProducto(eCodProduct: string) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
 
     const { data: productoActual, error: errorLectura } = await adminClient
       .from("productos")
-      .select("fkeCodCategory")
+      .select("fkeCodCategory, fkeCodCompany")
       .eq("eCodProduct", eCodProduct)
       .single();
 
-    if (errorLectura) {
-      return { error: `Error al leer producto: ${errorLectura.message}` };
+    if (errorLectura || !productoActual) {
+      return { error: "Producto no encontrado" };
+    }
+
+    if (productoActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
     }
 
     const categoriaDueña = productoActual?.fkeCodCategory as string | null;
@@ -143,7 +258,8 @@ export async function eliminarProducto(eCodProduct: string) {
     const { error: errorEliminar } = await adminClient
       .from("productos")
       .delete()
-      .eq("eCodProduct", eCodProduct);
+      .eq("eCodProduct", eCodProduct)
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
 
     if (errorEliminar) {
       return { error: `Error al eliminar producto: ${errorEliminar.message}` };

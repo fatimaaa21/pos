@@ -1,11 +1,31 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Inventario } from "@/types";
 
+async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany) return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
+
 export async function agregarStock(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const fkeCodProduct      = formData.get("fkeCodProduct") as string;
@@ -46,6 +66,20 @@ export async function agregarStock(formData: FormData) {
 
     if (productoError || !producto?.fkeCodCompany) {
       return { error: "No se pudo obtener el negocio del producto" };
+    }
+
+    if (producto.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
+    const { data: sucursal, error: sucursalError } = await adminClient
+      .from("sucursales")
+      .select("fkeCodCompany")
+      .eq("eCodSucursal", fkeCodSucursal)
+      .single();
+
+    if (sucursalError || !sucursal || sucursal.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
     }
 
     const fkeCodCompany = producto.fkeCodCompany;
@@ -97,6 +131,9 @@ export async function agregarStock(formData: FormData) {
 
 export async function editarStock(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodInventory = formData.get("eCodInventory") as string;
@@ -105,11 +142,12 @@ export async function editarStock(formData: FormData) {
 
     const { data: actual, error: errorLectura } = await adminClient
       .from("inventario")
-      .select("eCantIngresada")
+      .select("eCantIngresada, fkeCodCompany")
       .eq("eCodInventory", eCodInventory)
       .single();
 
     if (errorLectura || !actual) return { error: "No se encontró el registro" };
+    if (actual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const nuevaCantIngresada = actual.eCantIngresada + eCantAgregar;
 
@@ -149,7 +187,20 @@ export async function editarStock(formData: FormData) {
 
 export async function toggleEstadoInventario(eCodInventory: string, nuevoEstado: boolean) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: actual, error: errorLectura } = await adminClient
+      .from("inventario")
+      .select("fkeCodCompany")
+      .eq("eCodInventory", eCodInventory)
+      .single();
+
+    if (errorLectura || !actual) return { error: "No se encontró el registro" };
+    if (actual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { error } = await adminClient
       .from("inventario")
       .update({ bStateInventory: nuevoEstado, fhUpdateInventory: new Date().toISOString() })
@@ -166,7 +217,20 @@ export async function toggleEstadoInventario(eCodInventory: string, nuevoEstado:
 
 export async function eliminarInventario(eCodInventory: string) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: actual, error: errorLectura } = await adminClient
+      .from("inventario")
+      .select("fkeCodCompany")
+      .eq("eCodInventory", eCodInventory)
+      .single();
+
+    if (errorLectura || !actual) return { error: "No se encontró el registro" };
+    if (actual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { error } = await adminClient
       .from("inventario")
       .delete()

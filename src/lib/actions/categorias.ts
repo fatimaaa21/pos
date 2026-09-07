@@ -52,10 +52,37 @@ export async function crearCategoria(formData: FormData) {
 export async function editarCategoria(formData: FormData) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
 
     const eCodCategory = formData.get("eCodCategory") as string;
     const tNameCategory = formData.get("tNameCategory") as string;
     const ImgCategory = formData.get("ImgCategory") as string;
+
+    const { data: categoriaActual, error: errorLectura } = await adminClient
+      .from("categorias")
+      .select("fkeCodCompany")
+      .eq("eCodCategory", eCodCategory)
+      .single();
+
+    if (errorLectura || !categoriaActual) {
+      return { error: "Categoría no encontrada" };
+    }
+
+    if (categoriaActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
     const { data: categoria, error } = await adminClient
       .from("categorias")
       .update({
@@ -64,10 +91,9 @@ export async function editarCategoria(formData: FormData) {
         fhUpdateCategory: new Date().toISOString(),
       })
       .eq("eCodCategory", eCodCategory)
+      .eq("fkeCodCompany", perfil.fkeCodCompany)
       .select()
       .single();
-
-    // console.log("[editarCategoria] resultado:", categoria, "error:", error);
 
     if (error) return { error: `Error al actualizar categoría: ${error.message}` };
 
@@ -81,6 +107,32 @@ export async function editarCategoria(formData: FormData) {
 export async function toggleEstadoCategoria(eCodCategory: string, nuevoEstado: boolean) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const { data: categoriaActual, error: errorLectura } = await adminClient
+      .from("categorias")
+      .select("fkeCodCompany")
+      .eq("eCodCategory", eCodCategory)
+      .single();
+
+    if (errorLectura || !categoriaActual) {
+      return { error: "Categoría no encontrada" };
+    }
+
+    if (categoriaActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { error } = await adminClient
       .from("categorias")
@@ -88,7 +140,8 @@ export async function toggleEstadoCategoria(eCodCategory: string, nuevoEstado: b
         bStateCategory: nuevoEstado,
         fhUpdateCategory: new Date().toISOString(),
       })
-      .eq("eCodCategory", eCodCategory);
+      .eq("eCodCategory", eCodCategory)
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
 
     if (error) return { error: `Error al actualizar estado: ${error.message}` };
 
@@ -102,6 +155,32 @@ export async function toggleEstadoCategoria(eCodCategory: string, nuevoEstado: b
 export async function eliminarCategoria(eCodCategory: string) {
   try {
     const adminClient = createAdminClient();
+    const supabase = await createClient();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "No autenticado" };
+
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", user.id)
+      .single();
+
+    if (!perfil?.fkeCodCompany) return { error: "No se encontró el negocio" };
+
+    const { data: categoriaActual, error: errorLectura } = await adminClient
+      .from("categorias")
+      .select("fkeCodCompany")
+      .eq("eCodCategory", eCodCategory)
+      .single();
+
+    if (errorLectura || !categoriaActual) {
+      return { error: "Categoría no encontrada" };
+    }
+
+    if (categoriaActual.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { data: productosAsociados, error: errorConsulta } = await adminClient
       .from("productos")
@@ -120,7 +199,8 @@ export async function eliminarCategoria(eCodCategory: string) {
     const { error } = await adminClient
       .from("categorias")
       .delete()
-      .eq("eCodCategory", eCodCategory);
+      .eq("eCodCategory", eCodCategory)
+      .eq("fkeCodCompany", perfil.fkeCodCompany);
 
     if (error) return { error: `Error al eliminar categoría: ${error.message}` };
 

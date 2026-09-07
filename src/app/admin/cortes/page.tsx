@@ -57,5 +57,33 @@ const { data: cortes, error } = await cortesQuery;
     empleado: perfilesMap.get(c.fkeCodUser) ?? null,
   }));
 
-  return <CortesAdminClient cortes={cortesConEmpleado} />;
+  // Métodos de pago activos del negocio — el desglose del corte solo debe
+  // mostrar Efectivo/Tarjeta/Transferencia si el negocio realmente tiene
+  // activado algún método de esa categoría (mismo agrupamiento por nombre
+  // que ya usa cerrarTurno en src/lib/actions/cortes.ts).
+  const { data: negocio } = await adminClient
+    .from("negocios")
+    .select("metodosPago")
+    .eq("eCodCompany", fkeCodCompany)
+    .single();
+
+  const idsMetodosActivos: string[] = negocio?.metodosPago ?? [];
+
+  let nombresMetodosActivos: string[] = [];
+  if (idsMetodosActivos.length > 0) {
+    const { data: metodos } = await adminClient
+      .from("metodos_pago")
+      .select("tNamePay")
+      .in("eCodPay", idsMetodosActivos);
+
+    nombresMetodosActivos = (metodos ?? []).map((m) => m.tNamePay.toLowerCase());
+  }
+
+  const desgloseMetodos = {
+    efectivo:      nombresMetodosActivos.some((n) => n.includes("efectivo")),
+    tarjeta:       nombresMetodosActivos.some((n) => n.includes("tarjeta")),
+    transferencia: nombresMetodosActivos.some((n) => !n.includes("efectivo") && !n.includes("tarjeta")),
+  };
+
+  return <CortesAdminClient cortes={cortesConEmpleado} desgloseMetodos={desgloseMetodos} />;
 }

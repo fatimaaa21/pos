@@ -8,6 +8,29 @@ import { generarCodigoUnico } from "@/lib/utils/codigo";
 import { mensajeError } from "@/lib/utils/error";
 import { enviarEmailBienvenida } from "@/lib/utils/emailBienvenida";
 
+// ─────────────────────────────────────────────────────────────
+// HELPER: admin autenticado del negocio actual
+// No confiamos solo en el middleware de /admin — cada acción
+// vuelve a verificar rol y resuelve fkeCodCompany desde la sesión,
+// nunca desde datos que manda el cliente.
+// ─────────────────────────────────────────────────────────────
+
+async function getPerfilAdminActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany, tRolUser")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany || perfil.tRolUser !== "admin") return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
+
 export async function crearUsuario(formData: FormData) {
   try {
     const adminClient = createAdminClient();
@@ -17,21 +40,10 @@ export async function crearUsuario(formData: FormData) {
     const tRolUser = formData.get("tRolUser") as string;
     const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
 
-    // Resolver primero el negocio del admin que está creando el usuario,
-    // ANTES de generar código o tocar Auth — así no queda un usuario
-    // huérfano en Auth si esto falla.
-    const supabase = await createClient();
-    const { data: { user: adminUser } } = await supabase.auth.getUser();
-    const { data: perfilAdmin } = await supabase
-      .from("perfiles")
-      .select("fkeCodCompany")
-      .eq("eCodUser", adminUser!.id)
-      .single();
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
 
-    const fkeCodCompany = perfilAdmin?.fkeCodCompany;
-    if (!fkeCodCompany) {
-      return { error: "No se pudo determinar el negocio del administrador" };
-    }
+    const fkeCodCompany = perfilAdmin.fkeCodCompany;
 
     const eCodeUser = await generarCodigoUnico(adminClient, fkeCodCompany);
 
@@ -97,16 +109,34 @@ export async function editarUsuario(formData: FormData) {
   try {
     const adminClient = createAdminClient();
 
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
+
     const eCodUser = formData.get("eCodUser") as string;
     const tNameUser = formData.get("tNameUser") as string;
     const tEmailUser = formData.get("tEmailUser") as string;
     const tRolUser = formData.get("tRolUser") as string;
     const fkeCodSucursal = (formData.get("fkeCodSucursal") as string) || null;
 
+    const { data: usuarioActual, error: errorLectura } = await adminClient
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", eCodUser)
+      .single();
+
+    if (errorLectura || !usuarioActual) {
+      return { error: "Usuario no encontrado" };
+    }
+
+    if (usuarioActual.fkeCodCompany !== perfilAdmin.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
     const { data: perfil, error } = await adminClient
       .from("perfiles")
       .update({ tNameUser, tEmailUser, tRolUser, fkeCodSucursal: tRolUser === "empleado" ? fkeCodSucursal : null, fhUpdateUser: new Date().toISOString() })
       .eq("eCodUser", eCodUser)
+      .eq("fkeCodCompany", perfilAdmin.fkeCodCompany)
       .select()
       .single();
 
@@ -123,10 +153,28 @@ export async function toggleEstadoUsuario(eCodUser: string, nuevoEstado: boolean
   try {
     const adminClient = createAdminClient();
 
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
+
+    const { data: usuarioActual, error: errorLectura } = await adminClient
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", eCodUser)
+      .single();
+
+    if (errorLectura || !usuarioActual) {
+      return { error: "Usuario no encontrado" };
+    }
+
+    if (usuarioActual.fkeCodCompany !== perfilAdmin.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
     const { error } = await adminClient
       .from("perfiles")
       .update({ bStateUser: nuevoEstado, fhUpdateUser: new Date().toISOString() })
-      .eq("eCodUser", eCodUser);
+      .eq("eCodUser", eCodUser)
+      .eq("fkeCodCompany", perfilAdmin.fkeCodCompany);
 
     if (error) return { error: `Error al actualizar estado: ${error.message}` };
 
@@ -141,10 +189,28 @@ export async function eliminarUsuario(eCodUser: string) {
   try {
     const adminClient = createAdminClient();
 
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
+
+    const { data: usuarioActual, error: errorLectura } = await adminClient
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", eCodUser)
+      .single();
+
+    if (errorLectura || !usuarioActual) {
+      return { error: "Usuario no encontrado" };
+    }
+
+    if (usuarioActual.fkeCodCompany !== perfilAdmin.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
     const { error: perfilError } = await adminClient
       .from("perfiles")
       .delete()
-      .eq("eCodUser", eCodUser);
+      .eq("eCodUser", eCodUser)
+      .eq("fkeCodCompany", perfilAdmin.fkeCodCompany);
 
     if (perfilError) return { error: `Error al eliminar perfil: ${perfilError.message}` };
 
@@ -161,10 +227,28 @@ export async function actualizarAvatar(eCodUser: string, ImgUser: string) {
   try {
     const adminClient = createAdminClient();
 
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
+
+    const { data: usuarioActual, error: errorLectura } = await adminClient
+      .from("perfiles")
+      .select("fkeCodCompany")
+      .eq("eCodUser", eCodUser)
+      .single();
+
+    if (errorLectura || !usuarioActual) {
+      return { error: "Usuario no encontrado" };
+    }
+
+    if (usuarioActual.fkeCodCompany !== perfilAdmin.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
     const { error } = await adminClient
       .from("perfiles")
       .update({ ImgUser, fhUpdateUser: new Date().toISOString() })
-      .eq("eCodUser", eCodUser);
+      .eq("eCodUser", eCodUser)
+      .eq("fkeCodCompany", perfilAdmin.fkeCodCompany);
 
     if (error) return { error: error.message };
 

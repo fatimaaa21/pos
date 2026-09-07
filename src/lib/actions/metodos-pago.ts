@@ -14,6 +14,38 @@ export interface MetodoPagoGlobal {
   bStatePay:   boolean;
 }
 
+// ── Helpers internos ──────────────────────────────────────────────────────────
+
+async function getPerfilSistemas(): Promise<boolean> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("tRolUser")
+    .eq("eCodUser", user.id)
+    .single();
+
+  return perfil?.tRolUser === "sistemas";
+}
+
+async function getPerfilAdminActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany, tRolUser")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany || perfil.tRolUser !== "admin") return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 /** Todos los métodos del catálogo global (para Sistemas) */
@@ -68,9 +100,12 @@ export async function getMetodosParaAdmin(): Promise<{
 }
 
 // ── Mutations — Sistemas ──────────────────────────────────────────────────────
+// Catálogo GLOBAL: lo ven todos los negocios. Solo rol "sistemas" puede tocarlo.
 
 export async function crearMetodoPago(formData: FormData) {
   try {
+    if (!(await getPerfilSistemas())) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const tNamePay    = formData.get("tNamePay")    as string;
@@ -99,6 +134,8 @@ export async function crearMetodoPago(formData: FormData) {
 
 export async function editarMetodoPago(formData: FormData) {
   try {
+    if (!(await getPerfilSistemas())) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodPay     = formData.get("eCodPay")     as string;
@@ -128,6 +165,8 @@ export async function editarMetodoPago(formData: FormData) {
 
 export async function toggleActivoMetodoPago(eCodPay: string, bStatePay: boolean) {
   try {
+    if (!(await getPerfilSistemas())) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
     const { error } = await adminClient
       .from("metodos_pago")
@@ -145,6 +184,8 @@ export async function toggleActivoMetodoPago(eCodPay: string, bStatePay: boolean
 
 export async function eliminarMetodoPago(eCodPay: string) {
   try {
+    if (!(await getPerfilSistemas())) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
     const { error } = await adminClient
       .from("metodos_pago")
@@ -162,14 +203,22 @@ export async function eliminarMetodoPago(eCodPay: string) {
 
 // ── Mutations — Admin ─────────────────────────────────────────────────────────
 
-/** Guarda los eCodPay de los métodos activados por el admin para su negocio */
+/**
+ * Guarda los eCodPay de los métodos activados por el admin para su negocio.
+ * codCompany viene del cliente solo por compatibilidad de firma — NO se usa
+ * para decidir qué fila tocar. El negocio real se resuelve desde la sesión,
+ * así un admin nunca puede sobreescribir la configuración de otro negocio.
+ */
 export async function guardarMetodosNegocio(codCompany: string, metodosPago: string[]) {
   try {
+    const perfilAdmin = await getPerfilAdminActual();
+    if (!perfilAdmin) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
     const { error } = await adminClient
       .from("negocios")
       .update({ metodosPago })
-      .eq("eCodCompany", codCompany);
+      .eq("eCodCompany", perfilAdmin.fkeCodCompany);
 
     if (error) return { error: error.message };
 

@@ -6,6 +6,23 @@ import { getSucursalContext } from "@/lib/utils/sucursal";
 import { revalidatePath }    from "next/cache";
 import type { InsumoConStock, InsumoMaestro } from "@/types";
 
+// ── Helper interno: sesión + negocio del usuario actual ──────────────────────
+async function getPerfilActual(): Promise<{ userId: string; fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany) return null;
+
+  return { userId: user.id, fkeCodCompany: perfil.fkeCodCompany };
+}
+
 // ── Helper interno: junta maestro + stock en el shape InsumoConStock ────────
 function combinar(stockRow: any): InsumoConStock {
   const maestro = stockRow.insumos_maestro;
@@ -174,6 +191,9 @@ export async function getInsumosMaestroDisponibles(
 
 export async function agregarInsumoExistenteASucursal(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const fkeCodInsumoMaestro = formData.get("fkeCodInsumoMaestro") as string;
@@ -192,6 +212,17 @@ export async function agregarInsumoExistenteASucursal(formData: FormData) {
       .single();
 
     if (errMaestro || !maestro) return { error: "Insumo no encontrado" };
+    if (maestro.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
+    const { data: sucursal, error: errSucursal } = await adminClient
+      .from("sucursales")
+      .select("fkeCodCompany")
+      .eq("eCodSucursal", fkeCodSucursal)
+      .single();
+
+    if (errSucursal || !sucursal || sucursal.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { data: stock, error: errStock } = await adminClient
       .from("insumos_stock")
@@ -227,6 +258,9 @@ export async function agregarInsumoExistenteASucursal(formData: FormData) {
 
 export async function editarInsumo(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodInsumoMaestro = formData.get("eCodInsumoMaestro") as string;
@@ -242,6 +276,25 @@ export async function editarInsumo(formData: FormData) {
     if (!tNombre) return { error: "El nombre es requerido" };
     if (isNaN(eFactorConversion) || eFactorConversion <= 0)
       return { error: "El factor de conversión debe ser mayor a 0" };
+
+    const { data: maestroActual, error: errLecturaMaestro } = await adminClient
+      .from("insumos_maestro")
+      .select("fkeCodCompany")
+      .eq("eCodInsumoMaestro", eCodInsumoMaestro)
+      .single();
+
+    if (errLecturaMaestro || !maestroActual) return { error: "Insumo no encontrado" };
+    if (maestroActual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
+    const { data: stockActual, error: errLecturaStock } = await adminClient
+      .from("insumos_stock")
+      .select("fkeCodInsumoMaestro")
+      .eq("eCodInsumoStock", eCodInsumoStock)
+      .single();
+
+    if (errLecturaStock || !stockActual || stockActual.fkeCodInsumoMaestro !== eCodInsumoMaestro) {
+      return { error: "No autorizado" };
+    }
 
     const { data: maestro, error: errMaestro } = await adminClient
       .from("insumos_maestro")
@@ -285,11 +338,10 @@ export async function editarInsumo(formData: FormData) {
 
 export async function ajustarStockInsumo(formData: FormData) {
   try {
-    const supabase    = await createClient();
-    const adminClient = createAdminClient();
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "No autenticado" };
+    const adminClient = createAdminClient();
 
     const eCodInsumoStock = formData.get("eCodInsumoStock") as string;
     const eCantAgregar    = parseFloat(formData.get("eCantAgregar") as string);
@@ -301,11 +353,14 @@ export async function ajustarStockInsumo(formData: FormData) {
 
     const { data: actual, error: errorLectura } = await adminClient
       .from("insumos_stock")
-      .select("eCantidadStock, fkeCodInsumoMaestro, fkeCodSucursal, insumos_maestro(tNombre, tUnidadReceta)")
+      .select("eCantidadStock, fkeCodInsumoMaestro, fkeCodSucursal, insumos_maestro(tNombre, tUnidadReceta, fkeCodCompany)")
       .eq("eCodInsumoStock", eCodInsumoStock)
       .single();
 
     if (errorLectura || !actual) return { error: "No se encontró el insumo" };
+
+    const maestroInfo = (actual as any).insumos_maestro;
+    if (maestroInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const nuevaCantidad = actual.eCantidadStock + eCantAgregar;
     if (nuevaCantidad < 0) return { error: "El ajuste dejaría el stock en negativo" };
@@ -322,8 +377,6 @@ export async function ajustarStockInsumo(formData: FormData) {
 
     if (error) return { error: `Error al ajustar stock: ${error.message}` };
 
-    const maestroInfo = (actual as any).insumos_maestro;
-
     await adminClient.from("historial_ajustes_insumos").insert({
       fkeCodInsumoStock:      eCodInsumoStock,
       fkeCodSucursal:         actual.fkeCodSucursal,
@@ -333,7 +386,7 @@ export async function ajustarStockInsumo(formData: FormData) {
       eCantidadDespues:       nuevaCantidad,
       tUnidadRecetaSnapshot:  maestroInfo?.tUnidadReceta ?? "",
       tMotivo,
-      fkeCodUser:             user.id,
+      fkeCodUser:             perfil.userId,
     });
 
     const { data: maestro } = await adminClient
@@ -428,11 +481,10 @@ export async function confirmarCompraInsumos(
   items: { eCodInsumoStock: string; eCantidadComprada: number }[]
 ): Promise<{ ok: true; actualizados: number; errores: string[] } | { error: string }> {
   try {
-    const supabase    = await createClient();
-    const adminClient = createAdminClient();
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { error: "No autenticado" };
+    const adminClient = createAdminClient();
 
     let actualizados = 0;
     const errores: string[] = [];
@@ -442,7 +494,7 @@ export async function confirmarCompraInsumos(
 
       const { data: stock, error: errStock } = await adminClient
         .from("insumos_stock")
-        .select("eCantidadStock, version, fkeCodSucursal, insumos_maestro(tNombre, tUnidadCompra, tUnidadReceta, eFactorConversion)")
+        .select("eCantidadStock, version, fkeCodSucursal, insumos_maestro(tNombre, tUnidadCompra, tUnidadReceta, eFactorConversion, fkeCodCompany)")
         .eq("eCodInsumoStock", item.eCodInsumoStock)
         .single();
 
@@ -452,6 +504,12 @@ export async function confirmarCompraInsumos(
       }
 
       const maestro = (stock as any).insumos_maestro;
+
+      if (maestro?.fkeCodCompany !== perfil.fkeCodCompany) {
+        errores.push(`No autorizado para un insumo (id: ${item.eCodInsumoStock})`);
+        continue;
+      }
+
       const cantidadEnReceta = item.eCantidadComprada * maestro.eFactorConversion;
 
       const { data: actualizado, error: errUpdate } = await adminClient
@@ -478,7 +536,7 @@ export async function confirmarCompraInsumos(
         tUnidadCompraSnapshot:  maestro.tUnidadCompra,
         eCantidadAgregadaStock: cantidadEnReceta,
         tUnidadRecetaSnapshot:  maestro.tUnidadReceta,
-        fkeCodUser:             user.id,
+        fkeCodUser:             perfil.userId,
       });
 
       actualizados++;
@@ -612,7 +670,21 @@ export async function obtenerHistorialAjustes(): Promise<
 
 export async function toggleEstadoInsumo(eCodInsumoStock: string, nuevoEstado: boolean) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: stockActual, error: errLectura } = await adminClient
+      .from("insumos_stock")
+      .select("insumos_maestro(fkeCodCompany)")
+      .eq("eCodInsumoStock", eCodInsumoStock)
+      .single();
+
+    if (errLectura || !stockActual) return { error: "Insumo no encontrado" };
+
+    const maestroInfo = (stockActual as any).insumos_maestro;
+    if (maestroInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { error } = await adminClient
       .from("insumos_stock")
@@ -638,15 +710,21 @@ export async function toggleEstadoInsumo(eCodInsumoStock: string, nuevoEstado: b
 
 export async function eliminarInsumo(eCodInsumoStock: string) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const { data: stock, error: errStock } = await adminClient
       .from("insumos_stock")
-      .select("fkeCodInsumoMaestro")
+      .select("fkeCodInsumoMaestro, insumos_maestro(fkeCodCompany)")
       .eq("eCodInsumoStock", eCodInsumoStock)
       .single();
 
     if (errStock || !stock) return { error: "Insumo no encontrado" };
+
+    const maestroInfo = (stock as any).insumos_maestro;
+    if (maestroInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data: enUso, error: errUso } = await adminClient
       .from("receta_insumos")
