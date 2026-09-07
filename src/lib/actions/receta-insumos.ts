@@ -5,6 +5,22 @@ import { createClient }      from "@/lib/supabase/server";
 import { revalidatePath }    from "next/cache";
 import type { RecetaInsumoConDatos, PresentacionConReceta } from "@/types";
 
+async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany) return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
+
 // ── LISTAR TODAS LAS PRESENTACIONES CON SU ESTADO DE RECETA ─────────────────
 // Alimenta la vista dedicada /admin/insumos/recetas. Company-level (la receta
 // no varía por sucursal), igual que presentaciones/productos.
@@ -62,7 +78,22 @@ export async function obtenerRecetaPresentacion(
   fkeCodPresentacion: string
 ): Promise<{ receta?: RecetaInsumoConDatos[]; error?: string }> {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: presentacion, error: errorPresentacion } = await adminClient
+      .from("presentaciones")
+      .select("productos(fkeCodCompany)")
+      .eq("eCodPresentacion", fkeCodPresentacion)
+      .single();
+
+    if (errorPresentacion || !presentacion) return { error: "Presentación no encontrada" };
+
+    const productoInfo = (presentacion as any).productos;
+    if (productoInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { data, error } = await adminClient
       .from("receta_insumos")
       .select("*, insumos_maestro(*)")
@@ -132,6 +163,9 @@ export async function obtenerInsumosDisponiblesParaReceta(
 
 export async function agregarInsumoAReceta(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const fkeCodPresentacion  = formData.get("fkeCodPresentacion") as string;
@@ -142,6 +176,26 @@ export async function agregarInsumoAReceta(formData: FormData) {
     if (!fkeCodInsumoMaestro) return { error: "Selecciona un insumo" };
     if (isNaN(eCantidadNecesaria) || eCantidadNecesaria <= 0)
       return { error: "La cantidad debe ser mayor a 0" };
+
+    const { data: presentacion, error: errorPresentacion } = await adminClient
+      .from("presentaciones")
+      .select("productos(fkeCodCompany)")
+      .eq("eCodPresentacion", fkeCodPresentacion)
+      .single();
+
+    if (errorPresentacion || !presentacion) return { error: "Presentación no encontrada" };
+    if ((presentacion as any).productos?.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
+
+    const { data: maestro, error: errorMaestro } = await adminClient
+      .from("insumos_maestro")
+      .select("fkeCodCompany")
+      .eq("eCodInsumoMaestro", fkeCodInsumoMaestro)
+      .single();
+
+    if (errorMaestro || !maestro) return { error: "Insumo no encontrado" };
+    if (maestro.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data, error } = await adminClient
       .from("receta_insumos")
@@ -179,6 +233,9 @@ export async function agregarInsumoAReceta(formData: FormData) {
 
 export async function editarCantidadRecetaInsumo(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodReceta         = formData.get("eCodReceta") as string;
@@ -187,6 +244,17 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
     if (!eCodReceta) return { error: "Receta no especificada" };
     if (isNaN(eCantidadNecesaria) || eCantidadNecesaria <= 0)
       return { error: "La cantidad debe ser mayor a 0" };
+
+    const { data: recetaActual, error: errorLectura } = await adminClient
+      .from("receta_insumos")
+      .select("insumos_maestro(fkeCodCompany)")
+      .eq("eCodReceta", eCodReceta)
+      .single();
+
+    if (errorLectura || !recetaActual) return { error: "Receta no encontrada" };
+    if ((recetaActual as any).insumos_maestro?.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { data, error } = await adminClient
       .from("receta_insumos")
@@ -222,7 +290,21 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
 
 export async function eliminarInsumoDeReceta(eCodReceta: string) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: recetaActual, error: errorLectura } = await adminClient
+      .from("receta_insumos")
+      .select("insumos_maestro(fkeCodCompany)")
+      .eq("eCodReceta", eCodReceta)
+      .single();
+
+    if (errorLectura || !recetaActual) return { error: "Receta no encontrada" };
+    if ((recetaActual as any).insumos_maestro?.fkeCodCompany !== perfil.fkeCodCompany) {
+      return { error: "No autorizado" };
+    }
 
     const { error } = await adminClient
       .from("receta_insumos")

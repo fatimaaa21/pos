@@ -290,6 +290,7 @@
  
 .btnSuccess {
   flex: 2;
+  padding: 10px var(--space-5);
   border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-family);
@@ -306,6 +307,7 @@
  
 .btnDanger {
   flex: 1;
+  padding: 10px var(--space-5);
   border: 1px solid var(--color-error);
   border-radius: var(--radius-md);
   background: white;

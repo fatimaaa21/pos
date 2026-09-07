@@ -1,8 +1,25 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { Presentacion } from "@/types";
+
+async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: perfil } = await supabase
+    .from("perfiles")
+    .select("fkeCodCompany")
+    .eq("eCodUser", user.id)
+    .single();
+
+  if (!perfil?.fkeCodCompany) return null;
+
+  return { fkeCodCompany: perfil.fkeCodCompany };
+}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -10,7 +27,20 @@ export async function obtenerPresentaciones(
   eCodProduct: string
 ): Promise<{ presentaciones?: Presentacion[]; error?: string }> {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: producto, error: errorProducto } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany")
+      .eq("eCodProduct", eCodProduct)
+      .single();
+
+    if (errorProducto || !producto) return { error: "Producto no encontrado" };
+    if (producto.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { data, error } = await adminClient
       .from("presentaciones")
       .select("*")
@@ -28,6 +58,9 @@ export async function obtenerPresentaciones(
 
 export async function crearPresentacion(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const fkeCodProduct      = formData.get("fkeCodProduct") as string;
@@ -42,6 +75,15 @@ export async function crearPresentacion(formData: FormData) {
     if (eCantidadUnidades < 1) {
       return { error: "La cantidad de unidades debe ser al menos 1" };
     }
+
+    const { data: producto, error: errorProducto } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany")
+      .eq("eCodProduct", fkeCodProduct)
+      .single();
+
+    if (errorProducto || !producto) return { error: "Producto no encontrado" };
+    if (producto.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const ahora = new Date().toISOString();
     const { data, error } = await adminClient
@@ -72,6 +114,9 @@ export async function crearPresentacion(formData: FormData) {
 
 export async function editarPresentacion(formData: FormData) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
 
     const eCodPresentacion   = formData.get("eCodPresentacion") as string;
@@ -83,6 +128,17 @@ export async function editarPresentacion(formData: FormData) {
     if (!eCodPresentacion || !tNombre || isNaN(ePricePresentacion)) {
       return { error: "Datos inválidos" };
     }
+
+    const { data: presentacionActual, error: errorLectura } = await adminClient
+      .from("presentaciones")
+      .select("fkeCodProduct, productos(fkeCodCompany)")
+      .eq("eCodPresentacion", eCodPresentacion)
+      .single();
+
+    if (errorLectura || !presentacionActual) return { error: "Presentación no encontrada" };
+
+    const productoInfo = (presentacionActual as any).productos;
+    if (productoInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data, error } = await adminClient
       .from("presentaciones")
@@ -110,7 +166,21 @@ export async function editarPresentacion(formData: FormData) {
 
 export async function eliminarPresentacion(eCodPresentacion: string) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: presentacionActual, error: errorLectura } = await adminClient
+      .from("presentaciones")
+      .select("fkeCodProduct, productos(fkeCodCompany)")
+      .eq("eCodPresentacion", eCodPresentacion)
+      .single();
+
+    if (errorLectura || !presentacionActual) return { error: "Presentación no encontrada" };
+
+    const productoInfo = (presentacionActual as any).productos;
+    if (productoInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     // Bloquear si tiene inventario activo
     const { data: invActivo } = await adminClient
@@ -146,7 +216,22 @@ export async function eliminarPresentacion(eCodPresentacion: string) {
 
 export async function toggleEstadoPresentacion(eCodPresentacion: string, nuevoEstado: boolean) {
   try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return { error: "No autorizado" };
+
     const adminClient = createAdminClient();
+
+    const { data: presentacionActual, error: errorLectura } = await adminClient
+      .from("presentaciones")
+      .select("productos(fkeCodCompany)")
+      .eq("eCodPresentacion", eCodPresentacion)
+      .single();
+
+    if (errorLectura || !presentacionActual) return { error: "Presentación no encontrada" };
+
+    const productoInfo = (presentacionActual as any).productos;
+    if (productoInfo?.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
     const { error } = await adminClient
       .from("presentaciones")
       .update({ bStatePresentacion: nuevoEstado, fhUpdate: new Date().toISOString() })

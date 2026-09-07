@@ -7,7 +7,7 @@ import { Badge }             from "@/components/ui/Badge";
 import { formatFechaHora }   from "@/lib/utils/fecha";
 import { revisarCorte }      from "@/lib/actions/cortes";
 import type { CorteCaja }    from "@/types";
-import type { CorteConEmpleado } from "./CortesAdminClient";
+import type { CorteConEmpleado, DesgloseMetodosActivos } from "./CortesAdminClient";
 import styles from "./ModalRevisarCorte.module.css";
 
 const ESTADO_BADGE: Record<string, { variante: "admin" | "pendiente" | "activo" | "error"; label: string }> = {
@@ -18,12 +18,13 @@ const ESTADO_BADGE: Record<string, { variante: "admin" | "pendiente" | "activo" 
 };
 
 interface Props {
-  corte:      CorteConEmpleado;
-  onClose:    () => void;
-  onRevisado: (corte: CorteCaja) => void;
+  corte:           CorteConEmpleado;
+  onClose:         () => void;
+  onRevisado:      (corte: CorteCaja) => void;
+  desgloseMetodos: DesgloseMetodosActivos;
 }
 
-export function ModalRevisarCorte({ corte, onClose, onRevisado }: Props) {
+export function ModalRevisarCorte({ corte, onClose, onRevisado, desgloseMetodos }: Props) {
   const [nota, setNota]       = useState(corte.tNotaAdmin ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -107,26 +108,34 @@ export function ModalRevisarCorte({ corte, onClose, onRevisado }: Props) {
       <div>
         <p className={styles.secTitulo}>Desglose por método</p>
         <div className={styles.desglose}>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><Banknote size={14} /></div>
-            <span className={styles.desgloseLabel}>Efectivo</span>
-            <span className={styles.desgloseValor}>{fmt(corte.eTotalEfectivo ?? 0)}</span>
-          </div>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><CreditCard size={14} /></div>
-            <span className={styles.desgloseLabel}>Tarjeta</span>
-            <span className={styles.desgloseValor}>{fmt(corte.eTotalTarjeta ?? 0)}</span>
-          </div>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><Smartphone size={14} /></div>
-            <span className={styles.desgloseLabel}>QR / Transferencia</span>
-            <span className={styles.desgloseValor}>{fmt(corte.eTotalTransferencia ?? 0)}</span>
-          </div>
-          <div className={`${styles.desgloseRow} ${styles.desgloseTotal}`}>
-            <div className={styles.desgloseIcono}><TrendingUp size={14} /></div>
-            <span className={styles.desgloseLabel}>Efectivo esperado en caja</span>
-            <span className={styles.desgloseValor}>{fmt(corte.eEfectivoEsperado ?? 0)}</span>
-          </div>
+          {desgloseMetodos.efectivo && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><Banknote size={14} /></div>
+              <span className={styles.desgloseLabel}>Efectivo</span>
+              <span className={styles.desgloseValor}>{fmt(corte.eTotalEfectivo ?? 0)}</span>
+            </div>
+          )}
+          {desgloseMetodos.tarjeta && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><CreditCard size={14} /></div>
+              <span className={styles.desgloseLabel}>Tarjeta</span>
+              <span className={styles.desgloseValor}>{fmt(corte.eTotalTarjeta ?? 0)}</span>
+            </div>
+          )}
+          {desgloseMetodos.transferencia && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><Smartphone size={14} /></div>
+              <span className={styles.desgloseLabel}>QR / Transferencia</span>
+              <span className={styles.desgloseValor}>{fmt(corte.eTotalTransferencia ?? 0)}</span>
+            </div>
+          )}
+          {desgloseMetodos.efectivo && (
+            <div className={`${styles.desgloseRow} ${styles.desgloseTotal}`}>
+              <div className={styles.desgloseIcono}><TrendingUp size={14} /></div>
+              <span className={styles.desgloseLabel}>Efectivo esperado en caja</span>
+              <span className={styles.desgloseValor}>{fmt(corte.eEfectivoEsperado ?? 0)}</span>
+            </div>
+          )}
         </div>
       </div>
 

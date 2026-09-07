@@ -19,12 +19,13 @@ import toast from "react-hot-toast";
 
 
 interface Props {
-  productos:   Producto[];
-  categorias:  Categoria[];
-  tipoNegocio: "general" | "impresion";
+  productos:          Producto[];
+  categorias:         Categoria[];
+  tipoNegocio:        "general" | "impresion";
+  moduloCocinaActivo: boolean;
 }
 
-export function ProductClient({ productos: inicial, tipoNegocio, categorias }: Props) {
+export function ProductClient({ productos: inicial, tipoNegocio, categorias, moduloCocinaActivo }: Props) {
   const [productos, setProductos] = useState<Producto[]>(inicial);
   const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
   const [busqueda, setBusqueda] = useState("");
@@ -254,6 +255,7 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
           onClose={() => setModalCrear(false)}
           onCreado={handleProductoCreado}
           categorias={categorias}
+          moduloCocinaActivo={moduloCocinaActivo}
         />
       )}
       {productoVer && (
@@ -269,6 +271,7 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias }: P
           categorias={categorias}
           onClose={() => setProductoEditar(null)}
           onEditado={handleProductoEditado}
+          moduloCocinaActivo={moduloCocinaActivo}
         />
       )}
 

@@ -16,8 +16,15 @@ export interface CorteConEmpleado extends CorteCaja {
   empleado?: { eCodUser: string; tNameUser: string } | null;
 }
 
+export interface DesgloseMetodosActivos {
+  efectivo:      boolean;
+  tarjeta:       boolean;
+  transferencia: boolean;
+}
+
 interface Props {
-  cortes: CorteConEmpleado[];
+  cortes:          CorteConEmpleado[];
+  desgloseMetodos: DesgloseMetodosActivos;
 }
 
 // ── Configuración de estados del corte ───────────────────────────────────────
@@ -80,7 +87,7 @@ function clasificarDiferencia(c: CorteConEmpleado): string {
   return "sin_diferencia";
 }
 
-export function CortesAdminClient({ cortes: inicial }: Props) {
+export function CortesAdminClient({ cortes: inicial, desgloseMetodos }: Props) {
   const [cortes,        setCortes]       = useState<CorteConEmpleado[]>(inicial);
   const [corteVer,      setCorteVer]     = useState<CorteConEmpleado | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
@@ -325,6 +332,7 @@ export function CortesAdminClient({ cortes: inicial }: Props) {
           corte={corteVer}
           onClose={() => setCorteVer(null)}
           onRevisado={handleCorteRevisado}
+          desgloseMetodos={desgloseMetodos}
         />
       )}
     </div>

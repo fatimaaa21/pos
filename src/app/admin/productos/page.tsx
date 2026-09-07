@@ -26,6 +26,15 @@ export default async function ProductsPage() {
 
   const tipoNegocio = negocio?.tipo_negocio ?? "general";
 
+  const { data: moduloCocinaRow } = await adminClient
+    .from("modulos_tenant")
+    .select("bStateModulo")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("tModulo", "cocina")
+    .maybeSingle();
+
+  const moduloCocinaActivo = moduloCocinaRow?.bStateModulo ?? false;
+
   const { data: productos, error } = await supabase
     .from("productos")
     .select(`*, categorias (eCodCategory, tNameCategory)`)
@@ -60,6 +69,7 @@ export default async function ProductsPage() {
     productos={lista}
     categorias={listaCats}
     tipoNegocio={tipoNegocio}
+    moduloCocinaActivo={moduloCocinaActivo}
   />
 );
 }

@@ -60,6 +60,50 @@ export async function crearVenta(
     // ── Fase 1: validar stock ─────────────────────────────────────────────────
     for (const item of items) {
 
+      // Verificar que el producto pertenece al negocio de quien vende — todo
+      // en `item` viene del cliente (eCodProduct, eCodMaterial, eCodPresentacion)
+      // y hasta ahora no se comparaba contra fkeCodCompany antes de usarlo.
+      const { data: productoDeItem, error: errorProductoDeItem } = await adminClient
+        .from("productos")
+        .select("fkeCodCompany, eAnchoCm, eAltoCm, fkeCodMaterial")
+        .eq("eCodProduct", item.eCodProduct)
+        .single();
+
+      if (errorProductoDeItem || !productoDeItem) {
+        return { error: `Producto no encontrado (id: ${item.eCodProduct})` };
+      }
+      if (productoDeItem.fkeCodCompany !== fkeCodCompany) {
+        return { error: "No autorizado" };
+      }
+
+      if (item.eCodMaterial) {
+        const { data: materialDeItem, error: errorMaterialDeItem } = await adminClient
+          .from("materiales")
+          .select("fkeCodCompany")
+          .eq("eCodMaterial", item.eCodMaterial)
+          .single();
+
+        if (errorMaterialDeItem || !materialDeItem || materialDeItem.fkeCodCompany !== fkeCodCompany) {
+          return { error: "No autorizado" };
+        }
+      }
+
+      if (item.eCodPresentacion) {
+        const { data: presentacionDeItem, error: errorPresentacionDeItem } = await adminClient
+          .from("presentaciones")
+          .select("fkeCodProduct")
+          .eq("eCodPresentacion", item.eCodPresentacion)
+          .single();
+
+        if (
+          errorPresentacionDeItem ||
+          !presentacionDeItem ||
+          presentacionDeItem.fkeCodProduct !== item.eCodProduct
+        ) {
+          return { error: "No autorizado" };
+        }
+      }
+
       // Productos por medida — el stock es el material, no inventario
       if (item.eCodMaterial) {
         const { data: material, error: materialError } = await adminClient
@@ -96,11 +140,7 @@ export async function crearVenta(
       // ── Primero verificar si el producto tiene material vinculado ─────────
       // Para productos de impresión por unidad, el stock lo controla el material,
       // no un registro de inventario. Se salta vista_inventario en ese caso.
-      const { data: prodDims } = await adminClient
-        .from("productos")
-        .select("eAnchoCm, eAltoCm, fkeCodMaterial")
-        .eq("eCodProduct", item.eCodProduct)
-        .single();
+      const prodDims = productoDeItem;
 
       if (prodDims?.fkeCodMaterial && prodDims.eAnchoCm && prodDims.eAltoCm) {
         // Producto unidad vinculado a hoja — validar solo el material
