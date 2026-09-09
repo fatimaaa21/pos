@@ -7,6 +7,7 @@ import { guardarConfigNegocio, type ConfigNegocio } from "@/lib/actions/configur
 import { guardarMetodosNegocio, type MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 import { ConceptosBillarClient } from "@/app/admin/conceptos-billar/ConceptosBillarClient";
+import { FacturacionConfigTab } from "@/app/admin/facturacion/FacturacionConfigTab";
 import styles from "./ModalConfiguracion.module.css";
 import { Spinner } from "@/components/ui/Spinner/Spinner";
 
@@ -30,12 +31,13 @@ const ZONAS = [
   { value: "America/New_York",               label: "Nueva York (UTC-5)"       },
 ];
 
-type Tab = "general" | "pagos" | "conceptos";
+type Tab = "general" | "pagos" | "facturacion" | "conceptos";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "general",    label: "General"         },
-  { id: "pagos",      label: "Métodos de pago" },
-  { id: "conceptos",  label: "Conceptos"       },
+  { id: "general",     label: "General"         },
+  { id: "pagos",       label: "Métodos de pago" },
+  { id: "facturacion", label: "Facturación"     },
+  { id: "conceptos",   label: "Conceptos"       },
 ];
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -393,6 +395,8 @@ export function ModalConfiguracion({
               </div>
             </>
           )}
+
+          {tab === "facturacion" && <FacturacionConfigTab />}
 
           {tab === "conceptos" && config.tipo_negocio === "billar" && (
             <>

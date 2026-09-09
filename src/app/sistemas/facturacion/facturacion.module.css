@@ -1,0 +1,38 @@
+/* ── Avatar del negocio en tabla (mismo patrón que /sistemas/negocios) ── */
+.avatarNegocio {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatarFallback {
+  width: 100%;
+  height: 100%;
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sinConfigurar {
+  font-size: 12px;
+  color: var(--gray);
+  font-style: italic;
+}

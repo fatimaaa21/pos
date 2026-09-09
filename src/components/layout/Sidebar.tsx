@@ -16,6 +16,7 @@ import {
   Calculator, Menu, X, LayoutGrid, MapPin, ChevronDown,
   ShoppingBasket,
   ChefHat,
+  CreditCard,
 } from "lucide-react";
 
 // Orden fijo por usabilidad (uso diario primero, configuración al final).
@@ -55,9 +56,10 @@ function buildNavEmpleado(_modulosActivos: string[]) {
 }
 
 const navSistemas = [
-  { icon: LayoutDashboard,  label: "Dashboard", href: "/sistemas/dashboard"   },
-  { icon: Building2,        label: "Negocios",  href: "/sistemas/negocios"    },
-  { icon: CircleDollarSign, label: "Pagos",     href: "/sistemas/metodosPago" },
+  { icon: LayoutDashboard,  label: "Dashboard",    href: "/sistemas/dashboard"    },
+  { icon: Building2,        label: "Negocios",     href: "/sistemas/negocios"     },
+  { icon: CircleDollarSign, label: "Pagos",        href: "/sistemas/metodosPago"  },
+  { icon: CreditCard,       label: "Facturación",  href: "/sistemas/facturacion"  },
 ];
 
 interface NegocioInfo {
