@@ -61,16 +61,20 @@ async function getPerfilAdminActual(): Promise<{
 
 export interface FacturacionNegocio {
   fkeCodCompany:            string;
-  eMontoMensual:            number;
+  eMontoMensual:            number | null;
   eMontoMensualPendiente:   number | null;
+  eDiaCobro:                number | null;
+  eDiaCobroPendiente:       number | null;
   tEstadoDomiciliacion:     "manual" | "domiciliado" | "pausado_por_falla";
   tCodStripeCustomer:       string | null;
 }
 
 interface FacturacionRow {
   fkeCodCompany:            string;
-  eMontoMensual:            number;
+  eMontoMensual:            number | null;
   eMontoMensualPendiente?:  number | null;
+  eDiaCobro?:               number | null;
+  eDiaCobroPendiente?:      number | null;
   tEstadoDomiciliacion:     "manual" | "domiciliado" | "pausado_por_falla";
   tCodStripeCustomer?:      string | null;
 }
@@ -80,12 +84,27 @@ function mapFacturacion(row: FacturacionRow): FacturacionNegocio {
     fkeCodCompany:          row.fkeCodCompany,
     eMontoMensual:          row.eMontoMensual,
     eMontoMensualPendiente: row.eMontoMensualPendiente ?? null,
+    eDiaCobro:              row.eDiaCobro ?? null,
+    eDiaCobroPendiente:     row.eDiaCobroPendiente ?? null,
     tEstadoDomiciliacion:   row.tEstadoDomiciliacion,
     tCodStripeCustomer:     row.tCodStripeCustomer ?? null,
   };
 }
 
 const NOMBRE_PRODUCTO_STRIPE = "Kivi — mensualidad";
+
+/**
+ * Unix timestamp (segundos) de la próxima vez que "día" ocurra, contando
+ * desde "desde" (por default, ahora). Restringido a 1-28 en la validación
+ * de guardarMontoMensual, así que aquí no hay que lidiar con meses cortos.
+ */
+function proximaFechaDia(dia: number, desde: Date = new Date()): number {
+  let candidato = new Date(desde.getFullYear(), desde.getMonth(), dia, 12, 0, 0);
+  if (candidato.getTime() <= desde.getTime()) {
+    candidato = new Date(desde.getFullYear(), desde.getMonth() + 1, dia, 12, 0, 0);
+  }
+  return Math.floor(candidato.getTime() / 1000);
+}
 
 // ─────────────────────────────────────────────────────────────
 // Crea la suscripción en Stripe una vez que YA hay monto Y YA hay tarjeta
@@ -96,7 +115,8 @@ async function activarSuscripcion(
   adminClient: ReturnType<typeof createAdminClient>,
   fkeCodCompany: string,
   eMontoMensual: number,
-  tCodStripeCustomer: string
+  tCodStripeCustomer: string,
+  eDiaCobro: number | null
 ): Promise<{ facturacion: FacturacionNegocio } | { error: string }> {
   try {
     const price = await stripe.prices.create({
@@ -106,12 +126,20 @@ async function activarSuscripcion(
       product_data: { name: NOMBRE_PRODUCTO_STRIPE },
     });
 
+    // Sin billing_cycle_anchor, Stripe cobra hoy y ancla el ciclo al día de
+    // hoy. Con un día específico, Stripe cobra HOY prorrateado por los días
+    // que faltan para esa fecha, y desde el segundo ciclo cobra completo
+    // cada mes en ese día — es el comportamiento default de proration al
+    // pasar billing_cycle_anchor a futuro, no algo que arme a mano.
+    const billingCycleAnchor = eDiaCobro ? proximaFechaDia(eDiaCobro) : undefined;
+
     // Sin default_payment_method explícito: Stripe usa el
     // invoice_settings.default_payment_method del customer, que ya
     // quedó fijado en guardarTarjetaDomiciliada.
     const subscription = await stripe.subscriptions.create({
       customer: tCodStripeCustomer,
       items: [{ price: price.id }],
+      ...(billingCycleAnchor ? { billing_cycle_anchor: billingCycleAnchor } : {}),
     });
 
     const { data, error } = await adminClient
@@ -119,6 +147,7 @@ async function activarSuscripcion(
       .update({
         tCodStripeSubscription: subscription.id,
         tCodStripePriceActual:  price.id,
+        eDiaCobro:              eDiaCobro,
         tEstadoDomiciliacion:   "domiciliado",
         fhUpdateFacturacion:    new Date().toISOString(),
       })
@@ -140,7 +169,8 @@ async function activarSuscripcion(
 
 export async function guardarMontoMensual(
   fkeCodCompany: string,
-  eMontoMensual: number
+  eMontoMensual: number,
+  eDiaCobro: number | null
 ): Promise<{ facturacion: FacturacionNegocio } | { error: string }> {
   try {
     if (!(await esSistemas())) return { error: "No autorizado" };
@@ -148,6 +178,9 @@ export async function guardarMontoMensual(
     if (!fkeCodCompany) return { error: "Negocio no especificado" };
     if (!Number.isFinite(eMontoMensual) || eMontoMensual < 0) {
       return { error: "El monto debe ser un número mayor o igual a 0" };
+    }
+    if (eDiaCobro != null && (!Number.isInteger(eDiaCobro) || eDiaCobro < 1 || eDiaCobro > 28)) {
+      return { error: "El día de cobro debe ser un número entre 1 y 28" };
     }
 
     const adminClient = createAdminClient();
@@ -172,7 +205,7 @@ export async function guardarMontoMensual(
       const { data, error } = await adminClient
         .from("facturacion_negocios")
         .upsert(
-          { fkeCodCompany, eMontoMensual, fhUpdateFacturacion: new Date().toISOString() },
+          { fkeCodCompany, eMontoMensual, eDiaCobro, fhUpdateFacturacion: new Date().toISOString() },
           { onConflict: "fkeCodCompany" }
         )
         .select("*")
@@ -183,7 +216,7 @@ export async function guardarMontoMensual(
       // Si el admin ya domicilió su tarjeta antes de que sistemas fijara el
       // monto, este es el momento en que se activa la suscripción de verdad.
       if (data.tCodStripeCustomer) {
-        const activado = await activarSuscripcion(adminClient, fkeCodCompany, eMontoMensual, data.tCodStripeCustomer);
+        const activado = await activarSuscripcion(adminClient, fkeCodCompany, eMontoMensual, data.tCodStripeCustomer, eDiaCobro);
         revalidatePath("/sistemas/facturacion");
         return activado;
       }
@@ -194,8 +227,8 @@ export async function guardarMontoMensual(
 
     // ── Caso 2: ya domiciliado con suscripción activa ──────────────────────
     // El cambio NO aplica de inmediato — se programa para el siguiente ciclo
-    // vía Subscription Schedule. eMontoMensual sigue reflejando lo que se
-    // cobra HOY; eMontoMensualPendiente es lo que entra al siguiente ciclo.
+    // vía Subscription Schedule. eMontoMensual/eDiaCobro siguen reflejando
+    // lo que se cobra HOY; *Pendiente es lo que entra al siguiente ciclo.
     const nuevoPrice = await stripe.prices.create({
       currency: "mxn",
       unit_amount: Math.round(eMontoMensual * 100),
@@ -214,22 +247,37 @@ export async function guardarMontoMensual(
 
     const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
     const faseActual = schedule.phases[0];
+    const itemsFaseActual = faseActual.items.map((i) => ({
+      price: typeof i.price === "string" ? i.price : i.price.id,
+    }));
 
-    await stripe.subscriptionSchedules.update(scheduleId, {
-      phases: [
-        {
-          items:      faseActual.items.map((i) => ({
-            price: typeof i.price === "string" ? i.price : i.price.id,
-          })),
-          start_date: faseActual.start_date,
-          end_date:   faseActual.end_date,
-        },
-        {
-          // Sin end_date/iterations: corre indefinido hasta el próximo cambio.
-          items: [{ price: nuevoPrice.id }],
-        },
-      ],
-    });
+    // ¿Pidieron un día de cobro distinto al que ya tiene este negocio? Si sí,
+    // no basta con encadenar la fase 2 justo al final de la fase 1 — hay que
+    // insertar un puente que corra con el precio VIEJO desde que termina el
+    // ciclo actual hasta la próxima vez que caiga el día NUEVO, y solo a
+    // partir de ahí empieza el precio nuevo con el día nuevo. Sin esto el
+    // día de cobro nunca se movería de verdad, solo el precio.
+    const cambiaDia = eDiaCobro != null && eDiaCobro !== actual.eDiaCobro;
+
+    const finFaseActual = faseActual.end_date;
+    const inicioFaseFinal = cambiaDia
+      ? proximaFechaDia(eDiaCobro!, new Date(finFaseActual * 1000))
+      : finFaseActual;
+
+    const fasesNuevas =
+      inicioFaseFinal === finFaseActual
+        ? [
+            { items: itemsFaseActual, start_date: faseActual.start_date, end_date: finFaseActual },
+            { items: [{ price: nuevoPrice.id }] }, // sin end_date: corre indefinido
+          ]
+        : [
+            { items: itemsFaseActual, start_date: faseActual.start_date, end_date: finFaseActual },
+            // Puente: sigue cobrando el precio viejo hasta que llegue el día nuevo.
+            { items: itemsFaseActual, start_date: finFaseActual, end_date: inicioFaseFinal },
+            { items: [{ price: nuevoPrice.id }] }, // desde aquí, precio y día nuevos, indefinido
+          ];
+
+    await stripe.subscriptionSchedules.update(scheduleId, { phases: fasesNuevas });
 
     const { data, error } = await adminClient
       .from("facturacion_negocios")
@@ -237,6 +285,7 @@ export async function guardarMontoMensual(
         tCodStripeScheduleId:     scheduleId,
         tCodStripePricePendiente: nuevoPrice.id,
         eMontoMensualPendiente:   eMontoMensual,
+        eDiaCobroPendiente:       cambiaDia ? eDiaCobro : null,
         fhUpdateFacturacion:      new Date().toISOString(),
       })
       .eq("fkeCodCompany", fkeCodCompany)
@@ -284,6 +333,11 @@ export async function crearSetupIntent(): Promise<{ clientSecret: string } | { e
       });
       customerId = customer.id;
 
+      // OJO: no incluimos eMontoMensual aquí a propósito. Si la fila ya
+      // existía (sistemas ya había puesto un monto real), un upsert que
+      // mencione esta columna la pisaría con null. Al omitirla, Postgres
+      // solo la toca en el INSERT (nueva fila → null por default) y la deja
+      // intacta en el UPDATE (fila existente → conserva lo que ya tenía).
       const { error } = await adminClient
         .from("facturacion_negocios")
         .upsert(
@@ -347,12 +401,13 @@ export async function guardarTarjetaDomiciliada(
     // Si sistemas ya había fijado un monto, este es el momento de activar
     // la suscripción de verdad. Si no, queda domiciliado sin cobrar todavía
     // — activarSuscripcion() se dispara después, desde guardarMontoMensual.
-    if (!actual.tCodStripeSubscription && actual.eMontoMensual > 0) {
+    if (!actual.tCodStripeSubscription && actual.eMontoMensual != null && actual.eMontoMensual > 0) {
       const activado = await activarSuscripcion(
         adminClient,
         perfil.fkeCodCompany,
         actual.eMontoMensual,
-        actual.tCodStripeCustomer
+        actual.tCodStripeCustomer,
+        actual.eDiaCobro ?? null
       );
       revalidatePath("/admin/configuracion");
       return activado;
@@ -396,6 +451,67 @@ export async function obtenerFacturacionAdmin(): Promise<
     if (error) return { error: error.message };
 
     return { facturacion: data ? mapFacturacion(data) : null };
+  } catch (e: unknown) {
+    return { error: `Error inesperado: ${mensajeError(e)}` };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// HISTORIAL DE COBROS
+// facturacion_cobros solo la escribe el webhook — estas dos funciones son
+// de solo lectura, una para sistemas (cualquier negocio) y otra para el
+// admin (nada más el suyo, resuelto desde su propia sesión).
+// ─────────────────────────────────────────────────────────────
+
+export interface CobroHistorial {
+  eCodCobro:         string;
+  tCodStripeInvoice: string;
+  eMonto:            number;
+  tEstado:           "succeeded" | "failed";
+  tMotivoFallo:       string | null;
+  fhCobro:           string;
+}
+
+export async function obtenerHistorialCobrosSistemas(
+  fkeCodCompany: string
+): Promise<{ cobros: CobroHistorial[] } | { error: string }> {
+  try {
+    if (!(await esSistemas())) return { error: "No autorizado" };
+    if (!fkeCodCompany) return { error: "Negocio no especificado" };
+
+    const adminClient = createAdminClient();
+
+    const { data, error } = await adminClient
+      .from("facturacion_cobros")
+      .select("eCodCobro, tCodStripeInvoice, eMonto, tEstado, tMotivoFallo, fhCobro")
+      .eq("fkeCodCompany", fkeCodCompany)
+      .order("fhCobro", { ascending: false });
+
+    if (error) return { error: error.message };
+    return { cobros: (data ?? []) as CobroHistorial[] };
+  } catch (e: unknown) {
+    return { error: `Error inesperado: ${mensajeError(e)}` };
+  }
+}
+
+export async function obtenerHistorialCobrosAdmin(): Promise<
+  { cobros: CobroHistorial[] } | { error: string }
+> {
+  try {
+    const perfil = await getPerfilAdminActual();
+    if (!perfil) return { error: "No autorizado" };
+
+    const adminClient = createAdminClient();
+
+    const { data, error } = await adminClient
+      .from("facturacion_cobros")
+      .select("eCodCobro, tCodStripeInvoice, eMonto, tEstado, tMotivoFallo, fhCobro")
+      .eq("fkeCodCompany", perfil.fkeCodCompany)
+      .order("fhCobro", { ascending: false })
+      .limit(12);
+
+    if (error) return { error: error.message };
+    return { cobros: (data ?? []) as CobroHistorial[] };
   } catch (e: unknown) {
     return { error: `Error inesperado: ${mensajeError(e)}` };
   }

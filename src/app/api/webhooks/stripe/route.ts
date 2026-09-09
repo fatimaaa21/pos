@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
 
         const { data: facturacion } = await adminClient
           .from("facturacion_negocios")
-          .select("fkeCodCompany, tCodStripePricePendiente, eMontoMensualPendiente")
+          .select("fkeCodCompany, tCodStripePricePendiente, eMontoMensualPendiente, eDiaCobroPendiente")
           .eq("tCodStripeSubscription", subscription.id)
           .maybeSingle();
 
@@ -159,6 +159,12 @@ export async function POST(req: NextRequest) {
             .update({
               eMontoMensual:            facturacion.eMontoMensualPendiente,
               eMontoMensualPendiente:   null,
+              // Si no hubo cambio de día en este schedule, eDiaCobroPendiente
+              // ya era null desde que se programó — no promovemos un valor
+              // que nunca se puso, para no borrar el día actual por error.
+              ...(facturacion.eDiaCobroPendiente != null
+                ? { eDiaCobro: facturacion.eDiaCobroPendiente, eDiaCobroPendiente: null }
+                : {}),
               tCodStripePriceActual:    facturacion.tCodStripePricePendiente,
               tCodStripePricePendiente: null,
               tCodStripeScheduleId:     null,

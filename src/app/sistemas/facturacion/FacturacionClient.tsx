@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, History } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCards } from "@/components/ui/Statscards";
 import { TablaToolbar, type FiltrosUsuario } from "@/components/ui/TablaToolbar";
 import { DataTable, type ColumnaTabla } from "@/components/ui/DataTable";
 import { Badge } from "@/components/ui/Badge";
 import { ModalEditarMonto } from "./ModalEditarMonto";
+import { ModalHistorialCobros } from "./ModalHistorialCobros";
 import styles from "./facturacion.module.css";
 
 export interface NegocioConFacturacion {
@@ -18,6 +19,8 @@ export interface NegocioConFacturacion {
   bStateCompany:          string; // "activo" | "pausado"
   eMontoMensual:          number | null;
   eMontoMensualPendiente: number | null;
+  eDiaCobro:              number | null;
+  eDiaCobroPendiente:     number | null;
   tEstadoDomiciliacion:   "manual" | "domiciliado" | "pausado_por_falla" | null;
 }
 
@@ -44,7 +47,8 @@ const fmtMoneda = (n: number) =>
 
 export function FacturacionClient({ negocios: inicial }: Props) {
   const [negocios, setNegocios]           = useState<NegocioConFacturacion[]>(inicial);
-  const [negocioEditar, setNegocioEditar] = useState<NegocioConFacturacion | null>(null);
+  const [negocioEditar, setNegocioEditar]       = useState<NegocioConFacturacion | null>(null);
+  const [negocioHistorial, setNegocioHistorial] = useState<NegocioConFacturacion | null>(null);
   const [filtros, setFiltros] = useState<FiltrosUsuario>({
     busqueda:   "",
     roles:      [],
@@ -116,9 +120,14 @@ export function FacturacionClient({ negocios: inicial }: Props) {
         n.eMontoMensual != null ? (
           <div>
             <span style={{ fontWeight: 600 }}>{fmtMoneda(n.eMontoMensual)}</span>
+            {n.eDiaCobro != null && (
+              <span style={{ fontSize: 11, color: "var(--gray)" }}> · día {n.eDiaCobro}</span>
+            )}
             {n.eMontoMensualPendiente != null && (
               <div style={{ fontSize: 11, color: "var(--gray)" }}>
-                → {fmtMoneda(n.eMontoMensualPendiente)} el próximo ciclo
+                → {fmtMoneda(n.eMontoMensualPendiente)}
+                {n.eDiaCobroPendiente != null && ` (día ${n.eDiaCobroPendiente})`}
+                {" "}el próximo ciclo
               </div>
             )}
           </div>
@@ -144,7 +153,7 @@ export function FacturacionClient({ negocios: inicial }: Props) {
       key: "acciones",
       label: "Acciones",
       render: (n) => (
-        <div style={{ display: "flex", justifyContent: "flex-start" }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
           <button
             title="Fijar pago mensual"
             onClick={() => setNegocioEditar(n)}
@@ -156,6 +165,18 @@ export function FacturacionClient({ negocios: inicial }: Props) {
             }}
           >
             <Pencil size={18} />
+          </button>
+          <button
+            title="Ver historial de cobros"
+            onClick={() => setNegocioHistorial(n)}
+            style={{
+              width: 28, height: 28, border: "none", background: "transparent",
+              borderRadius: "var(--radius-sm)", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "var(--gray)",
+            }}
+          >
+            <History size={18} />
           </button>
         </div>
       ),
@@ -205,6 +226,13 @@ export function FacturacionClient({ negocios: inicial }: Props) {
           negocio={negocioEditar}
           onClose={() => setNegocioEditar(null)}
           onGuardado={handleMontoGuardado}
+        />
+      )}
+
+      {negocioHistorial && (
+        <ModalHistorialCobros
+          negocio={negocioHistorial}
+          onClose={() => setNegocioHistorial(null)}
         />
       )}
     </div>

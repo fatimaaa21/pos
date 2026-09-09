@@ -33,7 +33,7 @@ export default async function SistemasFacturacionPage() {
 
   const { data: facturacion, error: errorFacturacion } = await adminClient
     .from("facturacion_negocios")
-    .select("fkeCodCompany, eMontoMensual, eMontoMensualPendiente, tEstadoDomiciliacion");
+    .select("fkeCodCompany, eMontoMensual, eMontoMensualPendiente, eDiaCobro, eDiaCobroPendiente, tEstadoDomiciliacion");
 
   if (errorFacturacion) console.error("Error cargando facturación:", errorFacturacion.message);
 
@@ -51,6 +51,8 @@ export default async function SistemasFacturacionPage() {
       bStateCompany:          n.bStateCompany,
       eMontoMensual:          fact?.eMontoMensual ?? null,
       eMontoMensualPendiente: fact?.eMontoMensualPendiente ?? null,
+      eDiaCobro:              fact?.eDiaCobro ?? null,
+      eDiaCobroPendiente:     fact?.eDiaCobroPendiente ?? null,
       tEstadoDomiciliacion:   (fact?.tEstadoDomiciliacion ?? null) as NegocioConFacturacion["tEstadoDomiciliacion"],
     };
   });
