@@ -8,7 +8,7 @@
 // integrada (antes el empleado siempre pasaba primero por /empleado/menu,
 // que sí la tiene).
 
-import { useState }       from "react";
+import { useState, createContext, useContext } from "react";
 import React              from "react";
 import { useRouter }      from "next/navigation";
 import { Calculator, LogOut } from "lucide-react";
@@ -16,16 +16,31 @@ import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
 import { ModalCerrarCaja } from "@/app/empleado/menu/ModalCerrarCaja";
 import { iniciarTurno }   from "@/lib/actions/cortes";
 import type { CorteCaja, VentasDelTurno } from "@/types";
+import type { MetodoPagoGlobal }          from "@/lib/actions/metodos-pago";
 import styles             from "@/app/empleado/menu/menu.module.css";
 
 interface Props {
   tieneTurno:     boolean;
   corte:          CorteCaja | null;
   ventasDelTurno: VentasDelTurno;
+  metodosPago:    MetodoPagoGlobal[];
   children:       React.ReactNode;
 }
 
-export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: Props) {
+// ── Context para "cerrar caja" ──────────────────────────────────────────────
+// No usamos React.cloneElement para inyectar este callback en `children`:
+// `children` aquí viene de un Server Component (admin/menu/page.tsx y
+// empleado/menu/page.tsx lo arman con `await` antes de pasarlo), y clonar un
+// elemento que cruzó esa frontera server→client rompe su referencia interna
+// (el error "Element type is invalid" que ya cazamos). Context sí es seguro
+// porque se lee del lado del cliente, después de la hidratación.
+const CerrarCajaContext = createContext<(() => void) | null>(null);
+
+export function useCerrarCaja() {
+  return useContext(CerrarCajaContext);
+}
+
+export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, metodosPago, children }: Props) {
   const router = useRouter();
 
   // ── Abrir turno ──────────────────────────────────────────────────────────
@@ -51,7 +66,7 @@ export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: 
   const [modalCerrarCaja, setModalCerrarCaja] = useState(false);
 
   return (
-    <>
+    <CerrarCajaContext.Provider value={tieneTurno ? () => setModalCerrarCaja(true) : null}>
       {!tieneTurno && (
         <div className={styles.bannerTurno}>
           <div className={styles.bannerTexto}>
@@ -67,12 +82,7 @@ export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: 
         </div>
       )}
 
-      {/* Pasa onCerrarCaja a MesasClient para que lo coloque junto a sus botones */}
-      {tieneTurno
-        ? React.cloneElement(children as React.ReactElement<any>, {
-            onCerrarCaja: () => setModalCerrarCaja(true),
-          })
-        : children}
+      {children}
 
       {modalTurno && (
         <Modal
@@ -107,10 +117,11 @@ export function AbrirTurnoGate({ tieneTurno, corte, ventasDelTurno, children }: 
         <ModalCerrarCaja
           corte={corte}
           ventasDelTurno={ventasDelTurno}
+          metodosPago={metodosPago}
           onClose={() => setModalCerrarCaja(false)}
           onCerrado={() => { setModalCerrarCaja(false); router.refresh(); }}
         />
       )}
-    </>
+    </CerrarCajaContext.Provider>
   );
 }

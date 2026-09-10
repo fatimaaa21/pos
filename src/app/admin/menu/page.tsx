@@ -67,7 +67,7 @@ export default async function AdminMenuPage() {
   if (moduloMesas) {
     const [mesas, datos, turno] = await Promise.all([
       obtenerMesasConEstado(),
-      obtenerDatosMesasPOS(ctx.fkeCodCompany),
+      obtenerDatosMesasPOS(ctx.fkeCodCompany, ctx.fkeCodSucursal),
       obtenerEstadoTurno(ctx.uid),
     ]);
 
@@ -76,6 +76,7 @@ export default async function AdminMenuPage() {
         tieneTurno={turno.tieneTurno}
         corte={turno.corte}
         ventasDelTurno={turno.ventasDelTurno}
+        metodosPago={datos.metodosPago}
       >
         <MesasClient
           mesasIniciales={mesas as MesaConEstado[]}
@@ -93,7 +94,7 @@ export default async function AdminMenuPage() {
 
   // ── Sin módulo de mesas: venta directa de mostrador (comportamiento actual) ──
   const [datos, turno] = await Promise.all([
-    obtenerDatosMenuPOS(ctx.fkeCodCompany),
+    obtenerDatosMenuPOS(ctx.fkeCodCompany, ctx.fkeCodSucursal),
     obtenerEstadoTurno(ctx.uid),
   ]);
 

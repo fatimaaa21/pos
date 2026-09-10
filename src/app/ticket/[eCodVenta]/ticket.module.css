@@ -212,15 +212,22 @@
   letter-spacing: 0.5px;
 }
 
-/* ── Separadores ── */
-.sep {
-  font-size: 10px;
-  color: #000;
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
+/* ── Separadores ──
+   Línea real (border), no caracteres repetidos — width:100% garantiza que
+   siempre llegue al borde derecho del ticket, sin importar el ancho de las
+   columnas que tenga arriba o abajo. */
+.sepSimple {
+  width: 100%;
+  border-top: 1px solid #000;
   margin: 1.5mm 0;
-  letter-spacing: -0.5px; /* compacta los guiones */
+}
+
+.sepDoble {
+  width: 100%;
+  border-top: 1px solid #000;
+  border-bottom: 1px solid #000;
+  height: 2px;
+  margin: 1.5mm 0;
 }
 
 /* ── Fila genérica key: value ── */
@@ -253,10 +260,14 @@
   margin: 1.5mm 0;
 }
 
-/* ── Header columnas de items ── */
+/* ── Header columnas de items ──
+   Columnas 2 y 3 con ancho FIJO en ch (no "auto") — así el header y cada
+   renglón de item, aunque son grids distintos, alinean entre sí. Con "auto"
+   cada grid se ajustaba a su propio contenido ("Cant" vs "×1") y no había
+   forma de que coincidieran. */
 .itemsHeader {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr 4ch 7ch;
   gap: 4px;
   font-size: 8.5px;
   font-weight: 700;
@@ -266,6 +277,11 @@
   margin: 0.5mm 0;
 }
 
+.itemsHeaderCant,
+.itemsHeaderTotal {
+  text-align: right;
+}
+
 /* ── Item individual ── */
 .item {
   margin: 1.5mm 0;
@@ -273,7 +289,7 @@
 
 .itemNombreFila {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr 4ch 7ch;
   gap: 4px;
   align-items: baseline;
 }
@@ -299,6 +315,7 @@
 }
 
 .itemSubtotal {
+  grid-column: 3;
   font-size: 10.5px;
   font-weight: 700;
   text-align: right;

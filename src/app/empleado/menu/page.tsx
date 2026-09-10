@@ -17,11 +17,12 @@ export default async function MenuPage() {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("fkeCodCompany")
+    .select("fkeCodCompany, fkeCodSucursal")
     .eq("eCodUser", user!.id)
     .single();
 
-  const fkeCodCompany = perfil?.fkeCodCompany;
+  const fkeCodCompany   = perfil?.fkeCodCompany;
+  const fkeCodSucursal  = perfil?.fkeCodSucursal ?? null;
 
   if (!fkeCodCompany) {
     return (
@@ -50,7 +51,7 @@ export default async function MenuPage() {
   if (moduloMesas) {
     const [mesas, datos, turno] = await Promise.all([
       obtenerMesasConEstado(),
-      obtenerDatosMesasPOS(fkeCodCompany),
+      obtenerDatosMesasPOS(fkeCodCompany, fkeCodSucursal),
       obtenerEstadoTurno(user!.id),
     ]);
 
@@ -59,6 +60,7 @@ export default async function MenuPage() {
         tieneTurno={turno.tieneTurno}
         corte={turno.corte}
         ventasDelTurno={turno.ventasDelTurno}
+        metodosPago={datos.metodosPago}
       >
         <MesasClient
           mesasIniciales={mesas as MesaConEstado[]}
@@ -76,7 +78,7 @@ export default async function MenuPage() {
 
   // ── Sin módulo de mesas: venta directa de mostrador (comportamiento actual) ──
   const [datos, turno] = await Promise.all([
-    obtenerDatosMenuPOS(fkeCodCompany),
+    obtenerDatosMenuPOS(fkeCodCompany, fkeCodSucursal),
     obtenerEstadoTurno(user!.id),
   ]);
 

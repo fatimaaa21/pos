@@ -63,7 +63,7 @@ export function ModalHistorialCompras({ onClose }: Props) {
   }, []);
 
   return (
-    <Modal titulo="Historial de movimientos" onCerrar={onClose} labelCancelar="Cerrar" ancho="md">
+    <Modal titulo="Historial de movimientos" onCerrar={onClose} labelCancelar="Cerrar" ancho="sm">
       {cargando ? (
         <p style={{ fontSize: 12, color: "var(--gray)" }}>Cargando…</p>
       ) : movimientos.length === 0 ? (

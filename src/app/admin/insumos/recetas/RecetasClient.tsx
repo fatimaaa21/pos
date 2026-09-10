@@ -32,10 +32,10 @@ export function RecetasClient({ presentaciones: inicial }: Props) {
 
   function handleCambioReceta(cantidadInsumos: number) {
     if (!editando) return;
+    const key = (p: PresentacionConReceta) => p.eCodPresentacion ?? `producto:${p.eCodProduct}`;
+    const keyEditando = key(editando);
     setPresentaciones((prev) =>
-      prev.map((p) =>
-        p.eCodPresentacion === editando.eCodPresentacion ? { ...p, cantidadInsumos } : p
-      )
+      prev.map((p) => (key(p) === keyEditando ? { ...p, cantidadInsumos } : p))
     );
   }
 
@@ -113,13 +113,14 @@ export function RecetasClient({ presentaciones: inicial }: Props) {
       <DataTable
         columnas={columnas}
         datos={filtradas}
-        keyExtractor={(p) => p.eCodPresentacion}
+        keyExtractor={(p) => p.eCodPresentacion ?? `producto:${p.eCodProduct}`}
         vacio="No se encontraron presentaciones"
       />
 
       {viendo && (
         <ModalVerReceta
           fkeCodPresentacion={viendo.eCodPresentacion}
+          fkeCodProduct={viendo.eCodPresentacion ? null : viendo.eCodProduct}
           nombrePresentacion={viendo.tNombre}
           nombreProducto={viendo.tNameProduct}
           onClose={() => setViendo(null)}
@@ -129,6 +130,7 @@ export function RecetasClient({ presentaciones: inicial }: Props) {
       {editando && (
         <ModalRecetaPresentacion
           fkeCodPresentacion={editando.eCodPresentacion}
+          fkeCodProduct={editando.eCodPresentacion ? null : editando.eCodProduct}
           nombrePresentacion={editando.tNombre}
           nombreProducto={editando.tNameProduct}
           onClose={() => setEditando(null)}

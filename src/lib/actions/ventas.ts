@@ -246,22 +246,23 @@ export async function crearVenta(
       });
     }
 
-    // ── Fase 1c: validar y resolver insumos según receta (solo items con presentación) ──
-    // La receta cuelga de presentación, no de producto — items sin
-    // eCodPresentacion no tienen receta que resolver.
+    // ── Fase 1c: validar y resolver insumos según receta ────────────────────────
+    // La receta cuelga de presentación O de producto (cuando el producto no
+    // tiene presentaciones y se vende directo) — nunca de ambos para el mismo
+    // item, mismo contrato que el CHECK de receta_insumos en la BD.
     for (const item of items) {
-      if (!item.eCodPresentacion) {
-        insumosPorItem.push([]);
-        continue;
-      }
-
-      const { data: receta } = await adminClient
+      let query = adminClient
         .from("receta_insumos")
-        .select("fkeCodInsumoMaestro, eCantidadNecesaria")
-        .eq("fkeCodPresentacion", item.eCodPresentacion);
+        .select("fkeCodInsumoMaestro, eCantidadNecesaria");
+
+      query = item.eCodPresentacion
+        ? query.eq("fkeCodPresentacion", item.eCodPresentacion)
+        : query.eq("fkeCodProduct", item.eCodProduct);
+
+      const { data: receta } = await query;
 
       if (!receta || receta.length === 0) {
-        insumosPorItem.push([]); // presentación sin receta = no descuenta nada
+        insumosPorItem.push([]); // sin receta = no descuenta nada
         continue;
       }
 

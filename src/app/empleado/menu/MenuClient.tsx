@@ -321,6 +321,7 @@ export function MenuClient({
         <ModalCerrarCaja
           corte={corte}
           ventasDelTurno={ventasDelTurno}
+          metodosPago={metodosPago}
           onClose={() => setModalCerrarCaja(false)}
           onCerrado={() => { setModalCerrarCaja(false); router.refresh(); }}
         />

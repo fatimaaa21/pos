@@ -10,22 +10,32 @@ import { Badge }             from "@/components/ui/Badge";
 import { formatFechaHora }   from "@/lib/utils/fecha";
 import { cerrarTurno }       from "@/lib/actions/cortes";
 import type { CorteCaja, VentasDelTurno } from "@/types";
+import type { MetodoPagoGlobal }          from "@/lib/actions/metodos-pago";
 import styles from "./modalCerrarCaja.module.css";
 
 interface Props {
   corte:          CorteCaja;
   ventasDelTurno: VentasDelTurno;
+  metodosPago:    MetodoPagoGlobal[];
   onClose:        () => void;
   onCerrado:      () => void;
 }
 
-export function ModalCerrarCaja({ corte, ventasDelTurno, onClose, onCerrado }: Props) {
+export function ModalCerrarCaja({ corte, ventasDelTurno, metodosPago, onClose, onCerrado }: Props) {
   const [efectivoContado, setEfectivoContado] = useState("");
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState<string | null>(null);
 
   const fmt = (n: number) =>
     n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+  // Misma regla de agrupación que usa src/lib/actions/cortes.ts para sumar
+  // eTotalEfectivo/eTotalTarjeta/eTotalTransferencia — si se agrega una
+  // categoría ahí, hay que replicarla aquí también.
+  const nombres      = metodosPago.map((m) => m.tNamePay.toLowerCase());
+  const tieneEfectivo = nombres.some((n) => n.includes("efectivo"));
+  const tieneTarjeta  = nombres.some((n) => n.includes("tarjeta"));
+  const tieneOtro     = nombres.some((n) => !n.includes("efectivo") && !n.includes("tarjeta"));
 
   const efectivoEsperado = (corte.eFondoInicial ?? 0) + (ventasDelTurno.eTotalEfectivo ?? 0);
 
@@ -101,21 +111,27 @@ export function ModalCerrarCaja({ corte, ventasDelTurno, onClose, onCerrado }: P
       <div>
         <p className={styles.secTitulo}>Ventas del turno</p>
         <div className={styles.desglose}>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><Banknote size={14} /></div>
-            <span className={styles.desgloseLabel}>Efectivo</span>
-            <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalEfectivo)}</span>
-          </div>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><CreditCard size={14} /></div>
-            <span className={styles.desgloseLabel}>Tarjeta</span>
-            <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalTarjeta)}</span>
-          </div>
-          <div className={styles.desgloseRow}>
-            <div className={styles.desgloseIcono}><Smartphone size={14} /></div>
-            <span className={styles.desgloseLabel}>QR / Transferencia</span>
-            <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalTransferencia)}</span>
-          </div>
+          {tieneEfectivo && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><Banknote size={14} /></div>
+              <span className={styles.desgloseLabel}>Efectivo</span>
+              <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalEfectivo)}</span>
+            </div>
+          )}
+          {tieneTarjeta && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><CreditCard size={14} /></div>
+              <span className={styles.desgloseLabel}>Tarjeta</span>
+              <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalTarjeta)}</span>
+            </div>
+          )}
+          {tieneOtro && (
+            <div className={styles.desgloseRow}>
+              <div className={styles.desgloseIcono}><Smartphone size={14} /></div>
+              <span className={styles.desgloseLabel}>QR / Transferencia</span>
+              <span className={styles.desgloseValor}>{fmt(ventasDelTurno.eTotalTransferencia)}</span>
+            </div>
+          )}
           <div className={`${styles.desgloseRow} ${styles.desgloseTotal}`}>
             <div className={styles.desgloseIcono}><TrendingUp size={14} /></div>
             <span className={styles.desgloseLabel}>Total de ventas</span>
