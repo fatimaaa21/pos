@@ -6,7 +6,8 @@ import { obtenerRecetaPresentacion } from "@/lib/actions/receta-insumos";
 import type { RecetaInsumoConDatos } from "@/types";
 
 interface Props {
-  fkeCodPresentacion: string;
+  fkeCodPresentacion: string | null;
+  fkeCodProduct:      string | null;
   nombrePresentacion: string;
   nombreProducto:      string;
   onClose: () => void;
@@ -15,18 +16,18 @@ interface Props {
 // Solo lectura — sin inputs, sin botones de agregar/quitar/editar cantidad.
 // Para cambios reales, se usa ModalRecetaPresentacion desde el ícono de editar.
 
-export function ModalVerReceta({ fkeCodPresentacion, nombrePresentacion, nombreProducto, onClose }: Props) {
+export function ModalVerReceta({ fkeCodPresentacion, fkeCodProduct, nombrePresentacion, nombreProducto, onClose }: Props) {
   const [receta, setReceta]   = useState<RecetaInsumoConDatos[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    obtenerRecetaPresentacion(fkeCodPresentacion).then((result) => {
+    obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct).then((result) => {
       if (result.error) setError(result.error);
       setReceta(result.receta ?? []);
       setCargando(false);
     });
-  }, [fkeCodPresentacion]);
+  }, [fkeCodPresentacion, fkeCodProduct]);
 
   return (
     <Modal
@@ -40,7 +41,7 @@ export function ModalVerReceta({ fkeCodPresentacion, nombrePresentacion, nombreP
         <p style={{ fontSize: 12, color: "var(--gray)" }}>Cargando receta…</p>
       ) : receta.length === 0 ? (
         <p style={{ fontSize: 12, color: "var(--gray)" }}>
-          Esta presentación no tiene receta configurada — no se descuenta ningún insumo al venderla.
+          Este producto no tiene receta configurada — no se descuenta ningún insumo al venderlo.
         </p>
       ) : (
         <div>

@@ -11,6 +11,7 @@ import { ProductoGrid }      from "@/components/ui/ProductoGrid/ProductoGrid";
 import { PedidoPanel }       from "@/components/ui/PedidoPanel/PedidoPanel";
 import { ModalVentaExitosa } from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
 import { ModalEntregaCocina } from "./ModalEntregaCocina";
+import { useCerrarCaja }     from "@/components/pos/AbrirTurnoGate";
 import {
   obtenerMesasConEstado,
   obtenerOrdenAbierta,
@@ -63,7 +64,6 @@ interface Props {
   aplicarIva:        boolean;
   tipo_negocio:      "general" | "impresion" | "billar";
   conceptos:         ConceptoBillar[];
-  onCerrarCaja?:     () => void;
 }
 
 // ── Floor plan de mesas ───────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ function MesaFloorPlan({
                 {ocupada ? "Ocupada" : "Libre"}
               </span>
 
-              {esBillar && ocupada && ahora && (() => {
+              {ocupada && ahora && (() => {
                 const inicio = mesa.segmentoActivo?.fhInicio ?? fhAbierta;
                 const fin    = mesa.segmentoActivo?.fhFin ?? null;
                 if (!inicio) return null;
@@ -164,8 +164,10 @@ function MesaFloorPlan({
                 const finEfectivo = fin ? new Date(fin) : ahora;
                 const diffMs      = Math.max(0, finEfectivo.getTime() - new Date(inicio).getTime());
                 const totalSeg    = Math.floor(diffMs / 1000);
-                const min = Math.floor(totalSeg / 60).toString().padStart(2, "0");
+                const h   = Math.floor(totalSeg / 3600);
+                const min = Math.floor((totalSeg % 3600) / 60).toString().padStart(2, "0");
                 const seg = (totalSeg % 60).toString().padStart(2, "0");
+                const tiempoTexto = h > 0 ? `${h}:${min}:${seg}` : `${min}:${seg}`;
 
                 const costoHora = costoPorConcepto.get(mesa.fkeCodConcepto ?? "");
                 const costo     = costoHora ? Math.round((diffMs / 3600000) * costoHora * 100) / 100 : null;
@@ -173,7 +175,7 @@ function MesaFloorPlan({
                 return (
                   <>
                     <span className={styles.floorMesaTimer}>
-                      {fin && "⏸ "}{min}:{seg}
+                      {fin && "⏸ "}{tiempoTexto}
                     </span>
                     {costo != null && (
                       <span className={styles.floorMesaCosto}>
@@ -247,8 +249,8 @@ export function MesasClient({
   aplicarIva,
   tipo_negocio,
   conceptos,
-  onCerrarCaja,
 }: Props) {
+  const onCerrarCaja = useCerrarCaja();
   const [vista,           setVista]           = useState<Vista>("mesas");
   const [mesas,           setMesas]           = useState(mesasIniciales);
   const [mesaActiva,      setMesaActiva]      = useState<MesaConEstado | null>(null);
@@ -324,18 +326,17 @@ export function MesasClient({
     tNombreMesa: string;
   } | null>(null);
 
-  // ── Timer para billar ─────────────────────────────────────────────────────
+  // ── Timer de mesa abierta (todas las líneas de negocio) ─────────────────────
   const esBillar = tipo_negocio === "billar";
   const [ahora,          setAhora]     = useState<Date | null>(null);
   const [ahoraCongelado, setCongelado] = useState<Date | null>(null);
   const ahoraEfectivo = ahoraCongelado ?? ahora;
 
   useEffect(() => {
-    if (!esBillar) return;
     setAhora(new Date());
     const id = setInterval(() => setAhora(new Date()), 1000);
     return () => clearInterval(id);
-  }, [esBillar]);
+  }, []);
 
   const formatTiempo = useCallback((fhAbierta: string): string => {
     if (!ahoraEfectivo) return "00:00";

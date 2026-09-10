@@ -385,18 +385,21 @@ export interface InsumoConStock extends InsumoMaestro, InsumoStock {}
 
 export interface RecetaInsumoConDatos {
   eCodReceta:          string;
-  fkeCodPresentacion:  string;
+  fkeCodPresentacion:  string | null;
+  fkeCodProduct:       string | null;
   fkeCodInsumoMaestro: string;
   eCantidadNecesaria:  number;
   tNombreInsumo:        string;  // resuelto vía join, no columna propia
   tUnidadReceta:        string;  // resuelto vía join, no columna propia
 }
 
-// Fila de la vista /admin/insumos/recetas — una por presentación, con el
-// nombre del producto dueño y cuántos insumos tiene su receta (0 = sin receta).
+// Fila de la vista /admin/insumos/recetas — una por presentación O por
+// producto sin presentaciones (venta directa). Cuando eCodPresentacion es
+// null, el renglón representa al producto completo y las acciones de receta
+// deben usar eCodProduct en su lugar.
 export interface PresentacionConReceta {
-  eCodPresentacion: string;
-  tNombre:          string;  // nombre de la presentación
+  eCodPresentacion: string | null;
+  tNombre:          string;  // nombre de la presentación, o "—" si es venta directa
   eCodProduct:      string;
   tNameProduct:     string;  // nombre del producto dueño
   cantidadInsumos:  number;

@@ -49,11 +49,11 @@ interface Props {
 }
 
 // ── Helper: genera una línea de separador ─────────────────────────────────────
-// 32 caracteres ≈ ancho cómodo para 72mm en Courier New 10.5px
+// Línea real de CSS al 100% del ancho — no caracteres repetidos, para que
+// nunca quede corta sin importar el ancho de las columnas o el font usado.
 
 function Sep({ doble = false }: { doble?: boolean }) {
-  const char = doble ? "═" : "─";
-  return <span className={styles.sep}>{char.repeat(20)}</span>;
+  return <div className={doble ? styles.sepDoble : styles.sepSimple} />;
 }
 
 // ── Componente ────────────────────────────────────────────────────────────────
@@ -178,8 +178,8 @@ export function TicketClient({
         {/* ── Header de columnas ── */}
         <div className={styles.itemsHeader}>
           <span>Producto</span>
-          <span>Cant</span>
-          <span>Total</span>
+          <span className={styles.itemsHeaderCant}>Cant</span>
+          <span className={styles.itemsHeaderTotal}>Total</span>
         </div>
 
         <Sep />

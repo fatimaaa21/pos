@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Eye }               from "lucide-react";
 import { PageHeader }        from "@/components/ui/PageHeader";
 import { StatCards }         from "@/components/ui/Statscards";
@@ -91,6 +91,17 @@ export function CortesAdminClient({ cortes: inicial, desgloseMetodos }: Props) {
   const [cortes,        setCortes]       = useState<CorteConEmpleado[]>(inicial);
   const [corteVer,      setCorteVer]     = useState<CorteConEmpleado | null>(null);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
+
+  // `useState(inicial)` solo lee `inicial` en el montaje — si el admin cambia
+  // de sucursal (SucursalSelector hace router.refresh(), que vuelve a correr
+  // page.tsx en el servidor con datos filtrados distintos), este componente
+  // ya está montado y nunca vuelve a leer la prop nueva sin este efecto. Sin
+  // esto, tanto la tabla como el filtro de empleados (que se calcula a partir
+  // de `cortes`) se quedan pegados con los datos de la sucursal anterior
+  // hasta que se recarga la página entera.
+  useEffect(() => {
+    setCortes(inicial);
+  }, [inicial]);
 
   // ── Filtros ───────────────────────────────────────────────────────────────
   // metodo    → estado del corte (abierto/pendiente/aprobado/diferencia/todos)

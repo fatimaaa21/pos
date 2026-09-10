@@ -18,12 +18,13 @@ export default async function MesasPage() {
 
   const { data: perfil } = await supabase
     .from("perfiles")
-    .select("fkeCodCompany, tRolUser")
+    .select("fkeCodCompany, fkeCodSucursal, tRolUser")
     .eq("eCodUser", user.id)
     .single();
 
   if (!perfil?.fkeCodCompany) redirect("/auth/login");
-  const fkeCodCompany = perfil.fkeCodCompany;
+  const fkeCodCompany  = perfil.fkeCodCompany;
+  const fkeCodSucursal = perfil.fkeCodSucursal ?? null;
 
   // ── Verificar módulo ──────────────────────────────────────────────────────
   const moduloActivo = await verificarModuloMesas(fkeCodCompany);
@@ -95,12 +96,14 @@ export default async function MesasPage() {
     .order("tNameCategory");
 
   // ── Productos con stock (rama general) ───────────────────────────────────
-  const { data: lotes } = await adminClient
+  let lotesQuery = adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
     .eq("fkeCodCompany", fkeCodCompany)
     .eq("bStateInventory", true)
     .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+  if (fkeCodSucursal) lotesQuery = lotesQuery.eq("fkeCodSucursal", fkeCodSucursal);
+  const { data: lotes } = await lotesQuery;
 
   const stockProducto    = new Map<string, number>();
   const infinitoProducto = new Map<string, boolean>();

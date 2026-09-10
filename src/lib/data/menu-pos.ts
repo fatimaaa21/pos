@@ -33,7 +33,7 @@ export interface DatosMesasPOS {
 // obtenerDatosMenuPOS
 // ─────────────────────────────────────────────────────────────
 
-export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosMenuPOS> {
+export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal: string | null): Promise<DatosMenuPOS> {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
 
@@ -88,13 +88,15 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
     const presByProducto   = new Map<string, PresentacionConStock[]>();
 
     if (idsConInventario.length > 0) {
-      const { data: lotes } = await adminClient
+      let loteQuery = adminClient
         .from("vista_inventario")
         .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
         .in("fkeCodProduct", idsConInventario)
         .eq("fkeCodCompany", fkeCodCompany)
         .eq("bStateInventory", true)
         .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+      if (fkeCodSucursal) loteQuery = loteQuery.eq("fkeCodSucursal", fkeCodSucursal);
+      const { data: lotes } = await loteQuery;
 
       const lotesSinPres = (lotes ?? []).filter((l: any) => !l.fkeCodPresentacion);
       const lotesConPres = (lotes ?? []).filter((l: any) =>  l.fkeCodPresentacion);
@@ -224,12 +226,14 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string): Promise<DatosM
   }
 
   // ── Rama general ──────────────────────────────────────────────────────────
-  const { data: lotes, error } = await adminClient
+  let loteQueryGeneral = adminClient
     .from("vista_inventario")
     .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
     .eq("fkeCodCompany", fkeCodCompany)
     .eq("bStateInventory", true)
     .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+  if (fkeCodSucursal) loteQueryGeneral = loteQueryGeneral.eq("fkeCodSucursal", fkeCodSucursal);
+  const { data: lotes, error } = await loteQueryGeneral;
 
   if (error) console.error("Error menú lotes:", JSON.stringify(error));
 
@@ -401,9 +405,17 @@ export async function obtenerEstadoTurno(userId: string): Promise<{
 // obtenerDatosMesasPOS
 // ─────────────────────────────────────────────────────────────
 
-export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<DatosMesasPOS> {
+export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal: string | null): Promise<DatosMesasPOS> {
   const supabase    = await createClient();
   const adminClient = createAdminClient();
+
+  let lotesQuery = adminClient
+    .from("vista_inventario")
+    .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
+    .eq("fkeCodCompany", fkeCodCompany)
+    .eq("bStateInventory", true)
+    .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0");
+  if (fkeCodSucursal) lotesQuery = lotesQuery.eq("fkeCodSucursal", fkeCodSucursal);
 
   // ── Queries independientes en paralelo ────────────────────────────────────
   const [negocioRes, categoriasRes, lotesRes] = await Promise.all([
@@ -418,12 +430,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string): Promise<Datos
       .eq("fkeCodCompany", fkeCodCompany)
       .eq("bStateCategory", true)
       .order("tNameCategory"),
-    adminClient
-      .from("vista_inventario")
-      .select("fkeCodProduct, fkeCodPresentacion, eCantRestante, bUnlimitedInventory")
-      .eq("fkeCodCompany", fkeCodCompany)
-      .eq("bStateInventory", true)
-      .or("bUnlimitedInventory.eq.true,eCantRestante.gt.0"),
+    lotesQuery,
   ]);
 
   const negocio        = negocioRes.data;

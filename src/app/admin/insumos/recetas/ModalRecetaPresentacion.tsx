@@ -17,14 +17,15 @@ import toast from "react-hot-toast";
 import pedidoStyles from "@/components/ui/PedidoPanel/PedidoPanel.module.css";
 
 interface Props {
-  fkeCodPresentacion: string;
+  fkeCodPresentacion: string | null;
+  fkeCodProduct:      string | null;
   nombrePresentacion: string;
   nombreProducto:      string;
   onClose: () => void;
   onCambio: (cantidadInsumos: number) => void; // avisa a la lista para refrescar el contador
 }
 
-export function ModalRecetaPresentacion({ fkeCodPresentacion, nombrePresentacion, nombreProducto, onClose, onCambio }: Props) {
+export function ModalRecetaPresentacion({ fkeCodPresentacion, fkeCodProduct, nombrePresentacion, nombreProducto, onClose, onCambio }: Props) {
   const [receta, setReceta]           = useState<RecetaInsumoConDatos[]>([]);
   const [disponibles, setDisponibles] = useState<{ eCodInsumoMaestro: string; tNombre: string; tUnidadReceta: string }[]>([]);
   const [cargando, setCargando]       = useState(true);
@@ -42,8 +43,8 @@ export function ModalRecetaPresentacion({ fkeCodPresentacion, nombrePresentacion
   async function cargar() {
     setCargando(true);
     const [recetaResult, disponiblesResult] = await Promise.all([
-      obtenerRecetaPresentacion(fkeCodPresentacion),
-      obtenerInsumosDisponiblesParaReceta(fkeCodPresentacion),
+      obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct),
+      obtenerInsumosDisponiblesParaReceta(fkeCodPresentacion, fkeCodProduct),
     ]);
     if (recetaResult.error) setError(recetaResult.error);
     setReceta(recetaResult.receta ?? []);
@@ -57,7 +58,8 @@ export function ModalRecetaPresentacion({ fkeCodPresentacion, nombrePresentacion
     setError(null);
 
     const fd = new FormData();
-    fd.append("fkeCodPresentacion", fkeCodPresentacion);
+    if (fkeCodPresentacion) fd.append("fkeCodPresentacion", fkeCodPresentacion);
+    if (fkeCodProduct)      fd.append("fkeCodProduct", fkeCodProduct);
     fd.append("fkeCodInsumoMaestro", insumoNuevo);
     fd.append("eCantidadNecesaria", cantidadNueva);
 
