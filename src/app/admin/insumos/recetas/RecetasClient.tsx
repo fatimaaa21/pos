@@ -70,7 +70,7 @@ export function RecetasClient({ presentaciones: inicial }: Props) {
       render: (p) =>
         p.cantidadInsumos === 0
           ? <Badge variante="bajo">Sin receta</Badge>
-          : <Badge variante="disponible">{p.cantidadInsumos} insumo{p.cantidadInsumos !== 1 ? "s" : ""}</Badge>,
+          : <Badge variante="disponible">{p.cantidadInsumos} línea{p.cantidadInsumos !== 1 ? "s" : ""}</Badge>,
     },
     {
       key: "acciones",
@@ -92,7 +92,7 @@ export function RecetasClient({ presentaciones: inicial }: Props) {
     <div className="container">
       <PageHeader
         titulo="Recetas"
-        descripcion="Define qué insumos consume cada presentación al venderse"
+        descripcion="Define qué insumos consume cada presentación al venderse — insumos fijos (ej. café en grano) o resueltos según el extra que el cliente elija (ej. tipo de leche)"
       />
 
       <StatCards stats={[

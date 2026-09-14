@@ -8,6 +8,7 @@ import type {
   ConceptoBillar,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
+import { obtenerGruposExtrasPorProducto } from "@/lib/utils/extras";
 
 // ─────────────────────────────────────────────────────────────
 // INTERFACES
@@ -25,7 +26,7 @@ export interface DatosMesasPOS {
   productos:         ProductoConStock[];
   metodosPago:       MetodoPagoGlobal[];
   aplicarIva:        boolean;
-  tipo_negocio:      "general" | "impresion" | "billar";
+  tipo_negocio:      "general" | "impresion" | "billar" | "restaurante";
   conceptos:         ConceptoBillar[];
 }
 
@@ -285,6 +286,8 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal:
   const productos            = productosRes.data;
   const presentacionesDetalle = presRes.data ?? [];
 
+  const gruposPorProducto = await obtenerGruposExtrasPorProducto(adminClient, idsConStock);
+
   const presByProducto = new Map<string, PresentacionConStock[]>();
   for (const p of presentacionesDetalle) {
     const bInf  = infinitoPorPres.get(p.eCodPresentacion) ?? false;
@@ -304,6 +307,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal:
 
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => {
     const pres = presByProducto.get(p.eCodProduct);
+    const gruposExtras = gruposPorProducto.get(p.eCodProduct) ?? [];
     if (pres && pres.length > 0) {
       const anyInfinito = pres.some((pr) => pr.bInfinito);
       const totalStock  = pres.reduce((acc, pr) => acc + (pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible), 0);
@@ -316,6 +320,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal:
         stockDisponible: anyInfinito ? Number.MAX_SAFE_INTEGER : totalStock,
         bInfinito:       anyInfinito,
         presentaciones:  pres,
+        gruposExtras,
       };
     }
     const bInf = infinitoProducto.get(p.eCodProduct) ?? false;
@@ -327,6 +332,7 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal:
       ImgProduct:      p.ImgProduct,
       bInfinito:       bInf,
       stockDisponible: bInf ? Number.MAX_SAFE_INTEGER : (stockProducto.get(p.eCodProduct) ?? 0),
+      gruposExtras,
     };
   });
 
@@ -438,7 +444,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
   const lotes          = lotesRes.data;
 
   const aplicarIva: boolean = negocio?.aplicarIva    ?? true;
-  const tipo_negocio        = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
+  const tipo_negocio        = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar" | "restaurante";
 
   let conceptos: ConceptoBillar[] = [];
   if (tipo_negocio === "billar") {
@@ -507,6 +513,8 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
   const productos             = productosRes.data;
   const presentacionesDetalle = presRes.data ?? [];
 
+  const gruposPorProducto = await obtenerGruposExtrasPorProducto(adminClient, idsConStock);
+
   const presByProducto = new Map<string, PresentacionConStock[]>();
   for (const p of presentacionesDetalle) {
     const bInf  = infinitoPorPres.get(p.eCodPresentacion) ?? false;
@@ -527,6 +535,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
   const productosConStock: ProductoConStock[] = (productos ?? []).map((p) => {
     const pres = presByProducto.get(p.eCodProduct);
     const bInf = infinitoProducto.get(p.eCodProduct) ?? false;
+    const gruposExtras = gruposPorProducto.get(p.eCodProduct) ?? [];
     if (pres?.length) {
       const anyInf = pres.some((pr) => pr.bInfinito);
       return {
@@ -538,6 +547,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
         stockDisponible: anyInf ? Number.MAX_SAFE_INTEGER : pres.reduce((a, pr) => a + pr.stockDisponible, 0),
         bInfinito:       anyInf,
         presentaciones:  pres,
+        gruposExtras,
       };
     }
     return {
@@ -548,6 +558,7 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
       ImgProduct:      p.ImgProduct,
       stockDisponible: bInf ? Number.MAX_SAFE_INTEGER : (stockProducto.get(p.eCodProduct) ?? 0),
       bInfinito:       bInf,
+      gruposExtras,
     };
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Asterisk, ChevronDown, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner/Spinner";
 import styles from "./Modal.module.css";
@@ -47,6 +48,10 @@ export function Modal({
   ancho = "sm",
   children,
 }: ModalProps) {
+  // Portal seguro con SSR: document solo existe en cliente, así que se monta
+  // en un efecto y no se renderiza nada hasta entonces.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // Cerrar con Escape
   useEffect(() => {
@@ -73,7 +78,9 @@ export function Modal({
     ? styles.btnPeligro
     : styles.btnPrimario;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       className={styles.overlay}
       onClick={(e) => e.target === e.currentTarget && onCerrar()}
@@ -133,7 +140,8 @@ export function Modal({
         )}
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

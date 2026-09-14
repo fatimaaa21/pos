@@ -127,15 +127,36 @@ export async function cobrarCuenta(
   // 4. Productos de esta cuenta -> mismo formato ItemVenta que espera crearVenta
   const { data: productos, error: errProd } = await adminClient
     .from("cuenta_detalle_producto")
-    .select("fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario")
+    .select("eCodDetalle, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario")
     .eq("fkeCodCuenta", eCodCuenta);
   if (errProd) return { error: errProd.message };
 
+  // Extras capturados al agregar cada producto a la cuenta (antes de cobrar).
+  // crearVenta vuelve a validar precio/pertenencia contra opciones_extra — aquí
+  // solo se propaga qué se seleccionó, no se confía en ePrecioSnapshot para el total.
+  const idsDetalle = (productos ?? []).map((p) => p.eCodDetalle);
+  const extrasPorDetalle = new Map<string, { eCodOpcionExtra: string; eCantidad: number }[]>();
+
+  if (idsDetalle.length > 0) {
+    const { data: extras, error: errExtras } = await adminClient
+      .from("cuenta_detalle_producto_extras")
+      .select("fkeCodDetalle, fkeCodOpcionExtra, eCantidadSeleccionada")
+      .in("fkeCodDetalle", idsDetalle);
+    if (errExtras) return { error: errExtras.message };
+
+    for (const e of extras ?? []) {
+      const lista = extrasPorDetalle.get(e.fkeCodDetalle) ?? [];
+      lista.push({ eCodOpcionExtra: e.fkeCodOpcionExtra, eCantidad: e.eCantidadSeleccionada });
+      extrasPorDetalle.set(e.fkeCodDetalle, lista);
+    }
+  }
+
   const items = (productos ?? []).map((p) => ({
-    eCodProduct:      p.fkeCodProduct,
-    eCodPresentacion: p.fkeCodPresentacion ?? undefined,
-    cantidad:         p.eCantidad,
-    precioUnitario:   p.ePrecioUnitario,
+    eCodProduct:         p.fkeCodProduct,
+    eCodPresentacion:    p.fkeCodPresentacion ?? undefined,
+    cantidad:            p.eCantidad,
+    precioUnitario:      p.ePrecioUnitario,
+    extrasSeleccionados: extrasPorDetalle.get(p.eCodDetalle),
   }));
 
   if (items.length === 0 && cargoBillar === 0) {

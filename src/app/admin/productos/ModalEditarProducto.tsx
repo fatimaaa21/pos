@@ -10,6 +10,7 @@ import {
   editarPresentacion,
   eliminarPresentacion,
 } from "@/lib/actions/presentaciones";
+import { SeleccionGruposExtrasProducto } from "./SeleccionGruposExtrasProducto";
 import type { Categoria, Producto, Presentacion } from "@/types";
 import { ImageUploadInput } from "@/components/ui/ImageUploadInput";
 
@@ -19,6 +20,7 @@ interface Props {
   onClose:            () => void;
   onEditado:          (producto: Producto) => void;
   moduloCocinaActivo: boolean;
+  tieneExtrasActivo:  boolean;
 }
 
 interface FilaEditable extends Presentacion {
@@ -40,7 +42,7 @@ function toFila(p: Presentacion): FilaEditable {
   };
 }
 
-export function ModalEditarProducto({ producto, categorias, onClose, onEditado, moduloCocinaActivo }: Props) {
+export function ModalEditarProducto({ producto, categorias, onClose, onEditado, moduloCocinaActivo, tieneExtrasActivo }: Props) {
   const checkboxId = useId();
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -506,6 +508,16 @@ export function ModalEditarProducto({ producto, categorias, onClose, onEditado, 
           </>
         )}
       </div>
+
+      {/* ── Extras (solo negocios tipo Restaurante) ── */}
+      {tieneExtrasActivo && (
+        <div style={{ borderTop: "1px solid var(--border-light)", paddingTop: "var(--space-4)" }}>
+          <p style={{ margin: "0 0 var(--space-3)", fontSize: 13, fontWeight: 700, color: "var(--dark)" }}>
+            Extras
+          </p>
+          <SeleccionGruposExtrasProducto eCodProduct={producto.eCodProduct} />
+        </div>
+      )}
     </Modal>
   );
 }

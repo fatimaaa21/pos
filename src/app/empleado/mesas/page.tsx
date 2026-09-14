@@ -63,7 +63,7 @@ export default async function MesasPage() {
     .single();
 
   const aplicarIva   = negocio?.aplicarIva    ?? true;
-  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
+  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar" | "restaurante";
 
   let conceptos: ConceptoBillar[] = [];
   if (tipo_negocio === "billar") {

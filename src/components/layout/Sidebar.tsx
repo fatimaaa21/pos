@@ -17,7 +17,9 @@ import {
   ShoppingBasket,
   ChefHat,
   CreditCard,
+  Layers,
 } from "lucide-react";
+import { tieneExtras } from "@/lib/utils/negocio";
 
 // Orden fijo por usabilidad (uso diario primero, configuración al final).
 // Los ítems con `modulo` son opcionales: solo aparecen si ese módulo está
@@ -32,15 +34,18 @@ const NAV_ADMIN_MASTER = [
   { icon: ShoppingBasket,   label: "Insumos",        href: "/admin/insumos",         modulo: "insumos" },
   { icon: ChefHat,          label: "Recetas",        href: "/admin/insumos/recetas", modulo: "insumos" },
   { icon: Package,          label: "Productos",      href: "/admin/productos"        },
+  { icon: Layers,           label: "Extras",         href: "/admin/extras",          requiereExtras: true },
   { icon: BookOpenText,     label: "Catálogo",       href: "/admin/catalogo"         },
   { icon: LayoutGrid,       label: "Mesas",          href: "/admin/mesas",           modulo: "mesas"    },
   { icon: MapPin,           label: "Sucursales",     href: "/admin/sucursales"       },
   { icon: Users,            label: "Usuarios",       href: "/admin/usuarios"         },
 ];
 
-function buildNavAdmin(modulosActivos: string[]) {
+function buildNavAdmin(modulosActivos: string[], extrasActivo: boolean) {
   return NAV_ADMIN_MASTER.filter(
-    (item) => !item.modulo || modulosActivos.includes(item.modulo)
+    (item) =>
+      (!item.modulo || modulosActivos.includes(item.modulo)) &&
+      (!item.requiereExtras || extrasActivo)
   );
 }
 
@@ -70,6 +75,7 @@ interface NegocioInfo {
 interface SidebarProps {
   perfil:          Perfil;
   negocio?:        NegocioInfo | null;
+  tipoNegocio?:    string;
   modulosActivos?: string[];
   sucursales?:     Sucursal[];
   sucursalActiva?: string | null;
@@ -144,6 +150,7 @@ function SucursalSelector({
 export function Sidebar({
   perfil,
   negocio,
+  tipoNegocio     = "general",
   modulosActivos  = [],
   sucursales      = [],
   sucursalActiva  = null,
@@ -156,7 +163,7 @@ export function Sidebar({
   const abrirConfiguracion = useConfiguracionStore((s) => s.abrir);
 
   const nav =
-    perfil.tRolUser === "admin"    ? buildNavAdmin(modulosActivos)    :
+    perfil.tRolUser === "admin"    ? buildNavAdmin(modulosActivos, tieneExtras(tipoNegocio)) :
     perfil.tRolUser === "sistemas" ? navSistemas                      :
     buildNavEmpleado(modulosActivos);
 

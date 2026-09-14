@@ -6,12 +6,14 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import { crearVenta }        from "@/lib/actions/ventas";
 import { getSucursalContext } from "@/lib/utils/sucursal";
+import { validarExtrasSeleccionados, firmaExtras, type ExtraSeleccionado } from "@/lib/utils/extras";
 import type {
   MesaConEstado,
   OrdenMesaConDetalle,
   OrdenMesaDetalleConProducto,
   ItemListoCocina,
   MetodoPago,
+  ExtraCarrito,
 } from "@/types";
 
 // ─────────────────────────────────────────────────────────────
@@ -386,14 +388,32 @@ export async function obtenerOrdenAbierta(
   const productosMap     = new Map((productosRes.data     ?? []).map((p) => [p.eCodProduct,      p]));
   const presentacionesMap = new Map((presentacionesRes.data ?? []).map((p) => [p.eCodPresentacion, p]));
 
+  const { data: extrasDetalle } = await adminClient
+    .from("ordenes_mesa_detalle_extras")
+    .select("fkeCodDetalle, fkeCodOpcionExtra, eCantidadSeleccionada, ePrecioSnapshot, tNombreSnapshot")
+    .in("fkeCodDetalle", detalle.map((d) => d.eCodDetalle));
+
+  const extrasPorDetalle = new Map<string, ExtraCarrito[]>();
+  for (const e of extrasDetalle ?? []) {
+    const lista = extrasPorDetalle.get(e.fkeCodDetalle) ?? [];
+    lista.push({
+      fkeCodOpcionExtra: e.fkeCodOpcionExtra,
+      eCantidad:         e.eCantidadSeleccionada,
+      ePrecioExtra:      e.ePrecioSnapshot,
+      tNombreOpcion:     e.tNombreSnapshot,
+    });
+    extrasPorDetalle.set(e.fkeCodDetalle, lista);
+  }
+
   const detalleConProducto: OrdenMesaDetalleConProducto[] = detalle.map((d) => ({
     ...d,
     producto:     productosMap.get(d.fkeCodProduct)                                           ?? null,
     presentacion: d.fkeCodPresentacion ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null) : null,
+    extrasSeleccionados: extrasPorDetalle.get(d.eCodDetalle) ?? [],
   }));
 
   const eTotal = detalleConProducto.reduce(
-    (acc, d) => acc + d.ePrecio * d.eCantidad,
+    (acc, d) => acc + (d.ePrecio + (d.extrasSeleccionados ?? []).reduce((a, e) => a + e.ePrecioExtra * e.eCantidad, 0)) * d.eCantidad,
     0
   );
 
@@ -555,6 +575,7 @@ interface ItemOrden {
   eCodPresentacion?: string;
   eCantidad:         number;
   ePrecio:           number;
+  extrasSeleccionados?: ExtraSeleccionado[];
 }
 
 /**
@@ -591,8 +612,21 @@ export async function agregarItemOrden(
 
   const esCocina = producto?.bCocina === true;
 
-  // ── Sin cuenta (negocios no-billar): comportamiento original sin cambios ──
+  // ── Sin cuenta (negocios no-billar): comportamiento original + extras ─────
   if (!eCodCuenta) {
+    const resultadoExtras = await validarExtrasSeleccionados(
+      adminClient,
+      item.eCodProduct,
+      item.extrasSeleccionados
+    );
+    if ("error" in resultadoExtras) return resultadoExtras;
+    const extras = resultadoExtras.extras;
+
+    // Firma del conjunto de extras entrante — dos líneas del mismo producto
+    // con distinta firma NUNCA deben colapsar en una sola (ese era el bug:
+    // la RPC original colapsaba por producto+presentación sin mirar extras).
+    const firmaNueva = firmaExtras(extras.map((e) => ({ id: e.fkeCodOpcionExtra, eCantidad: e.eCantidad })));
+
     let q = adminClient
       .from("ordenes_mesa_detalle")
       .select("eCodDetalle, eCantidad")
@@ -603,7 +637,25 @@ export async function agregarItemOrden(
       ? q.eq("fkeCodPresentacion", item.eCodPresentacion)
       : q.is("fkeCodPresentacion", null);
 
-    const { data: itemExistente } = await q.maybeSingle();
+    const { data: candidatos } = await q;
+
+    let itemExistente: { eCodDetalle: string; eCantidad: number } | null = null;
+
+    for (const candidato of candidatos ?? []) {
+      const { data: extrasCandidato } = await adminClient
+        .from("ordenes_mesa_detalle_extras")
+        .select("fkeCodOpcionExtra, eCantidadSeleccionada")
+        .eq("fkeCodDetalle", candidato.eCodDetalle);
+
+      const firmaCandidato = firmaExtras(
+        (extrasCandidato ?? []).map((e) => ({ id: e.fkeCodOpcionExtra, eCantidad: e.eCantidadSeleccionada }))
+      );
+
+      if (firmaCandidato === firmaNueva) {
+        itemExistente = candidato;
+        break;
+      }
+    }
 
     if (itemExistente) {
       const updateData: Record<string, unknown> = {
@@ -618,7 +670,7 @@ export async function agregarItemOrden(
 
       if (error) return { error: `Error al actualizar cantidad: ${error.message}` };
     } else {
-      const { error } = await adminClient
+      const { data: nuevoDetalle, error } = await adminClient
         .from("ordenes_mesa_detalle")
         .insert({
           fkeCodOrden:        eCodOrden,
@@ -628,9 +680,32 @@ export async function agregarItemOrden(
           ePrecio:            item.ePrecio,
           fhAgregado:         new Date().toISOString(),
           tEstadoCocina:      esCocina ? "pendiente" : null,
-        });
+        })
+        .select("eCodDetalle")
+        .single();
 
-      if (error) return { error: `Error al agregar producto: ${error.message}` };
+      if (error || !nuevoDetalle) return { error: `Error al agregar producto: ${error?.message}` };
+
+      if (extras.length > 0) {
+        const { error: errorExtras } = await adminClient
+          .from("ordenes_mesa_detalle_extras")
+          .insert(
+            extras.map((e) => ({
+              fkeCodDetalle:         nuevoDetalle.eCodDetalle,
+              fkeCodOpcionExtra:     e.fkeCodOpcionExtra,
+              eCantidadSeleccionada: e.eCantidad,
+              ePrecioSnapshot:       e.ePrecioExtra,
+              tNombreSnapshot:       e.tNombreOpcion,
+            }))
+          );
+
+        if (errorExtras) {
+          // Rollback: la línea sin sus extras es peor que no tener línea —
+          // el mesero vería "café" cuando el cliente pidió "café con avena".
+          await adminClient.from("ordenes_mesa_detalle").delete().eq("eCodDetalle", nuevoDetalle.eCodDetalle);
+          return { error: `Error al guardar extras: ${errorExtras.message}` };
+        }
+      }
     }
 
     revalidatePath("/empleado/mesas");
@@ -638,6 +713,15 @@ export async function agregarItemOrden(
   }
 
   // ── Con cuenta (billar): verificar cuenta y escribir atómico vía RPC ──────
+  // Los extras están gateados por tipo_negocio === "restaurante" (ver
+  // tieneExtras en negocios.ts) y billar nunca tiene grupos_extras en sus
+  // productos, así que esta rama no debería recibir extrasSeleccionados en la
+  // práctica. Falla explícito en vez de perderlos en silencio si algún día
+  // deja de ser cierto (ej. Restaurante con split de cuenta tipo billar).
+  if (item.extrasSeleccionados?.length) {
+    return { error: "Los extras aún no están soportados en cuentas con split de mesa" };
+  }
+
   const { data: cuenta } = await adminClient
     .from("cuentas")
     .select("eCodCuenta, bAbierta, fkeCodCompany")
@@ -819,11 +903,31 @@ export async function cobrarOrdenMesa(
   if (!detalle?.length && cargoBillar === 0)
     return { error: "La orden no tiene productos" };
 
+  // Extras capturados cuando el item se mandó a cocina (antes de cobrar).
+  // crearVenta vuelve a validar precio/pertenencia contra opciones_extra.
+  const idsDetalleOrden = (detalle ?? []).map((d) => d.eCodDetalle);
+  const extrasPorDetalleOrden = new Map<string, { eCodOpcionExtra: string; eCantidad: number }[]>();
+
+  if (idsDetalleOrden.length > 0) {
+    const { data: extrasOrden, error: errExtrasOrden } = await adminClient
+      .from("ordenes_mesa_detalle_extras")
+      .select("fkeCodDetalle, fkeCodOpcionExtra, eCantidadSeleccionada")
+      .in("fkeCodDetalle", idsDetalleOrden);
+    if (errExtrasOrden) return { error: errExtrasOrden.message };
+
+    for (const e of extrasOrden ?? []) {
+      const lista = extrasPorDetalleOrden.get(e.fkeCodDetalle) ?? [];
+      lista.push({ eCodOpcionExtra: e.fkeCodOpcionExtra, eCantidad: e.eCantidadSeleccionada });
+      extrasPorDetalleOrden.set(e.fkeCodDetalle, lista);
+    }
+  }
+
   const items = (detalle ?? []).map((d) => ({
-    eCodProduct:      d.fkeCodProduct,
-    eCodPresentacion: d.fkeCodPresentacion ?? undefined,
-    cantidad:         d.eCantidad,
-    precioUnitario:   d.ePrecio,
+    eCodProduct:         d.fkeCodProduct,
+    eCodPresentacion:    d.fkeCodPresentacion ?? undefined,
+    cantidad:            d.eCantidad,
+    precioUnitario:      d.ePrecio,
+    extrasSeleccionados: extrasPorDetalleOrden.get(d.eCodDetalle),
   }));
 
   const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
@@ -1144,15 +1248,34 @@ export async function cobrarCuenta(
   // ── 4. Productos de esta cuenta ────────────────────────────────────────────
   const { data: productos, error: errProd } = await adminClient
     .from("cuenta_detalle_producto")
-    .select("fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario")
+    .select("eCodDetalle, fkeCodProduct, fkeCodPresentacion, eCantidad, ePrecioUnitario")
     .eq("fkeCodCuenta", eCodCuenta);
   if (errProd) return { error: errProd.message };
 
+  // Extras capturados al agregar cada producto a la cuenta (antes de cobrar).
+  const idsDetalleCuenta = (productos ?? []).map((p) => p.eCodDetalle);
+  const extrasPorDetalleCuenta = new Map<string, { eCodOpcionExtra: string; eCantidad: number }[]>();
+
+  if (idsDetalleCuenta.length > 0) {
+    const { data: extrasCuenta, error: errExtrasCuenta } = await adminClient
+      .from("cuenta_detalle_producto_extras")
+      .select("fkeCodDetalle, fkeCodOpcionExtra, eCantidadSeleccionada")
+      .in("fkeCodDetalle", idsDetalleCuenta);
+    if (errExtrasCuenta) return { error: errExtrasCuenta.message };
+
+    for (const e of extrasCuenta ?? []) {
+      const lista = extrasPorDetalleCuenta.get(e.fkeCodDetalle) ?? [];
+      lista.push({ eCodOpcionExtra: e.fkeCodOpcionExtra, eCantidad: e.eCantidadSeleccionada });
+      extrasPorDetalleCuenta.set(e.fkeCodDetalle, lista);
+    }
+  }
+
   const items = (productos ?? []).map((p) => ({
-    eCodProduct:      p.fkeCodProduct,
-    eCodPresentacion: p.fkeCodPresentacion ?? undefined,
-    cantidad:         p.eCantidad,
-    precioUnitario:   p.ePrecioUnitario,
+    eCodProduct:         p.fkeCodProduct,
+    eCodPresentacion:    p.fkeCodPresentacion ?? undefined,
+    cantidad:            p.eCantidad,
+    precioUnitario:      p.ePrecioUnitario,
+    extrasSeleccionados: extrasPorDetalleCuenta.get(p.eCodDetalle),
   }));
 
   if (items.length === 0 && cargoBillar === 0) {

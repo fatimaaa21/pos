@@ -75,6 +75,40 @@ export interface Presentacion {
   fhUpdate?:           string;
 }
 
+export interface GrupoExtra {
+  eCodGrupoExtra:     string;
+  fkeCodCompany:      string;
+  tNombreGrupo:       string;
+  bSeleccionMultiple: boolean;
+  bRequerido:         boolean;
+  eSeleccionMinima:   number | null;
+  eSeleccionMaxima:   number | null;
+  eOrden:             number;
+  bStateGrupoExtra:   boolean;
+  fhCreateGrupoExtra?: string;
+  fhUpdateGrupoExtra?: string | null;
+}
+
+export interface OpcionExtra {
+  eCodOpcionExtra:     string;
+  fkeCodGrupoExtra:    string;
+  tNombreOpcion:       string;
+  ePrecioExtra:        number;
+  eCantidadMaxima:     number;
+  eOrden:              number;
+  bStateOpcionExtra:   boolean;
+  /** Insumo que esta opción representa para efectos de descuento de inventario
+   *  (ej. "Avena" -> insumo "Leche de avena"). Null si esta opción no debe
+   *  descontar nada por sí sola — la receta del producto decide, no la opción. */
+  fkeCodInsumoMaestro: string | null;
+  fhCreateOpcionExtra?: string;
+  fhUpdateOpcionExtra?: string | null;
+}
+
+export interface GrupoExtraConOpciones extends GrupoExtra {
+  opciones: OpcionExtra[];
+}
+
 export interface PresentacionConStock {
   eCodPresentacion:   string;
   tNombre:            string;
@@ -122,6 +156,7 @@ export interface ProductoConStock {
   stockDisponible:  number;
   bInfinito?:       boolean;
   presentaciones?:  PresentacionConStock[];
+  gruposExtras?:    GrupoExtraConOpciones[];
   tipo_producto?:   "unidad" | "medida";
   ePrecioM2?:       number | null;
   eAnchoCm?:        number | null;
@@ -131,11 +166,19 @@ export interface ProductoConStock {
 
 // Carrito empleado
 
+export interface ExtraCarrito {
+  fkeCodOpcionExtra: string;
+  eCantidad:         number;
+  ePrecioExtra:      number;
+  tNombreOpcion:     string;
+}
+
 export interface ItemCarritoMenu {
   key?:            string;
   producto:        ProductoConStock;
   cantidad:        number;
   presentacion?:   PresentacionConStock;
+  extrasSeleccionados?: ExtraCarrito[];
   tipo_producto?:  "unidad" | "medida";
   anchoCm?:        number;
   largoCm?:        number;
@@ -330,6 +373,7 @@ export interface MesaConEstado extends Mesa {
 export interface OrdenMesaDetalleConProducto extends OrdenMesaDetalle {
   producto?:     { tNameProduct: string; ImgProduct?: string } | null;
   presentacion?: { tNombre: string } | null;
+  extrasSeleccionados?: ExtraCarrito[];
 }
 
 export interface OrdenMesaConDetalle extends OrdenMesa {
@@ -387,10 +431,15 @@ export interface RecetaInsumoConDatos {
   eCodReceta:          string;
   fkeCodPresentacion:  string | null;
   fkeCodProduct:       string | null;
-  fkeCodInsumoMaestro: string;
+  /** Insumo fijo (excluyente con fkeCodGrupoExtra). */
+  fkeCodInsumoMaestro: string | null;
+  /** Grupo de extras a resolver en el momento de la venta — cada opción
+   *  elegida de este grupo aporta su propio insumo (excluyente con fkeCodInsumoMaestro). */
+  fkeCodGrupoExtra:    string | null;
   eCantidadNecesaria:  number;
-  tNombreInsumo:        string;  // resuelto vía join, no columna propia
-  tUnidadReceta:        string;  // resuelto vía join, no columna propia
+  tNombreInsumo:        string | null;  // null cuando la fila cuelga de un grupo
+  tUnidadReceta:         string | null;  // null cuando la fila cuelga de un grupo
+  tNombreGrupo:          string | null;  // resuelto vía join, solo cuando fkeCodGrupoExtra
 }
 
 // Fila de la vista /admin/insumos/recetas — una por presentación O por

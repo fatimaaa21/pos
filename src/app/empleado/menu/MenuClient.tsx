@@ -4,9 +4,10 @@ import { useState }   from "react";
 import { useRouter }  from "next/navigation";
 import type {
   Categoria, ProductoConStock, PresentacionConStock,
-  ItemCarritoMenu, MetodoPago,
+  ItemCarritoMenu, MetodoPago, ExtraCarrito,
 } from "@/types";
 import type { MetodoPagoGlobal }  from "@/lib/actions/metodos-pago";
+import { firmaExtras } from "@/lib/utils/extras";
 import { Modal, ModalField, ModalInput } from "@/components/ui/Modal";
 import { iniciarTurno }           from "@/lib/actions/cortes";
 import { Calculator }             from "lucide-react";
@@ -28,9 +29,10 @@ const VENTAS_VACIO: VentasDelTurno = {
   eTotalTransferencia: 0, eTotalVentas: 0, eNumVentas: 0,
 };
 
-function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion">): string {
+function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion" | "extrasSeleccionados">): string {
   if (item.key) return item.key;
-  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
+  const firma = firmaExtras((item.extrasSeleccionados ?? []).map((e) => ({ id: e.fkeCodOpcionExtra, eCantidad: e.eCantidad })));
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}_${firma}`;
 }
 
 interface Props {
@@ -75,11 +77,11 @@ export function MenuClient({
     ),
   };
 
-  function agregarProducto(producto: ProductoConStock, presentacion?: PresentacionConStock) {
+  function agregarProducto(producto: ProductoConStock, presentacion?: PresentacionConStock, extras?: ExtraCarrito[]) {
     if (!tieneTurno) return;
     setErrorVenta(null);
 
-    const key    = carritoKey({ producto, presentacion });
+    const key    = carritoKey({ producto, presentacion, extrasSeleccionados: extras });
     const stock  = presentacion?.stockDisponible ?? producto.stockDisponible;
     const bInf   = presentacion?.bInfinito       ?? producto.bInfinito;
 
@@ -91,7 +93,7 @@ export function MenuClient({
           carritoKey(i) === key ? { ...i, cantidad: i.cantidad + 1 } : i
         );
       }
-      return [...prev, { producto, cantidad: 1, presentacion }];
+      return [...prev, { producto, cantidad: 1, presentacion, extrasSeleccionados: extras }];
     });
   }
 
@@ -171,6 +173,12 @@ export function MenuClient({
         metrosConsumidos:  i.metrosConsumidos,
         eAnchoCm:          i.anchoCm,
         eLargoCm:          i.largoCm,
+        // El precio de cada extra se recalcula server-side contra opciones_extra —
+        // aquí solo se manda qué se seleccionó.
+        extrasSeleccionados: i.extrasSeleccionados?.map((e) => ({
+          eCodOpcionExtra: e.fkeCodOpcionExtra,
+          eCantidad:       e.eCantidad,
+        })),
       })),
       metodoPago,
       aplicarIva,

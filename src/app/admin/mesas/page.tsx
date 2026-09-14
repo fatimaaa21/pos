@@ -49,7 +49,7 @@ export default async function AdminMesasPage() {
     .eq("eCodCompany", perfil.fkeCodCompany)
     .single();
 
-  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar";
+  const tipo_negocio = (negocio?.tipo_negocio ?? "general") as "general" | "impresion" | "billar" | "restaurante";
 
   let conceptos: ConceptoBillar[] = [];
   if (tipo_negocio === "billar") {

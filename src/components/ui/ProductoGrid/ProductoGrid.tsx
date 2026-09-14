@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import type { ProductoConStock, PresentacionConStock } from "@/types";
+import type { ProductoConStock, PresentacionConStock, ExtraCarrito } from "@/types";
+import { ModalExtras } from "@/components/ui/ModalExtras/ModalExtras";
 import styles from "./ProductoGrid.module.css";
 
 interface Props {
   productos:   ProductoConStock[];
-  onAgregar:   (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  onAgregar:   (producto: ProductoConStock, presentacion?: PresentacionConStock, extras?: ExtraCarrito[]) => void;
   onAgregarPorMedida?: (producto: ProductoConStock) => void;
 }
 
@@ -27,11 +28,13 @@ function ProductoCard({
   onAgregarPorMedida,
 }: {
   producto:             ProductoConStock;
-  onAgregar:            (producto: ProductoConStock, presentacion?: PresentacionConStock) => void;
+  onAgregar:            (producto: ProductoConStock, presentacion?: PresentacionConStock, extras?: ExtraCarrito[]) => void;
   onAgregarPorMedida?:  (producto: ProductoConStock) => void;
 }) {
   const tienePres = (producto.presentaciones?.length ?? 0) > 0;
+  const tieneExtras = (producto.gruposExtras?.length ?? 0) > 0;
   const [presSeleccionada, setPresSeleccionada] = useState<PresentacionConStock | null>(null);
+  const [mostrarModalExtras, setMostrarModalExtras] = useState(false);
 
   const agotado = !producto.bInfinito && producto.stockDisponible === 0;
 
@@ -64,6 +67,10 @@ function ProductoCard({
       return;
     }
     if (!puedeAgregar) return;
+    if (tieneExtras) {
+      setMostrarModalExtras(true);
+      return;
+    }
     onAgregar(producto, presSeleccionada ?? undefined);
   }
 
@@ -143,6 +150,18 @@ function ProductoCard({
           </button>
         </div>
       </div>
+
+      {mostrarModalExtras && (
+        <ModalExtras
+          producto={producto}
+          grupos={producto.gruposExtras ?? []}
+          onCerrar={() => setMostrarModalExtras(false)}
+          onConfirmar={(extras) => {
+            setMostrarModalExtras(false);
+            onAgregar(producto, presSeleccionada ?? undefined, extras);
+          }}
+        />
+      )}
     </div>
   );
 }

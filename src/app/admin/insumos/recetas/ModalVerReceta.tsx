@@ -6,17 +6,21 @@ import { obtenerRecetaPresentacion } from "@/lib/actions/receta-insumos";
 import type { RecetaInsumoConDatos } from "@/types";
 
 interface Props {
-  fkeCodPresentacion: string | null;
-  fkeCodProduct:      string | null;
-  nombrePresentacion: string;
-  nombreProducto:      string;
+  fkeCodPresentacion?: string | null;
+  fkeCodProduct?:      string | null;
+  nombrePresentacion?: string;
+  nombreProducto?:     string;
   onClose: () => void;
 }
 
 // Solo lectura — sin inputs, sin botones de agregar/quitar/editar cantidad.
 // Para cambios reales, se usa ModalRecetaPresentacion desde el ícono de editar.
 
-export function ModalVerReceta({ fkeCodPresentacion, fkeCodProduct, nombrePresentacion, nombreProducto, onClose }: Props) {
+export function ModalVerReceta({
+  fkeCodPresentacion = null, fkeCodProduct = null,
+  nombrePresentacion, nombreProducto,
+  onClose,
+}: Props) {
   const [receta, setReceta]   = useState<RecetaInsumoConDatos[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError]     = useState<string | null>(null);
@@ -53,9 +57,18 @@ export function ModalVerReceta({ fkeCodPresentacion, fkeCodProduct, nombrePresen
                 padding: "8px 0", borderBottom: "1px solid var(--border-default, #eee)",
               }}
             >
-              <span style={{ fontSize: 13 }}>{item.tNombreInsumo}</span>
+              <span style={{ fontSize: 13 }}>
+                {item.fkeCodGrupoExtra ? (
+                  <>
+                    {item.tNombreGrupo}{" "}
+                    <span style={{ color: "var(--gray)", fontWeight: 500 }}>(según selección)</span>
+                  </>
+                ) : (
+                  item.tNombreInsumo
+                )}
+              </span>
               <span style={{ fontSize: 13, color: "var(--gray)" }}>
-                {item.eCantidadNecesaria} {item.tUnidadReceta}
+                {item.eCantidadNecesaria} {item.tUnidadReceta ?? "ml"}
               </span>
             </div>
           ))}

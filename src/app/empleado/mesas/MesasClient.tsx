@@ -12,6 +12,7 @@ import { PedidoPanel }       from "@/components/ui/PedidoPanel/PedidoPanel";
 import { ModalVentaExitosa } from "@/components/ui/ModalVentaExitosa/Modalventaexitosa";
 import { ModalEntregaCocina } from "./ModalEntregaCocina";
 import { useCerrarCaja }     from "@/components/pos/AbrirTurnoGate";
+import { firmaExtras } from "@/lib/utils/extras";
 import {
   obtenerMesasConEstado,
   obtenerOrdenAbierta,
@@ -45,6 +46,7 @@ import type {
   ItemCarritoMenu,
   MetodoPago,
   ConceptoBillar,
+  ExtraCarrito,
 } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./mesas.module.css";
@@ -62,7 +64,7 @@ interface Props {
   metodosPago:       MetodoPagoGlobal[];
   tieneTurno:        boolean;
   aplicarIva:        boolean;
-  tipo_negocio:      "general" | "impresion" | "billar";
+  tipo_negocio:      "general" | "impresion" | "billar" | "restaurante";
   conceptos:         ConceptoBillar[];
 }
 
@@ -220,6 +222,7 @@ function itemsACarrito(items: OrdenMesaDetalleConProducto[]): ItemCarritoMenu[] 
       bInfinito:       true,
     },
     cantidad:    item.eCantidad,
+    extrasSeleccionados: item.extrasSeleccionados,
     presentacion: item.fkeCodPresentacion
       ? {
           eCodPresentacion:   item.fkeCodPresentacion,
@@ -234,8 +237,9 @@ function itemsACarrito(items: OrdenMesaDetalleConProducto[]): ItemCarritoMenu[] 
   }));
 }
 
-function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion">): string {
-  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
+function carritoKey(item: Pick<ItemCarritoMenu, "producto" | "presentacion" | "extrasSeleccionados">): string {
+  const firma = firmaExtras((item.extrasSeleccionados ?? []).map((e) => ({ id: e.fkeCodOpcionExtra, eCantidad: e.eCantidad })));
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}_${firma}`;
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -674,11 +678,12 @@ export function MesasClient({
 
   function agregarProductoDirecto(
     producto: ProductoConStock,
-    presentacion?: PresentacionConStock
+    presentacion?: PresentacionConStock,
+    extras?: ExtraCarrito[]
   ) {
     if (!tieneTurno) return;
     setErrorDirecto(null);
-    const key   = carritoKey({ producto, presentacion });
+    const key   = carritoKey({ producto, presentacion, extrasSeleccionados: extras });
     const stock = presentacion?.stockDisponible ?? producto.stockDisponible;
     const bInf  = presentacion?.bInfinito       ?? producto.bInfinito;
 
@@ -690,7 +695,7 @@ export function MesasClient({
           carritoKey(i) === key ? { ...i, cantidad: i.cantidad + 1 } : i
         );
       }
-      return [...prev, { producto, cantidad: 1, presentacion }];
+      return [...prev, { producto, cantidad: 1, presentacion, extrasSeleccionados: extras }];
     });
   }
 
@@ -723,6 +728,10 @@ export function MesasClient({
         eCodPresentacion: i.presentacion?.eCodPresentacion,
         cantidad:         i.cantidad,
         precioUnitario:   i.presentacion?.ePricePresentacion ?? i.producto.ePriceProduct,
+        extrasSeleccionados: i.extrasSeleccionados?.map((e) => ({
+          eCodOpcionExtra: e.fkeCodOpcionExtra,
+          eCantidad:       e.eCantidad,
+        })),
       })),
       metodoPago,
       aplicarIva,
@@ -806,7 +815,8 @@ export function MesasClient({
 
   function handleAgregarProducto(
     producto: ProductoConStock,
-    presentacion?: PresentacionConStock
+    presentacion?: PresentacionConStock,
+    extras?: ExtraCarrito[]
   ) {
     if (!eCodOrden) return;
     if (esBillar && !eCodCuenta) {
@@ -827,6 +837,10 @@ export function MesasClient({
           eCodPresentacion: presentacion?.eCodPresentacion,
           eCantidad:        1,
           ePrecio,
+          extrasSeleccionados: extras?.map((e) => ({
+            eCodOpcionExtra: e.fkeCodOpcionExtra,
+            eCantidad:       e.eCantidad,
+          })),
         },
         eCodCuenta
       );
