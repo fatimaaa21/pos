@@ -181,13 +181,11 @@ export function KitchenDisplay({ token, tNombreSucursal }: Props) {
                                 {item.tNombrePresentacion}
                               </span>
                             )}
-                            {item.extras.length > 0 && (
-                              <span className={styles.itemPresentacion}>
-                                {item.extras
-                                  .map((e) => (e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombre}` : e.tNombre))
-                                  .join(", ")}
+                            {item.extras.map((e) => (
+                              <span key={e.tNombre} className={styles.itemPresentacion}>
+                                {e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombre}` : e.tNombre}
                               </span>
-                            )}
+                            ))}
                           </div>
                           <div className={styles.itemTiempo}>
                             <Clock size={11} />

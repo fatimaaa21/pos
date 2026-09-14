@@ -20,6 +20,7 @@ import pedidoStyles from "@/components/ui/PedidoPanel/PedidoPanel.module.css";
 interface Props {
   fkeCodPresentacion?: string | null;
   fkeCodProduct?:      string | null;
+  fkeCodOpcionExtra?:  string | null;
   nombrePresentacion?: string;
   nombreProducto?:     string;
   onClose: () => void;
@@ -29,10 +30,14 @@ interface Props {
 type FuenteNueva = "insumo" | "grupo";
 
 export function ModalRecetaPresentacion({
-  fkeCodPresentacion = null, fkeCodProduct = null,
+  fkeCodPresentacion = null, fkeCodProduct = null, fkeCodOpcionExtra = null,
   nombrePresentacion, nombreProducto,
   onClose, onCambio,
 }: Props) {
+  // El mecanismo de "resolver por grupo" solo tiene sentido a nivel de
+  // producto/presentación — una opción no puede resolverse vía otro grupo.
+  const esObjetivoOpcion = !!fkeCodOpcionExtra;
+
   const [receta, setReceta]           = useState<RecetaInsumoConDatos[]>([]);
   const [insumosDisp, setInsumosDisp] = useState<{ eCodInsumoMaestro: string; tNombre: string; tUnidadReceta: string }[]>([]);
   const [gruposDisp, setGruposDisp]   = useState<{ eCodGrupoExtra: string; tNombreGrupo: string }[]>([]);
@@ -48,14 +53,14 @@ export function ModalRecetaPresentacion({
   const [guardandoId, setGuardandoId]   = useState<string | null>(null);
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
 
-  useEffect(() => { cargar(); }, []);
-
   async function cargar() {
     setCargando(true);
     const [recetaResult, insumosResult, gruposResult] = await Promise.all([
-      obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct),
-      obtenerInsumosDisponiblesParaReceta(fkeCodPresentacion, fkeCodProduct),
-      obtenerGruposDisponiblesParaReceta(fkeCodPresentacion, fkeCodProduct),
+      obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct, fkeCodOpcionExtra),
+      obtenerInsumosDisponiblesParaReceta(fkeCodPresentacion, fkeCodProduct, fkeCodOpcionExtra),
+      esObjetivoOpcion
+        ? Promise.resolve([])
+        : obtenerGruposDisponiblesParaReceta(fkeCodPresentacion, fkeCodProduct),
     ]);
     if (recetaResult.error) setError(recetaResult.error);
     setReceta(recetaResult.receta ?? []);
@@ -63,6 +68,11 @@ export function ModalRecetaPresentacion({
     setGruposDisp(gruposResult);
     setCargando(false);
   }
+
+  useEffect(() => {
+    (async () => { await cargar(); })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleAgregar() {
     if (!cantidadNueva) return;
@@ -75,6 +85,7 @@ export function ModalRecetaPresentacion({
     const fd = new FormData();
     if (fkeCodPresentacion) fd.append("fkeCodPresentacion", fkeCodPresentacion);
     if (fkeCodProduct)      fd.append("fkeCodProduct", fkeCodProduct);
+    if (fkeCodOpcionExtra)  fd.append("fkeCodOpcionExtra", fkeCodOpcionExtra);
     if (fuenteNueva === "insumo") fd.append("fkeCodInsumoMaestro", insumoNuevo);
     else                           fd.append("fkeCodGrupoExtra", grupoNuevo);
     fd.append("eCantidadNecesaria", cantidadNueva);
@@ -212,24 +223,26 @@ export function ModalRecetaPresentacion({
 
           <ModalInfo>Agregar a la receta:</ModalInfo>
 
-          <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 12 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                type="radio"
-                checked={fuenteNueva === "insumo"}
-                onChange={() => setFuenteNueva("insumo")}
-              />
-              Insumo fijo
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              <input
-                type="radio"
-                checked={fuenteNueva === "grupo"}
-                onChange={() => setFuenteNueva("grupo")}
-              />
-              Según extra elegido
-            </label>
-          </div>
+          {!esObjetivoOpcion && (
+            <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="radio"
+                  checked={fuenteNueva === "insumo"}
+                  onChange={() => setFuenteNueva("insumo")}
+                />
+                Insumo fijo
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input
+                  type="radio"
+                  checked={fuenteNueva === "grupo"}
+                  onChange={() => setFuenteNueva("grupo")}
+                />
+                Según extra elegido
+              </label>
+            </div>
+          )}
 
           {sinFuentesDisponibles ? (
             <p style={{ fontSize: 12, color: "var(--gray)" }}>
@@ -335,12 +348,12 @@ function CantidadStepper({
   cantidad: number; unidad: string; guardando: boolean; onConfirm: (nueva: number) => void;
 }) {
   const [editando, setEditando] = useState(false);
-  const [valor, setValor]       = useState(String(cantidad));
+  const [valor, setValor]       = useState("");
   const inputRef                = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!editando) setValor(String(cantidad));
-  }, [cantidad, editando]);
+  // Sin useEffect: mientras no se está editando, el valor mostrado viene
+  // directo del prop en cada render — nada que sincronizar.
+  const valorMostrado = editando ? valor : String(cantidad);
 
   function handleFocus() {
     setEditando(true);
@@ -381,9 +394,9 @@ function CantidadStepper({
         inputMode="decimal"
         step="0.01"
         min={0.01}
-        value={valor}
+        value={valorMostrado}
         className={pedidoStyles.cantidadInput}
-        style={{ width: Math.max(32, valor.length * 10 + 8) }}
+        style={{ width: Math.max(32, valorMostrado.length * 10 + 8) }}
         disabled={guardando}
         onChange={(e) => setValor(e.target.value)}
         onFocus={handleFocus}

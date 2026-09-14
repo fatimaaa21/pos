@@ -392,6 +392,7 @@ export interface ItemListoCocina {
   tNombrePresentacion: string | null;
   eCantidad:           number;
   fhAgregado:          string;
+  extras:              { tNombre: string; eCantidad: number }[];
 }
 
 export interface InsumoMaestro {
@@ -431,6 +432,9 @@ export interface RecetaInsumoConDatos {
   eCodReceta:          string;
   fkeCodPresentacion:  string | null;
   fkeCodProduct:       string | null;
+  /** Receta propia de una opción (ej. "Cold Foam Vainilla" con varios insumos) —
+   *  independiente del mecanismo de grupo, coexisten los dos. */
+  fkeCodOpcionExtra:   string | null;
   /** Insumo fijo (excluyente con fkeCodGrupoExtra). */
   fkeCodInsumoMaestro: string | null;
   /** Grupo de extras a resolver en el momento de la venta — cada opción
@@ -440,6 +444,16 @@ export interface RecetaInsumoConDatos {
   tNombreInsumo:        string | null;  // null cuando la fila cuelga de un grupo
   tUnidadReceta:         string | null;  // null cuando la fila cuelga de un grupo
   tNombreGrupo:          string | null;  // resuelto vía join, solo cuando fkeCodGrupoExtra
+}
+
+// Fila de la vista /admin/insumos/recetas, sección Extras — una por opción
+// que tiene su PROPIA receta (ej. "Cold Foam Vainilla" -> crema batida + sirope).
+export interface OpcionConReceta {
+  eCodOpcionExtra: string;
+  tNombreOpcion:   string;
+  eCodGrupoExtra:  string;
+  tNombreGrupo:    string;
+  cantidadInsumos: number;
 }
 
 // Fila de la vista /admin/insumos/recetas — una por presentación O por

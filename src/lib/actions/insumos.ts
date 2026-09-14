@@ -46,7 +46,6 @@ export async function getInsumos(): Promise<InsumoConStock[]> {
       .from("insumos_stock")
       .select("*, insumos_maestro!inner(*)")
       .eq("insumos_maestro.fkeCodCompany", ctx.fkeCodCompany)
-      .eq("bStateInsumoStock", true)
       .order("fhCreateInsumoStock", { ascending: false });
 
     if (ctx.fkeCodSucursal) {

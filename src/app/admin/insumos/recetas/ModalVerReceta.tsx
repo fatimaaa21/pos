@@ -8,6 +8,7 @@ import type { RecetaInsumoConDatos } from "@/types";
 interface Props {
   fkeCodPresentacion?: string | null;
   fkeCodProduct?:      string | null;
+  fkeCodOpcionExtra?:  string | null;
   nombrePresentacion?: string;
   nombreProducto?:     string;
   onClose: () => void;
@@ -17,7 +18,7 @@ interface Props {
 // Para cambios reales, se usa ModalRecetaPresentacion desde el ícono de editar.
 
 export function ModalVerReceta({
-  fkeCodPresentacion = null, fkeCodProduct = null,
+  fkeCodPresentacion = null, fkeCodProduct = null, fkeCodOpcionExtra = null,
   nombrePresentacion, nombreProducto,
   onClose,
 }: Props) {
@@ -26,12 +27,12 @@ export function ModalVerReceta({
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct).then((result) => {
+    obtenerRecetaPresentacion(fkeCodPresentacion, fkeCodProduct, fkeCodOpcionExtra).then((result) => {
       if (result.error) setError(result.error);
       setReceta(result.receta ?? []);
       setCargando(false);
     });
-  }, [fkeCodPresentacion, fkeCodProduct]);
+  }, [fkeCodPresentacion, fkeCodProduct, fkeCodOpcionExtra]);
 
   return (
     <Modal

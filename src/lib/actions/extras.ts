@@ -472,6 +472,21 @@ export async function editarOpcionExtra(formData: FormData) {
         .single();
       if (errorMaestro || !maestro) return { error: "Insumo no encontrado" };
       if (maestro.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
+      // Mutuamente excluyente con la receta propia (Insumos > Recetas > Extras):
+      // si ya tiene una receta multi-insumo, no puede además tener un insumo
+      // directo — se descontaría dos veces al momento de vender.
+      const { data: recetaExistente } = await adminClient
+        .from("receta_insumos")
+        .select("eCodReceta")
+        .eq("fkeCodOpcionExtra", eCodOpcionExtra)
+        .limit(1);
+
+      if (recetaExistente && recetaExistente.length > 0) {
+        return {
+          error: "Esta opción ya tiene una receta propia en Insumos → Recetas → Extras. Quítala primero si quieres usar un insumo directo en su lugar.",
+        };
+      }
     }
 
     const { data, error } = await adminClient

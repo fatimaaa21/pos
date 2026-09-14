@@ -50,6 +50,27 @@ export default async function TicketPage({
     )
     .eq("fkeCodVenta", eCodVenta);
 
+  // ── Extras de cada línea ──────────────────────────────────────────────────
+  const idsDetalle = (detallesRaw ?? []).map((d) => d.eCodDetalle);
+
+  const { data: extrasRaw } =
+    idsDetalle.length > 0
+      ? await adminClient
+          .from("detalle_venta_extras")
+          .select("fkeCodDetalle, tNombreSnapshot, ePrecioSnapshot, eCantidadSeleccionada")
+          .in("fkeCodDetalle", idsDetalle)
+      : { data: [] };
+
+  const extrasPorDetalle = new Map<
+    string,
+    { tNombre: string; ePrecio: number; eCantidad: number }[]
+  >();
+  for (const e of extrasRaw ?? []) {
+    const lista = extrasPorDetalle.get(e.fkeCodDetalle) ?? [];
+    lista.push({ tNombre: e.tNombreSnapshot, ePrecio: e.ePrecioSnapshot, eCantidad: e.eCantidadSeleccionada });
+    extrasPorDetalle.set(e.fkeCodDetalle, lista);
+  }
+
   // ── Productos ─────────────────────────────────────────────────────────────
   const productIds = [
     ...new Set((detallesRaw ?? []).map((d) => d.fkeCodProduct)),
@@ -120,6 +141,7 @@ export default async function TicketPage({
     presentacion: d.fkeCodPresentacion
       ? (presentacionesMap.get(d.fkeCodPresentacion) ?? null)
       : null,
+    extras: extrasPorDetalle.get(d.eCodDetalle) ?? [],
   }));
 
   // ── Render ────────────────────────────────────────────────────────────────

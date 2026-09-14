@@ -267,25 +267,23 @@ export async function crearVenta(
     }
 
     // ── Fase 1c: validar y resolver insumos según receta ────────────────────────
-    // La receta cuelga de presentación O de producto (cuando el producto no
-    // tiene presentaciones y se vende directo) — nunca de ambos para el mismo
-    // item, mismo contrato que el CHECK de receta_insumos en la BD.
+    // Tres fuentes coexisten para cada item:
+    //  1. La receta del producto/presentación (insumo fijo, o resuelto por grupo).
+    //  2. La receta PROPIA de cada extra seleccionado (ej. "Cold Foam Vainilla"
+    //     con su propio insumo o varios) — independiente de lo que lleve el
+    //     producto base, se suma encima.
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       const resueltos: InsumoADescontar[] = [];
 
-      // La receta cuelga siempre del producto/presentación (nunca de una
-      // opción — ese mecanismo se quitó). Cada fila de receta puede apuntar
-      // a un insumo fijo, o a un grupo de extras cuyo insumo se resuelve
-      // según lo que el cliente haya elegido en ESTA venta.
       const { data: receta } = await adminClient
         .from("receta_insumos")
         .select("fkeCodInsumoMaestro, fkeCodGrupoExtra, eCantidadNecesaria")
         .eq(item.eCodPresentacion ? "fkeCodPresentacion" : "fkeCodProduct", item.eCodPresentacion ?? item.eCodProduct);
 
-      // Acumular por fkeCodInsumoMaestro ANTES de validar stock: si dos filas
-      // de receta (o una fija y una resuelta por grupo) terminan apuntando al
-      // mismo insumo, tienen que sumarse antes de comparar contra el stock.
+      // Acumular por fkeCodInsumoMaestro ANTES de validar stock: si varias
+      // fuentes terminan apuntando al mismo insumo, tienen que sumarse antes
+      // de comparar contra el stock.
       const necesarioPorInsumo = new Map<string, number>();
 
       for (const r of receta ?? []) {
@@ -312,6 +310,27 @@ export async function crearVenta(
           necesarioPorInsumo.set(
             extra.fkeCodInsumoMaestro,
             (necesarioPorInsumo.get(extra.fkeCodInsumoMaestro) ?? 0) + cantidad
+          );
+        }
+      }
+
+      // Fuente 2: receta propia de cada extra seleccionado (fkeCodOpcionExtra
+      // como objetivo en receta_insumos) — para opciones tipo "Cold Foam
+      // Vainilla" que consumen su(s) propio(s) insumo(s), sin relación con
+      // el mecanismo de grupo de arriba. Un extra puede tener ambos, ninguno,
+      // o solo uno de los dos — no son excluyentes entre sí.
+      for (const extra of extrasPorItem[idx]) {
+        const { data: recetaOpcion } = await adminClient
+          .from("receta_insumos")
+          .select("fkeCodInsumoMaestro, eCantidadNecesaria")
+          .eq("fkeCodOpcionExtra", extra.fkeCodOpcionExtra);
+
+        for (const r of recetaOpcion ?? []) {
+          if (!r.fkeCodInsumoMaestro) continue; // por CHECK siempre debería venir, defensivo nomás
+          const cantidad = r.eCantidadNecesaria * extra.eCantidad * item.cantidad;
+          necesarioPorInsumo.set(
+            r.fkeCodInsumoMaestro,
+            (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + cantidad
           );
         }
       }

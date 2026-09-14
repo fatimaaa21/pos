@@ -11,6 +11,7 @@ import {
   toggleEstadoOpcionExtra,
   obtenerInsumosMaestroNegocio,
 } from "@/lib/actions/extras";
+import { obtenerOpcionesConReceta } from "@/lib/actions/receta-insumos";
 import type { GrupoExtra, GrupoExtraConOpciones, OpcionExtra } from "@/types";
 
 interface Props {
@@ -79,9 +80,13 @@ export function ModalEditarGrupoExtra({ grupo, onClose, onEditado, onOpcionesCam
   const [nuevaOpcion, setNuevaOpcion] = useState({ tNombreOpcion: "", ePrecioExtra: "", eCantidadMaxima: "", fkeCodInsumoMaestro: "" });
   const [guardandoOpcion, setGuardandoOpcion] = useState(false);
   const [insumos, setInsumos] = useState<{ eCodInsumoMaestro: string; tNombre: string }[]>([]);
+  const [idsConRecetaPropia, setIdsConRecetaPropia] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     obtenerInsumosMaestroNegocio().then(setInsumos);
+    obtenerOpcionesConReceta().then((opcionesConReceta) => {
+      setIdsConRecetaPropia(new Set(opcionesConReceta.filter((o) => o.cantidadInsumos > 0).map((o) => o.eCodOpcionExtra)));
+    });
   }, []);
 
   function actualizarOpciones(fn: (prev: OpcionFila[]) => OpcionFila[]) {
@@ -321,10 +326,15 @@ export function ModalEditarGrupoExtra({ grupo, onClose, onEditado, onOpcionesCam
 
               {/* Insumo que esta opción representa — decide qué se descuenta
                   cuando la receta de un producto apunta al grupo en vez de a
-                  un insumo fijo. */}
+                  un insumo fijo. Mutuamente excluyente con una receta propia
+                  (Insumos > Recetas > Extras) — no se pueden tener las dos. */}
               <div style={{ padding: "0 10px 6px", display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.03em" }}>Insumo:</span>
-                {o.editando ? (
+                {idsConRecetaPropia.has(o.eCodOpcionExtra) ? (
+                  <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>
+                    tiene receta propia en Recetas — no puede tener también insumo directo
+                  </span>
+                ) : o.editando ? (
                   <div style={{ flex: 1, maxWidth: 220 }}>
                     <ModalSelect
                       value={o.insumoEdit}

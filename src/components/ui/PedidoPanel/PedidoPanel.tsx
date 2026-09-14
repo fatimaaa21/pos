@@ -259,13 +259,11 @@ export function PedidoPanel({
                           {item.anchoCm}m × {item.largoCm}m · {item.materialNombre}
                         </span>
                       ) : null}
-                      {(item.extrasSeleccionados?.length ?? 0) > 0 && (
-                        <span className={styles.itemPresentacion} style={{ color: "var(--gray)", fontSize: 11 }}>
-                          {item.extrasSeleccionados!
-                            .map((e) => (e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombreOpcion}` : e.tNombreOpcion))
-                            .join(", ")}
+                      {item.extrasSeleccionados?.map((e) => (
+                        <span key={e.fkeCodOpcionExtra} className={styles.itemPresentacion} style={{ color: "var(--gray)", fontSize: 11 }}>
+                          {e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombreOpcion}` : e.tNombreOpcion}
                         </span>
-                      )}
+                      ))}
                       <span className={styles.itemPrecioUnit}>${precio.toFixed(2)}</span>
                     </div>
                     <div className={styles.itemControles}>
@@ -320,14 +318,10 @@ export function PedidoPanel({
                     <span className={styles.totalLabel}>Sub Total</span>
                     <span className={styles.totalValor}>${subtotal.toFixed(2)}</span>
                   </div>
-                  {aplicarIva ? (
+                  {aplicarIva && (
                     <div className={styles.lineaTotal}>
                       <span className={styles.totalLabel}>IVA (16%)</span>
                       <span className={styles.totalValor}>${iva.toFixed(2)}</span>
-                    </div>
-                  ) : (
-                    <div className={styles.lineaTotal}>
-                      <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>Sin IVA</span>
                     </div>
                   )}
                 </>

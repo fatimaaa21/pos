@@ -22,6 +22,7 @@ interface Detalle {
   eSubtotal:         number;
   producto:          { tNameProduct: string } | null;
   presentacion:      { tNombre: string }      | null;
+  extras:            { tNombre: string; ePrecio: number; eCantidad: number }[];
 }
 
 interface CargoTiempo {
@@ -200,6 +201,14 @@ export function TicketClient({
                   <div className={styles.itemUnitario}>
                     c/u {fmt(d.ePrecioUnitario)}
                   </div>
+                  {d.extras.map((e) => (
+                    <div key={e.tNombre} className={styles.itemExtra}>
+                      <span>
+                        + {e.eCantidad > 1 ? `${e.eCantidad}× ` : ""}{e.tNombre}
+                      </span>
+                      {e.ePrecio > 0 && <span>+{fmt(e.ePrecio * e.eCantidad)}</span>}
+                    </div>
+                  ))}
                 </div>
                 <span className={styles.itemCantidad}>×{d.eCantidad}</span>
                 <span className={styles.itemSubtotal}>{fmt(d.eSubtotal)}</span>

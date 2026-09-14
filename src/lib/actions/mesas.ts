@@ -2001,6 +2001,18 @@ export async function obtenerItemsListos(
   const productosMap     = new Map((productosRes.data     ?? []).map((p) => [p.eCodProduct,      p.tNameProduct]));
   const presentacionesMap = new Map((presentacionesRes.data ?? []).map((p) => [p.eCodPresentacion, p.tNombre]));
 
+  const { data: extrasDetalle } = await adminClient
+    .from("ordenes_mesa_detalle_extras")
+    .select("fkeCodDetalle, tNombreSnapshot, eCantidadSeleccionada")
+    .in("fkeCodDetalle", detalles.map((d) => d.eCodDetalle));
+
+  const extrasPorDetalle = new Map<string, { tNombre: string; eCantidad: number }[]>();
+  for (const e of extrasDetalle ?? []) {
+    const lista = extrasPorDetalle.get(e.fkeCodDetalle) ?? [];
+    lista.push({ tNombre: e.tNombreSnapshot, eCantidad: e.eCantidadSeleccionada });
+    extrasPorDetalle.set(e.fkeCodDetalle, lista);
+  }
+
   return detalles.map((d) => ({
     eCodDetalle:         d.eCodDetalle,
     tNameProduct:        productosMap.get(d.fkeCodProduct) ?? "Producto",
@@ -2009,6 +2021,7 @@ export async function obtenerItemsListos(
       : null,
     eCantidad:  d.eCantidad,
     fhAgregado: d.fhAgregado,
+    extras:     extrasPorDetalle.get(d.eCodDetalle) ?? [],
   }));
 }
 
