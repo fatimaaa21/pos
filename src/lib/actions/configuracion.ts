@@ -13,7 +13,7 @@ export interface ConfigNegocio {
   moneda:           string;
   zona_horaria:     string;
   aplicarIva:       boolean;
-  tipo_negocio:     "general" | "impresion" | "billar";
+  tipo_negocio:     "general" | "impresion" | "billar" | "restaurante";
   // metodosPago se gestiona por separado en metodos-pago.ts
   // El precio por hora de billar/dominó/etc. se gestiona en conceptos_billar,
   // no aquí — costo_hora_billar era un campo legacy de un solo precio global
@@ -52,7 +52,7 @@ export async function getConfigNegocio(): Promise<ConfigNegocio | null> {
       zona_horaria:      negocio.zona_horaria      ?? "America/Mexico_City",
       // Si la columna no existe aún en DB, el valor vendrá como null → default true
       aplicarIva:        negocio.aplicarIva        ?? true,
-      tipo_negocio:      (negocio.tipo_negocio     ?? "general") as "general" | "impresion" | "billar",
+      tipo_negocio:      (negocio.tipo_negocio     ?? "general") as "general" | "impresion" | "billar" | "restaurante",
     };
   } catch {
     return null;

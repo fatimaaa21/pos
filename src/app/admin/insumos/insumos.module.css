@@ -92,3 +92,32 @@
 .botonSecundario:hover {
   background: var(--color-primary-50, #f0f5e8);
 }
+/* ── Tabs (Recetas: Productos / Extras) ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--space-4);
+}
+
+.tab {
+  padding: var(--space-3) var(--space-1);
+  margin-right: var(--space-5);
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--dark); }
+
+.tabActivo {
+  color: var(--color-primary-dark);
+  border-bottom-color: var(--color-primary);
+}

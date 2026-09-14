@@ -91,6 +91,11 @@ export function ModalEntregaCocina({
                           {item.tNombrePresentacion}
                         </span>
                       )}
+                      {item.extras.map((e) => (
+                        <span key={e.tNombre} className={styles.itemPresentacion}>
+                          {e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombre}` : e.tNombre}
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <button

@@ -4,6 +4,7 @@ import { createClient }      from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import { resolverSucursalVenta } from "@/lib/utils/sucursal";
+import { validarExtrasSeleccionados, type ExtraResuelto } from "@/lib/utils/extras";
 import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
@@ -15,6 +16,10 @@ interface ItemVenta {
   metrosConsumidos?: number;
   eAnchoCm?:         number;
   eLargoCm?:         number;
+  /** Extras seleccionados (ej. tipo de leche). Precio y receta se resuelven
+   *  server-side contra opciones_extra — nunca se confía en un precio o
+   *  nombre que venga del cliente. */
+  extrasSeleccionados?: { eCodOpcionExtra: string; eCantidad: number }[];
 }
 
 export async function crearVenta(
@@ -56,6 +61,7 @@ export async function crearVenta(
     const lotesPorItem:   LoteCapturado[] = [];
     const hojasPorItem:   (number | null)[] = []; // hojas a descontar por item (null = no aplica)
     const insumosPorItem: InsumoADescontar[][] = []; // uno por item, puede tener varios insumos o ninguno
+    const extrasPorItem:  ExtraResuelto[][] = []; // uno por item, extras validados contra la BD
 
     // ── Fase 1: validar stock ─────────────────────────────────────────────────
     for (const item of items) {
@@ -103,6 +109,20 @@ export async function crearVenta(
           return { error: "No autorizado" };
         }
       }
+
+      // ── Validar extras seleccionados ───────────────────────────────────────
+      // Igual que presentación/material: nada de lo que venga en item.extrasSeleccionados
+      // se confía sin re-verificar contra la BD. Lógica compartida con
+      // agregarItemOrden vía src/lib/utils/extras.ts — un solo lugar define
+      // qué es una selección de extras válida.
+      const resultadoExtras = await validarExtrasSeleccionados(
+        adminClient,
+        item.eCodProduct,
+        item.extrasSeleccionados
+      );
+      if ("error" in resultadoExtras) return resultadoExtras;
+
+      extrasPorItem.push(resultadoExtras.extras);
 
       // Productos por medida — el stock es el material, no inventario
       if (item.eCodMaterial) {
@@ -247,43 +267,88 @@ export async function crearVenta(
     }
 
     // ── Fase 1c: validar y resolver insumos según receta ────────────────────────
-    // La receta cuelga de presentación O de producto (cuando el producto no
-    // tiene presentaciones y se vende directo) — nunca de ambos para el mismo
-    // item, mismo contrato que el CHECK de receta_insumos en la BD.
-    for (const item of items) {
-      let query = adminClient
-        .from("receta_insumos")
-        .select("fkeCodInsumoMaestro, eCantidadNecesaria");
-
-      query = item.eCodPresentacion
-        ? query.eq("fkeCodPresentacion", item.eCodPresentacion)
-        : query.eq("fkeCodProduct", item.eCodProduct);
-
-      const { data: receta } = await query;
-
-      if (!receta || receta.length === 0) {
-        insumosPorItem.push([]); // sin receta = no descuenta nada
-        continue;
-      }
-
+    // Tres fuentes coexisten para cada item:
+    //  1. La receta del producto/presentación (insumo fijo, o resuelto por grupo).
+    //  2. La receta PROPIA de cada extra seleccionado (ej. "Cold Foam Vainilla"
+    //     con su propio insumo o varios) — independiente de lo que lleve el
+    //     producto base, se suma encima.
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
       const resueltos: InsumoADescontar[] = [];
 
-      for (const r of receta) {
+      const { data: receta } = await adminClient
+        .from("receta_insumos")
+        .select("fkeCodInsumoMaestro, fkeCodGrupoExtra, eCantidadNecesaria")
+        .eq(item.eCodPresentacion ? "fkeCodPresentacion" : "fkeCodProduct", item.eCodPresentacion ?? item.eCodProduct);
+
+      // Acumular por fkeCodInsumoMaestro ANTES de validar stock: si varias
+      // fuentes terminan apuntando al mismo insumo, tienen que sumarse antes
+      // de comparar contra el stock.
+      const necesarioPorInsumo = new Map<string, number>();
+
+      for (const r of receta ?? []) {
+        if (r.fkeCodInsumoMaestro) {
+          const cantidad = r.eCantidadNecesaria * item.cantidad;
+          necesarioPorInsumo.set(
+            r.fkeCodInsumoMaestro,
+            (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + cantidad
+          );
+          continue;
+        }
+
+        if (!r.fkeCodGrupoExtra) continue; // no debería pasar (CHECK en BD), pero no truena
+
+        // Resolver vía el/los extra(s) que el cliente eligió de este grupo en
+        // este item. Selección múltiple: cada opción elegida aporta su propia
+        // cantidad — "eCantidadNecesaria" es "por unidad de opción elegida",
+        // no un total fijo del grupo.
+        for (const extra of extrasPorItem[idx]) {
+          if (extra.fkeCodGrupoExtra !== r.fkeCodGrupoExtra) continue;
+          if (!extra.fkeCodInsumoMaestro) continue; // opción sin insumo mapeado = no descuenta
+
+          const cantidad = r.eCantidadNecesaria * extra.eCantidad * item.cantidad;
+          necesarioPorInsumo.set(
+            extra.fkeCodInsumoMaestro,
+            (necesarioPorInsumo.get(extra.fkeCodInsumoMaestro) ?? 0) + cantidad
+          );
+        }
+      }
+
+      // Fuente 2: receta propia de cada extra seleccionado (fkeCodOpcionExtra
+      // como objetivo en receta_insumos) — para opciones tipo "Cold Foam
+      // Vainilla" que consumen su(s) propio(s) insumo(s), sin relación con
+      // el mecanismo de grupo de arriba. Un extra puede tener ambos, ninguno,
+      // o solo uno de los dos — no son excluyentes entre sí.
+      for (const extra of extrasPorItem[idx]) {
+        const { data: recetaOpcion } = await adminClient
+          .from("receta_insumos")
+          .select("fkeCodInsumoMaestro, eCantidadNecesaria")
+          .eq("fkeCodOpcionExtra", extra.fkeCodOpcionExtra);
+
+        for (const r of recetaOpcion ?? []) {
+          if (!r.fkeCodInsumoMaestro) continue; // por CHECK siempre debería venir, defensivo nomás
+          const cantidad = r.eCantidadNecesaria * extra.eCantidad * item.cantidad;
+          necesarioPorInsumo.set(
+            r.fkeCodInsumoMaestro,
+            (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + cantidad
+          );
+        }
+      }
+
+      for (const [fkeCodInsumoMaestro, cantidadNecesaria] of necesarioPorInsumo) {
         const { data: stock } = await adminClient
           .from("insumos_stock")
           .select("eCodInsumoStock, eCantidadStock, version, insumos_maestro(tNombre, tUnidadReceta)")
-          .eq("fkeCodInsumoMaestro", r.fkeCodInsumoMaestro)
+          .eq("fkeCodInsumoMaestro", fkeCodInsumoMaestro)
           .eq("fkeCodSucursal", fkeCodSucursal)
           .eq("bStateInsumoStock", true)
           .maybeSingle();
 
         if (!stock) {
           return {
-            error: `Falta configurar el insumo "${(r as any).insumos_maestro?.tNombre ?? r.fkeCodInsumoMaestro}" en esta sucursal`,
+            error: `Falta configurar el insumo "${(stock as any)?.insumos_maestro?.tNombre ?? fkeCodInsumoMaestro}" en esta sucursal`,
           };
         }
-
-        const cantidadNecesaria = r.eCantidadNecesaria * item.cantidad;
 
         if (stock.eCantidadStock < cantidadNecesaria) {
           const nombreInsumo = (stock as any).insumos_maestro?.tNombre ?? "insumo";
@@ -305,8 +370,18 @@ export async function crearVenta(
     }
 
     // ── Total ─────────────────────────────────────────────────────────────────
-    const eTotalProductos = items.reduce((acc, i) => acc + i.precioUnitario * i.cantidad, 0);
-    const eTotal          = eTotalProductos + extraCharge;
+    // El costo de extras se calcula del lado del servidor con ePrecioExtra ya
+    // resuelto en Fase 1 (extrasPorItem) — NUNCA se suma un precio de extra
+    // que haya venido del cliente, mismo criterio que ya aplica a la validación
+    // de pertenencia de presentación/material.
+    const extraUnitario = (idx: number) =>
+      extrasPorItem[idx].reduce((acc, e) => acc + e.ePrecioExtra * e.eCantidad, 0);
+
+    const eTotalProductos = items.reduce(
+      (acc, i, idx) => acc + (i.precioUnitario + extraUnitario(idx)) * i.cantidad,
+      0
+    );
+    const eTotal = eTotalProductos + extraCharge;
 
     // ── Encabezado de venta ───────────────────────────────────────────────────
     const { data: venta, error: ventaError } = await adminClient
@@ -334,20 +409,47 @@ export async function crearVenta(
       fkeCodPresentacion: i.eCodPresentacion ?? null,
       eCantidad:          i.cantidad,
       ePrecioUnitario:    i.precioUnitario,
-      eSubtotal:          i.precioUnitario * i.cantidad,
+      eSubtotal:          (i.precioUnitario + extraUnitario(idx)) * i.cantidad,
       eAnchoCm:           i.eAnchoCm    ?? null,
       eLargoCm:           i.eLargoCm    ?? null,
       fkeCodMaterial:     i.eCodMaterial ?? null,
       eHojasConsumidas:   hojasPorItem[idx] ?? null,
     }));
 
-    const { error: detalleError } = await adminClient
+    // .select() para recuperar eCodDetalle: un INSERT ... VALUES (...) con
+    // RETURNING preserva el orden de las filas insertadas, así que idx sigue
+    // correlacionando con `items`/`extrasPorItem`.
+    const { data: detalleInsertado, error: detalleError } = await adminClient
       .from("detalle_venta")
-      .insert(detalle);
+      .insert(detalle)
+      .select("eCodDetalle");
 
-    if (detalleError) {
+    if (detalleError || !detalleInsertado) {
       await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
-      return { error: `Error al guardar detalle: ${detalleError.message}` };
+      return { error: `Error al guardar detalle: ${detalleError?.message}` };
+    }
+
+    // ── Extras por línea de venta ────────────────────────────────────────────
+    const filasExtras = items.flatMap((_, idx) =>
+      extrasPorItem[idx].map((e) => ({
+        fkeCodDetalle:         detalleInsertado[idx].eCodDetalle,
+        fkeCodOpcionExtra:     e.fkeCodOpcionExtra,
+        eCantidadSeleccionada: e.eCantidad,
+        ePrecioSnapshot:       e.ePrecioExtra,
+        tNombreSnapshot:       e.tNombreOpcion,
+      }))
+    );
+
+    if (filasExtras.length > 0) {
+      const { error: extrasError } = await adminClient
+        .from("detalle_venta_extras")
+        .insert(filasExtras);
+
+      if (extrasError) {
+        await adminClient.from("detalle_venta").delete().eq("fkeCodVenta", venta.eCodVenta);
+        await adminClient.from("ventas").delete().eq("eCodVenta", venta.eCodVenta);
+        return { error: `Error al guardar extras: ${extrasError.message}` };
+      }
     }
 
     // ── Fase 2: actualizar inventario (solo productos por unidad) ─────────────

@@ -15,17 +15,19 @@ import { ModalVerProducto } from "./ModalVerProducto";
 import { ModalEditarProducto } from "./ModalEditarProducto";
 import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { StatCards } from "@/components/ui/Statscards";
+import { tieneExtras } from "@/lib/utils/negocio";
 import toast from "react-hot-toast";
 
 
 interface Props {
   productos:          Producto[];
   categorias:         Categoria[];
-  tipoNegocio:        "general" | "impresion";
+  tipoNegocio:        "general" | "impresion" | "billar" | "restaurante";
   moduloCocinaActivo: boolean;
 }
 
 export function ProductClient({ productos: inicial, tipoNegocio, categorias, moduloCocinaActivo }: Props) {
+  const tieneExtrasActivo = tieneExtras(tipoNegocio);
   const [productos, setProductos] = useState<Producto[]>(inicial);
   const [imgTimestamps, setImgTimestamps] = useState<Record<string, number>>({});
   const [busqueda, setBusqueda] = useState("");
@@ -272,6 +274,7 @@ export function ProductClient({ productos: inicial, tipoNegocio, categorias, mod
           onClose={() => setProductoEditar(null)}
           onEditado={handleProductoEditado}
           moduloCocinaActivo={moduloCocinaActivo}
+          tieneExtrasActivo={tieneExtrasActivo}
         />
       )}
 

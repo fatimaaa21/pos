@@ -329,6 +329,15 @@
   padding-left: 2px;
 }
 
+.itemExtra {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 8.5px;
+  color: #666;
+  padding-left: 2px;
+}
+
 /* ── Sección de totales ── */
 .totales {
   margin: 0;

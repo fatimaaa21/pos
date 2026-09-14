@@ -7,6 +7,7 @@ import type { ItemCarritoMenu, MetodoPago } from "@/types";
 import type { MetodoPagoGlobal } from "@/lib/actions/metodos-pago";
 import styles from "./PedidoPanel.module.css";
 import { ModalEfectivo } from "@/components/ui/ModalEfectivo/ModalEfectivo";
+import { firmaExtras } from "@/lib/utils/extras";
 
 interface Props {
   items:             ItemCarritoMenu[];
@@ -25,9 +26,12 @@ interface Props {
 
 const IVA_RATE = 0.16;
 
-function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion">): string {
+// Debe producir EXACTAMENTE la misma llave que MenuClient.tsx — ambas viven
+// del mismo estado de carrito y se usan para hacer match por key.
+function carritoKey(item: Pick<ItemCarritoMenu, "key" | "producto" | "presentacion" | "extrasSeleccionados">): string {
   if (item.key) return item.key;
-  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}`;
+  const firma = firmaExtras((item.extrasSeleccionados ?? []).map((e) => ({ id: e.fkeCodOpcionExtra, eCantidad: e.eCantidad })));
+  return `${item.producto.eCodProduct}_${item.presentacion?.eCodPresentacion ?? ""}_${firma}`;
 }
 
 function IconoMetodo({ nombre, size = 18 }: { nombre: string; size?: number }) {
@@ -119,10 +123,13 @@ export function PedidoPanel({
   const [modalEfectivo, setModalEfectivo]     = useState(false);
   const [mobileExpandido, setMobileExpandido] = useState(false);
 
+  const extraUnitario = (item: ItemCarritoMenu) =>
+    (item.extrasSeleccionados ?? []).reduce((acc, e) => acc + e.ePrecioExtra * e.eCantidad, 0);
+
   const precioItem = (item: ItemCarritoMenu) =>
     item.tipo_producto === "medida"
       ? (item.precioCalculado ?? 0)
-      : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct);
+      : (item.presentacion?.ePricePresentacion ?? item.producto.ePriceProduct) + extraUnitario(item);
 
   const totalProductos = items.reduce((acc, i) => acc + precioItem(i) * i.cantidad, 0);
   const total          = totalProductos + (cargoExtra?.monto ?? 0);
@@ -252,6 +259,11 @@ export function PedidoPanel({
                           {item.anchoCm}m × {item.largoCm}m · {item.materialNombre}
                         </span>
                       ) : null}
+                      {item.extrasSeleccionados?.map((e) => (
+                        <span key={e.fkeCodOpcionExtra} className={styles.itemPresentacion} style={{ color: "var(--gray)", fontSize: 11 }}>
+                          {e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombreOpcion}` : e.tNombreOpcion}
+                        </span>
+                      ))}
                       <span className={styles.itemPrecioUnit}>${precio.toFixed(2)}</span>
                     </div>
                     <div className={styles.itemControles}>
@@ -306,14 +318,10 @@ export function PedidoPanel({
                     <span className={styles.totalLabel}>Sub Total</span>
                     <span className={styles.totalValor}>${subtotal.toFixed(2)}</span>
                   </div>
-                  {aplicarIva ? (
+                  {aplicarIva && (
                     <div className={styles.lineaTotal}>
                       <span className={styles.totalLabel}>IVA (16%)</span>
                       <span className={styles.totalValor}>${iva.toFixed(2)}</span>
-                    </div>
-                  ) : (
-                    <div className={styles.lineaTotal}>
-                      <span style={{ fontSize: 11, color: "var(--gray)", fontStyle: "italic" }}>Sin IVA</span>
                     </div>
                   )}
                 </>

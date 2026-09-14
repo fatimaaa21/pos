@@ -25,7 +25,7 @@ export interface NegocioConAdmin {
   imgCompany?:    string | null;
   moneda:         string;
   zona_horaria:   string;
-  tipo_negocio:   "general" | "impresion" | "billar";
+  tipo_negocio:   "general" | "impresion" | "billar" | "restaurante";
   bStateCompany:  string;
   fhCreateCompany: string;
   eMaxSucursales: number;

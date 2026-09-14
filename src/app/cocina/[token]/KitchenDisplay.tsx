@@ -17,6 +17,7 @@ interface ItemPendiente {
   tNombrePresentacion: string | null;
   eCantidad:           number;
   fhAgregado:          string;
+  extras:              { tNombre: string; eCantidad: number }[];
 }
 
 interface GrupoMesa {
@@ -180,6 +181,11 @@ export function KitchenDisplay({ token, tNombreSucursal }: Props) {
                                 {item.tNombrePresentacion}
                               </span>
                             )}
+                            {item.extras.map((e) => (
+                              <span key={e.tNombre} className={styles.itemPresentacion}>
+                                {e.eCantidad > 1 ? `${e.eCantidad}× ${e.tNombre}` : e.tNombre}
+                              </span>
+                            ))}
                           </div>
                           <div className={styles.itemTiempo}>
                             <Clock size={11} />

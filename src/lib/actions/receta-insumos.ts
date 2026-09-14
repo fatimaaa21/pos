@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient }      from "@/lib/supabase/server";
 import { revalidatePath }    from "next/cache";
-import type { RecetaInsumoConDatos, PresentacionConReceta } from "@/types";
+import type { RecetaInsumoConDatos, PresentacionConReceta, OpcionConReceta } from "@/types";
 
 async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
   const supabase = await createClient();
@@ -21,14 +21,46 @@ async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
   return { fkeCodCompany: perfil.fkeCodCompany };
 }
 
+/**
+ * Resuelve fkeCodCompany dueño de una fila de receta, vía su OBJETIVO —
+ * producto, presentación, u opción (siempre exactamente uno de los tres).
+ * No se resuelve vía insumos_maestro porque una fila puede colgar de un
+ * grupo de extras en vez de un insumo fijo (fkeCodInsumoMaestro null).
+ */
+async function companyDelObjetivo(
+  adminClient: ReturnType<typeof createAdminClient>,
+  fkeCodProduct:      string | null,
+  fkeCodPresentacion: string | null,
+  fkeCodOpcionExtra:  string | null = null
+): Promise<string | null> {
+  if (fkeCodPresentacion) {
+    const { data } = await adminClient
+      .from("presentaciones")
+      .select("productos(fkeCodCompany)")
+      .eq("eCodPresentacion", fkeCodPresentacion)
+      .single();
+    return (data as any)?.productos?.fkeCodCompany ?? null;
+  }
+  if (fkeCodProduct) {
+    const { data } = await adminClient
+      .from("productos")
+      .select("fkeCodCompany")
+      .eq("eCodProduct", fkeCodProduct)
+      .single();
+    return data?.fkeCodCompany ?? null;
+  }
+  if (fkeCodOpcionExtra) {
+    const { data } = await adminClient
+      .from("opciones_extra")
+      .select("grupos_extras(fkeCodCompany)")
+      .eq("eCodOpcionExtra", fkeCodOpcionExtra)
+      .single();
+    return (data as any)?.grupos_extras?.fkeCodCompany ?? null;
+  }
+  return null;
+}
+
 // ── LISTAR TODO LO QUE PUEDE TENER RECETA (presentaciones + productos directos) ──
-// Alimenta la vista dedicada /admin/insumos/recetas. Company-level (la receta
-// no varía por sucursal), igual que presentaciones/productos.
-//
-// La receta puede colgar de una presentación O de un producto sin
-// presentaciones (venta directa) — nunca de ambos para el mismo producto,
-// porque un producto solo cae en un caso o el otro. Se arman dos queries y
-// se combinan en una sola lista para la tabla.
 
 export async function obtenerPresentacionesConReceta(): Promise<PresentacionConReceta[]> {
   try {
@@ -46,7 +78,6 @@ export async function obtenerPresentacionesConReceta(): Promise<PresentacionConR
 
     if (!perfil?.fkeCodCompany) return [];
 
-    // 1. Presentaciones (como antes)
     const { data: pres, error: errorPres } = await adminClient
       .from("presentaciones")
       .select(`
@@ -72,9 +103,6 @@ export async function obtenerPresentacionesConReceta(): Promise<PresentacionConR
       cantidadInsumos:  row.receta_insumos?.length ?? 0,
     }));
 
-    // 2. Productos SIN ninguna presentación (venta directa) — estos también
-    //    pueden tener receta, colgada de fkeCodProduct en vez de
-    //    fkeCodPresentacion.
     const { data: productos, error: errorProductos } = await adminClient
       .from("productos")
       .select(`
@@ -106,53 +134,70 @@ export async function obtenerPresentacionesConReceta(): Promise<PresentacionConR
   }
 }
 
-// ── LISTAR RECETA DE UNA PRESENTACIÓN O UN PRODUCTO DIRECTO ──────────────────
-// Trae las filas de receta_insumos con el nombre/unidad del insumo ya
-// resuelto (join con insumos_maestro), para no hacer lookups extra en el modal.
-// Pasa exactamente uno de los dos identificadores; el otro debe ir null.
+// ── LISTAR OPCIONES DE EXTRAS CON SU PROPIA RECETA ────────────────────────────
+// Alimenta el tab "Extras" de /admin/insumos/recetas — opciones como
+// "Cold Foam Vainilla" que tienen su propia receta multi-insumo, independiente
+// de lo que lleve el producto al que se agregan.
+
+export async function obtenerOpcionesConReceta(): Promise<OpcionConReceta[]> {
+  try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return [];
+
+    const adminClient = createAdminClient();
+
+    const { data: opciones, error } = await adminClient
+      .from("opciones_extra")
+      .select("eCodOpcionExtra, tNombreOpcion, fkeCodGrupoExtra, fkeCodInsumoMaestro, grupos_extras!inner(tNombreGrupo, fkeCodCompany), receta_insumos(eCodReceta)")
+      .eq("grupos_extras.fkeCodCompany", perfil.fkeCodCompany)
+      .is("fkeCodInsumoMaestro", null); // insumo fijo y receta propia son excluyentes — si ya tiene insumo, no puede tener receta
+
+    if (error || !opciones) return [];
+
+    return (opciones as any[])
+      .map((o) => ({
+        eCodOpcionExtra: o.eCodOpcionExtra,
+        tNombreOpcion:   o.tNombreOpcion,
+        eCodGrupoExtra:  o.fkeCodGrupoExtra,
+        tNombreGrupo:    o.grupos_extras.tNombreGrupo,
+        cantidadInsumos: o.receta_insumos?.length ?? 0,
+      }))
+      .sort((a, b) => a.tNombreGrupo.localeCompare(b.tNombreGrupo) || a.tNombreOpcion.localeCompare(b.tNombreOpcion));
+  } catch {
+    return [];
+  }
+}
+
+// ── LISTAR RECETA DE UN PRODUCTO, PRESENTACIÓN, U OPCIÓN ──────────────────────
+// Pasa exactamente uno de los tres identificadores; los otros dos deben ir null.
 
 export async function obtenerRecetaPresentacion(
   fkeCodPresentacion: string | null,
-  fkeCodProduct:      string | null = null
+  fkeCodProduct:      string | null = null,
+  fkeCodOpcionExtra:  string | null = null
 ): Promise<{ receta?: RecetaInsumoConDatos[]; error?: string }> {
   try {
     const perfil = await getPerfilActual();
     if (!perfil) return { error: "No autorizado" };
-    if (!fkeCodPresentacion && !fkeCodProduct) return { error: "No se especificó qué receta consultar" };
+    if (!fkeCodPresentacion && !fkeCodProduct && !fkeCodOpcionExtra)
+      return { error: "No se especificó qué receta consultar" };
 
     const adminClient = createAdminClient();
 
-    // Verificar dueño (empresa) del lado correcto.
-    if (fkeCodPresentacion) {
-      const { data: presentacion, error: errorPresentacion } = await adminClient
-        .from("presentaciones")
-        .select("productos(fkeCodCompany)")
-        .eq("eCodPresentacion", fkeCodPresentacion)
-        .single();
-
-      if (errorPresentacion || !presentacion) return { error: "Presentación no encontrada" };
-      if ((presentacion as any).productos?.fkeCodCompany !== perfil.fkeCodCompany) {
-        return { error: "No autorizado" };
-      }
-    } else {
-      const { data: producto, error: errorProducto } = await adminClient
-        .from("productos")
-        .select("fkeCodCompany")
-        .eq("eCodProduct", fkeCodProduct as string)
-        .single();
-
-      if (errorProducto || !producto) return { error: "Producto no encontrado" };
-      if (producto.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
-    }
+    const company = await companyDelObjetivo(adminClient, fkeCodProduct, fkeCodPresentacion, fkeCodOpcionExtra);
+    if (!company) return { error: "No encontrado" };
+    if (company !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     let query = adminClient
       .from("receta_insumos")
-      .select("*, insumos_maestro(*)")
+      .select("*, insumos_maestro(*), grupos_extras(tNombreGrupo)")
       .order("fhCreateReceta", { ascending: true });
 
     query = fkeCodPresentacion
       ? query.eq("fkeCodPresentacion", fkeCodPresentacion)
-      : query.eq("fkeCodProduct", fkeCodProduct as string);
+      : fkeCodProduct
+        ? query.eq("fkeCodProduct", fkeCodProduct)
+        : query.eq("fkeCodOpcionExtra", fkeCodOpcionExtra as string);
 
     const { data, error } = await query;
 
@@ -162,10 +207,13 @@ export async function obtenerRecetaPresentacion(
       eCodReceta:          r.eCodReceta,
       fkeCodPresentacion:  r.fkeCodPresentacion,
       fkeCodProduct:       r.fkeCodProduct,
+      fkeCodOpcionExtra:   r.fkeCodOpcionExtra,
       fkeCodInsumoMaestro: r.fkeCodInsumoMaestro,
+      fkeCodGrupoExtra:    r.fkeCodGrupoExtra,
       eCantidadNecesaria:  r.eCantidadNecesaria,
-      tNombreInsumo:       r.insumos_maestro.tNombre,
-      tUnidadReceta:       r.insumos_maestro.tUnidadReceta,
+      tNombreInsumo:       r.insumos_maestro?.tNombre ?? null,
+      tUnidadReceta:       r.insumos_maestro?.tUnidadReceta ?? null,
+      tNombreGrupo:        r.grupos_extras?.tNombreGrupo ?? null,
     })) as RecetaInsumoConDatos[];
 
     return { receta };
@@ -174,28 +222,18 @@ export async function obtenerRecetaPresentacion(
   }
 }
 
-// ── LISTAR INSUMOS DISPONIBLES PARA AGREGAR A LA RECETA ──────────────────────
-// Insumos de la compañía que NO están ya en esta receta (para el selector).
-// Igual que arriba: pasa exactamente uno de los dos identificadores.
+// ── LISTAR INSUMOS DISPONIBLES PARA AGREGAR COMO INSUMO FIJO ─────────────────
 
 export async function obtenerInsumosDisponiblesParaReceta(
   fkeCodPresentacion: string | null,
-  fkeCodProduct:      string | null = null
+  fkeCodProduct:      string | null = null,
+  fkeCodOpcionExtra:  string | null = null
 ): Promise<{ eCodInsumoMaestro: string; tNombre: string; tUnidadReceta: string }[]> {
   try {
-    const supabase    = await createClient();
+    const perfil = await getPerfilActual();
+    if (!perfil) return [];
+
     const adminClient = createAdminClient();
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
-
-    const { data: perfil } = await supabase
-      .from("perfiles")
-      .select("fkeCodCompany")
-      .eq("eCodUser", user.id)
-      .single();
-
-    if (!perfil?.fkeCodCompany) return [];
 
     const { data: todos, error: errTodos } = await adminClient
       .from("insumos_maestro")
@@ -209,20 +247,74 @@ export async function obtenerInsumosDisponiblesParaReceta(
     let query = adminClient.from("receta_insumos").select("fkeCodInsumoMaestro");
     query = fkeCodPresentacion
       ? query.eq("fkeCodPresentacion", fkeCodPresentacion)
-      : query.eq("fkeCodProduct", fkeCodProduct as string);
+      : fkeCodProduct
+        ? query.eq("fkeCodProduct", fkeCodProduct)
+        : query.eq("fkeCodOpcionExtra", fkeCodOpcionExtra as string);
 
     const { data: yaEnReceta } = await query;
 
-    const idsExcluidos = new Set((yaEnReceta ?? []).map((r) => r.fkeCodInsumoMaestro));
+    const idsExcluidos = new Set((yaEnReceta ?? []).map((r) => r.fkeCodInsumoMaestro).filter(Boolean));
     return todos.filter((m) => !idsExcluidos.has(m.eCodInsumoMaestro));
   } catch {
     return [];
   }
 }
 
-// ── AGREGAR INSUMO A LA RECETA ────────────────────────────────────────────────
-// El form debe traer fkeCodPresentacion O fkeCodProduct (nunca ambos vacíos,
-// nunca ambos con valor) — mismo contrato que la restricción CHECK en la BD.
+// ── LISTAR GRUPOS DE EXTRAS DISPONIBLES (solo aplica a producto/presentación) ──
+// Un grupo se resuelve al nivel del producto, nunca al nivel de una opción —
+// no tendría sentido que la propia receta de una opción "se resuelva por
+// grupo". Por eso esta función no acepta fkeCodOpcionExtra.
+
+export async function obtenerGruposDisponiblesParaReceta(
+  fkeCodPresentacion: string | null,
+  fkeCodProduct:      string | null = null
+): Promise<{ eCodGrupoExtra: string; tNombreGrupo: string }[]> {
+  try {
+    const perfil = await getPerfilActual();
+    if (!perfil) return [];
+
+    const adminClient = createAdminClient();
+
+    let eCodProductoReal = fkeCodProduct;
+    if (fkeCodPresentacion) {
+      const { data: pres } = await adminClient
+        .from("presentaciones")
+        .select("fkeCodProduct")
+        .eq("eCodPresentacion", fkeCodPresentacion)
+        .single();
+      eCodProductoReal = pres?.fkeCodProduct ?? null;
+    }
+    if (!eCodProductoReal) return [];
+
+    const { data: asignados, error } = await adminClient
+      .from("producto_grupos_extras")
+      .select("fkeCodGrupoExtra, grupos_extras(eCodGrupoExtra, tNombreGrupo, bStateGrupoExtra, fkeCodCompany)")
+      .eq("fkeCodProduct", eCodProductoReal);
+
+    if (error || !asignados) return [];
+
+    let query = adminClient.from("receta_insumos").select("fkeCodGrupoExtra");
+    query = fkeCodPresentacion
+      ? query.eq("fkeCodPresentacion", fkeCodPresentacion)
+      : query.eq("fkeCodProduct", fkeCodProduct as string);
+
+    const { data: yaEnReceta } = await query;
+    const idsExcluidos = new Set((yaEnReceta ?? []).map((r) => r.fkeCodGrupoExtra).filter(Boolean));
+
+    return (asignados as any[])
+      .map((a) => a.grupos_extras)
+      .filter((g) => g && g.bStateGrupoExtra && g.fkeCodCompany === perfil.fkeCodCompany && !idsExcluidos.has(g.eCodGrupoExtra))
+      .map((g) => ({ eCodGrupoExtra: g.eCodGrupoExtra, tNombreGrupo: g.tNombreGrupo }));
+  } catch {
+    return [];
+  }
+}
+
+// ── AGREGAR A LA RECETA ───────────────────────────────────────────────────────
+// El form debe traer exactamente uno de (fkeCodPresentacion, fkeCodProduct,
+// fkeCodOpcionExtra) como objetivo, y exactamente uno de (fkeCodInsumoMaestro,
+// fkeCodGrupoExtra) como "qué" — fkeCodGrupoExtra solo tiene sentido cuando el
+// objetivo es producto/presentación, nunca cuando el objetivo ya es una opción.
 
 export async function agregarInsumoAReceta(formData: FormData) {
   try {
@@ -233,63 +325,95 @@ export async function agregarInsumoAReceta(formData: FormData) {
 
     const fkeCodPresentacion  = (formData.get("fkeCodPresentacion") as string) || null;
     const fkeCodProduct       = (formData.get("fkeCodProduct") as string) || null;
-    const fkeCodInsumoMaestro = formData.get("fkeCodInsumoMaestro") as string;
+    const fkeCodOpcionExtra   = (formData.get("fkeCodOpcionExtra") as string) || null;
+    const fkeCodInsumoMaestro = (formData.get("fkeCodInsumoMaestro") as string) || null;
+    const fkeCodGrupoExtra    = (formData.get("fkeCodGrupoExtra") as string) || null;
     const eCantidadNecesaria  = parseFloat(formData.get("eCantidadNecesaria") as string);
 
-    if (!fkeCodPresentacion && !fkeCodProduct) return { error: "No se especificó producto o presentación" };
-    if (fkeCodPresentacion && fkeCodProduct)   return { error: "No se puede recetar presentación y producto a la vez" };
-    if (!fkeCodInsumoMaestro) return { error: "Selecciona un insumo" };
+    const objetivos = [fkeCodPresentacion, fkeCodProduct, fkeCodOpcionExtra].filter(Boolean);
+    if (objetivos.length !== 1) return { error: "Se debe especificar exactamente un producto, presentación u opción" };
+
+    const fuentesInsumo = [fkeCodInsumoMaestro, fkeCodGrupoExtra].filter(Boolean);
+    if (fuentesInsumo.length !== 1) return { error: "Selecciona un insumo fijo o un grupo de extras, no ambos ni ninguno" };
+
+    if (fkeCodGrupoExtra && fkeCodOpcionExtra)
+      return { error: "Una opción no puede resolverse vía otro grupo — dale un insumo fijo" };
+
+    if (fkeCodOpcionExtra) {
+      // Mutuamente excluyente con el insumo directo (Extras > editar opción):
+      // si la opción ya representa un insumo fijo, no puede además tener una
+      // receta propia — se descontaría dos veces al momento de vender.
+      const { data: opcionActual } = await adminClient
+        .from("opciones_extra")
+        .select("fkeCodInsumoMaestro")
+        .eq("eCodOpcionExtra", fkeCodOpcionExtra)
+        .single();
+
+      if (opcionActual?.fkeCodInsumoMaestro) {
+        return {
+          error: "Esta opción ya tiene un insumo directo asignado en Extras. Quítalo primero si quieres darle una receta propia.",
+        };
+      }
+    }
+
     if (isNaN(eCantidadNecesaria) || eCantidadNecesaria <= 0)
       return { error: "La cantidad debe ser mayor a 0" };
 
-    // Verificar dueño (empresa) del lado correcto.
-    if (fkeCodPresentacion) {
-      const { data: presentacion, error: errorPresentacion } = await adminClient
-        .from("presentaciones")
-        .select("productos(fkeCodCompany)")
-        .eq("eCodPresentacion", fkeCodPresentacion)
-        .single();
+    const company = await companyDelObjetivo(adminClient, fkeCodProduct, fkeCodPresentacion, fkeCodOpcionExtra);
+    if (!company) return { error: "No encontrado" };
+    if (company !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
-      if (errorPresentacion || !presentacion) return { error: "Presentación no encontrada" };
-      if ((presentacion as any).productos?.fkeCodCompany !== perfil.fkeCodCompany) {
-        return { error: "No autorizado" };
-      }
-    } else {
-      const { data: producto, error: errorProducto } = await adminClient
-        .from("productos")
+    if (fkeCodInsumoMaestro) {
+      const { data: maestro, error: errorMaestro } = await adminClient
+        .from("insumos_maestro")
         .select("fkeCodCompany")
-        .eq("eCodProduct", fkeCodProduct as string)
+        .eq("eCodInsumoMaestro", fkeCodInsumoMaestro)
         .single();
 
-      if (errorProducto || !producto) return { error: "Producto no encontrado" };
-      if (producto.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+      if (errorMaestro || !maestro) return { error: "Insumo no encontrado" };
+      if (maestro.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+    } else {
+      const { data: grupo, error: errorGrupo } = await adminClient
+        .from("grupos_extras")
+        .select("fkeCodCompany")
+        .eq("eCodGrupoExtra", fkeCodGrupoExtra as string)
+        .single();
+
+      if (errorGrupo || !grupo) return { error: "Grupo no encontrado" };
+      if (grupo.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
+      const eCodProductoReal = fkeCodProduct ?? (
+        await adminClient.from("presentaciones").select("fkeCodProduct").eq("eCodPresentacion", fkeCodPresentacion as string).single()
+      ).data?.fkeCodProduct;
+
+      const { data: asignacion } = await adminClient
+        .from("producto_grupos_extras")
+        .select("eCodProductoGrupoExtra")
+        .eq("fkeCodProduct", eCodProductoReal as string)
+        .eq("fkeCodGrupoExtra", fkeCodGrupoExtra as string)
+        .maybeSingle();
+
+      if (!asignacion) {
+        return { error: "Este grupo de extras no está asignado a este producto — actívalo primero desde Productos" };
+      }
     }
-
-    const { data: maestro, error: errorMaestro } = await adminClient
-      .from("insumos_maestro")
-      .select("fkeCodCompany")
-      .eq("eCodInsumoMaestro", fkeCodInsumoMaestro)
-      .single();
-
-    if (errorMaestro || !maestro) return { error: "Insumo no encontrado" };
-    if (maestro.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data, error } = await adminClient
       .from("receta_insumos")
       .insert({
         fkeCodPresentacion,
         fkeCodProduct,
+        fkeCodOpcionExtra,
         fkeCodInsumoMaestro,
+        fkeCodGrupoExtra,
         eCantidadNecesaria,
         fhCreateReceta: new Date().toISOString(),
       })
-      .select("*, insumos_maestro(*)")
+      .select("*, insumos_maestro(*), grupos_extras(tNombreGrupo)")
       .single();
 
     if (error) {
-      // uq_receta_presentacion_insumo / uq_receta_producto_insumo saltan
-      // aquí si el insumo ya estaba en la receta.
-      return { error: `Error al agregar insumo a la receta: ${error.message}` };
+      return { error: `Error al agregar a la receta: ${error.message}` };
     }
 
     revalidatePath("/admin/productos");
@@ -299,10 +423,13 @@ export async function agregarInsumoAReceta(formData: FormData) {
         eCodReceta:          data.eCodReceta,
         fkeCodPresentacion:  data.fkeCodPresentacion,
         fkeCodProduct:       data.fkeCodProduct,
+        fkeCodOpcionExtra:   data.fkeCodOpcionExtra,
         fkeCodInsumoMaestro: data.fkeCodInsumoMaestro,
+        fkeCodGrupoExtra:    data.fkeCodGrupoExtra,
         eCantidadNecesaria:  data.eCantidadNecesaria,
-        tNombreInsumo:       data.insumos_maestro.tNombre,
-        tUnidadReceta:       data.insumos_maestro.tUnidadReceta,
+        tNombreInsumo:       data.insumos_maestro?.tNombre ?? null,
+        tUnidadReceta:       data.insumos_maestro?.tUnidadReceta ?? null,
+        tNombreGrupo:        data.grupos_extras?.tNombreGrupo ?? null,
       } as RecetaInsumoConDatos,
     };
   } catch (e: any) {
@@ -311,8 +438,6 @@ export async function agregarInsumoAReceta(formData: FormData) {
 }
 
 // ── EDITAR CANTIDAD ────────────────────────────────────────────────────────────
-// Sin cambios de fondo: opera por eCodReceta, que ya identifica un solo
-// renglón sin importar si cuelga de presentación o de producto.
 
 export async function editarCantidadRecetaInsumo(formData: FormData) {
   try {
@@ -330,14 +455,16 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
 
     const { data: recetaActual, error: errorLectura } = await adminClient
       .from("receta_insumos")
-      .select("insumos_maestro(fkeCodCompany)")
+      .select("fkeCodProduct, fkeCodPresentacion, fkeCodOpcionExtra")
       .eq("eCodReceta", eCodReceta)
       .single();
 
     if (errorLectura || !recetaActual) return { error: "Receta no encontrada" };
-    if ((recetaActual as any).insumos_maestro?.fkeCodCompany !== perfil.fkeCodCompany) {
-      return { error: "No autorizado" };
-    }
+
+    const company = await companyDelObjetivo(
+      adminClient, recetaActual.fkeCodProduct, recetaActual.fkeCodPresentacion, recetaActual.fkeCodOpcionExtra
+    );
+    if (company !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { data, error } = await adminClient
       .from("receta_insumos")
@@ -346,7 +473,7 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
         fhUpdateReceta: new Date().toISOString(),
       })
       .eq("eCodReceta", eCodReceta)
-      .select("*, insumos_maestro(*)")
+      .select("*, insumos_maestro(*), grupos_extras(tNombreGrupo)")
       .single();
 
     if (error) return { error: `Error al actualizar: ${error.message}` };
@@ -358,10 +485,13 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
         eCodReceta:          data.eCodReceta,
         fkeCodPresentacion:  data.fkeCodPresentacion,
         fkeCodProduct:       data.fkeCodProduct,
+        fkeCodOpcionExtra:   data.fkeCodOpcionExtra,
         fkeCodInsumoMaestro: data.fkeCodInsumoMaestro,
+        fkeCodGrupoExtra:    data.fkeCodGrupoExtra,
         eCantidadNecesaria:  data.eCantidadNecesaria,
-        tNombreInsumo:       data.insumos_maestro.tNombre,
-        tUnidadReceta:       data.insumos_maestro.tUnidadReceta,
+        tNombreInsumo:       data.insumos_maestro?.tNombre ?? null,
+        tUnidadReceta:       data.insumos_maestro?.tUnidadReceta ?? null,
+        tNombreGrupo:        data.grupos_extras?.tNombreGrupo ?? null,
       } as RecetaInsumoConDatos,
     };
   } catch (e: any) {
@@ -369,9 +499,7 @@ export async function editarCantidadRecetaInsumo(formData: FormData) {
   }
 }
 
-// ── QUITAR INSUMO DE LA RECETA ────────────────────────────────────────────────
-// No borra el insumo ni afecta otras presentaciones/productos — solo quita
-// la línea de esta receta.
+// ── QUITAR DE LA RECETA ───────────────────────────────────────────────────────
 
 export async function eliminarInsumoDeReceta(eCodReceta: string) {
   try {
@@ -382,14 +510,16 @@ export async function eliminarInsumoDeReceta(eCodReceta: string) {
 
     const { data: recetaActual, error: errorLectura } = await adminClient
       .from("receta_insumos")
-      .select("insumos_maestro(fkeCodCompany)")
+      .select("fkeCodProduct, fkeCodPresentacion, fkeCodOpcionExtra")
       .eq("eCodReceta", eCodReceta)
       .single();
 
     if (errorLectura || !recetaActual) return { error: "Receta no encontrada" };
-    if ((recetaActual as any).insumos_maestro?.fkeCodCompany !== perfil.fkeCodCompany) {
-      return { error: "No autorizado" };
-    }
+
+    const company = await companyDelObjetivo(
+      adminClient, recetaActual.fkeCodProduct, recetaActual.fkeCodPresentacion, recetaActual.fkeCodOpcionExtra
+    );
+    if (company !== perfil.fkeCodCompany) return { error: "No autorizado" };
 
     const { error } = await adminClient
       .from("receta_insumos")

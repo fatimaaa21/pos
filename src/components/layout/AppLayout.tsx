@@ -28,6 +28,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
   if (!perfil) redirect("/auth/login");
 
   let negocio: { tNameCompany: string; imgCompany: string | null } | null = null;
+  let tipoNegocio:     string = "general";
   let modulosActivos: string[] = [];
   let sucursales:     Sucursal[] = [];
   let sucursalActiva: string | null = null;
@@ -36,7 +37,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
     const [negocioRes, modulosRes, sucursalesRes] = await Promise.all([
       supabase
         .from("negocios")
-        .select("tNameCompany, imgCompany")
+        .select("tNameCompany, imgCompany, tipo_negocio")
         .eq("eCodCompany", perfil.fkeCodCompany)
         .single(),
       adminClient
@@ -57,6 +58,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
         tNameCompany: negocioRes.data.tNameCompany,
         imgCompany:   negocioRes.data.imgCompany ?? null,
       };
+      tipoNegocio = negocioRes.data.tipo_negocio ?? "general";
     }
 
     modulosActivos = (modulosRes.data ?? []).map((m: any) => m.tModulo);
@@ -77,6 +79,7 @@ export async function AppLayout({ children }: AppLayoutProps) {
       <Sidebar
         perfil={perfil as Perfil}
         negocio={negocio}
+        tipoNegocio={tipoNegocio}
         modulosActivos={modulosActivos}
         sucursales={sucursales}
         sucursalActiva={sucursalActiva}

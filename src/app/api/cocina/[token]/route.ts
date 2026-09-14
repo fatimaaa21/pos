@@ -130,6 +130,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
     )
   }
 
+  // 5. Extras seleccionados por línea — el barista necesita ver "avena", no
+  // solo "café con leche". Se lee de la tabla de captura al mandar a cocina,
+  // no de opciones_extra (esa puede haber cambiado desde entonces).
+  const { data: extrasDetalle } = await supabase
+    .from('ordenes_mesa_detalle_extras')
+    .select('fkeCodDetalle, tNombreSnapshot, eCantidadSeleccionada')
+    .in('fkeCodDetalle', detallesCocina.map((d) => d.eCodDetalle))
+
+  const extrasPorDetalle = new Map<string, { tNombre: string; eCantidad: number }[]>()
+  for (const e of extrasDetalle ?? []) {
+    const lista = extrasPorDetalle.get(e.fkeCodDetalle) ?? []
+    lista.push({ tNombre: e.tNombreSnapshot, eCantidad: e.eCantidadSeleccionada })
+    extrasPorDetalle.set(e.fkeCodDetalle, lista)
+  }
+
   // ─── Mapas de lookup ────────────────────────────────────────────────────
 
   const ordenMap = new Map(ordenes.map((o) => [o.eCodOrden, o.fkeCodMesa]))
@@ -146,6 +161,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     tNombrePresentacion: string | null
     eCantidad: number
     fhAgregado: string
+    extras: { tNombre: string; eCantidad: number }[]
   }
 
   type GrupoMesa = {
@@ -178,6 +194,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         : null,
       eCantidad: detalle.eCantidad,
       fhAgregado: detalle.fhAgregado,
+      extras: extrasPorDetalle.get(detalle.eCodDetalle) ?? [],
     })
   }
 

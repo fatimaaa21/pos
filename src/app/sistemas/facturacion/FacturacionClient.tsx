@@ -15,7 +15,7 @@ export interface NegocioConFacturacion {
   eCodCompany:            string;
   tNameCompany:           string;
   imgCompany:             string | null;
-  tipo_negocio:           "general" | "impresion" | "billar";
+  tipo_negocio:           "general" | "impresion" | "billar" | "restaurante";
   bStateCompany:          string; // "activo" | "pausado"
   eMontoMensual:          number | null;
   eMontoMensualPendiente: number | null;
@@ -29,15 +29,17 @@ interface Props {
 }
 
 const LABEL_TIPO_NEGOCIO: Record<NegocioConFacturacion["tipo_negocio"], string> = {
-  general:   "General",
-  impresion: "Impresión",
-  billar:    "Billar",
+  general:     "General",
+  restaurante: "Restaurante",
+  impresion:   "Impresión",
+  billar:      "Billar",
 };
 
 // Reutilizamos el slot opcionesCategorias del Toolbar para filtrar por tipo
 // de negocio — mismo patrón que ya usa CortesAdminClient para tipo de diferencia.
 const OPCIONES_TIPO_NEGOCIO = [
-  { value: "general",   label: "General"   },
+  { value: "general",     label: "General"     },
+  { value: "restaurante", label: "Restaurante" },
   { value: "impresion", label: "Impresión" },
   { value: "billar",    label: "Billar"    },
 ];

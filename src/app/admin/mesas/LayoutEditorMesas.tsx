@@ -25,7 +25,7 @@ import type { ConceptoBillar } from "@/types";
 interface Props {
   mesasIniciales:   MesaEditorData[];
   pathRevalidar:    string;
-  tipo_negocio:     "general" | "impresion" | "billar";
+  tipo_negocio:     "general" | "impresion" | "billar" | "restaurante";
   conceptos:        ConceptoBillar[];
 }
 
