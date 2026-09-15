@@ -1,0 +1,109 @@
+/* ── Botones de acción en la tabla ── */
+.actionBtn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  color: var(--gray);
+}
+
+.actionBtnDanger { color: var(--color-error); }
+
+/* ── Celdas de la tabla ── */
+.producto { font-size: 13px; }
+.itemsResumen { color: var(--gray); font-size: 11px; }
+.celdaNota { color: var(--gray); font-style: italic; max-width: 240px; display: inline-block; }
+.sinDato { color: var(--gray); }
+
+/* ── Modal ver autoconsumo (mismo look que ModalVerVenta) ── */
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.modalHeaderInfo { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.modalFecha { font-family: var(--font-family); font-size: 12px; color: var(--gray); font-weight: 500; }
+
+.modalEmpleado {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-family: var(--font-family); font-size: 13px; font-weight: 700; color: var(--dark);
+}
+
+.avatarEmpleado {
+  width: 32px; height: 32px;
+  background-color: var(--color-primary-50);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-family); font-size: 13px; font-weight: 800;
+  flex-shrink: 0;
+}
+
+.modalDetalle { display: flex; flex-direction: column; gap: 2px; }
+
+.modalDetalleHeader {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-family: var(--font-family);
+  font-size: 10px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.modalDetalleRow {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  align-items: center;
+}
+
+.modalDetalleRow:nth-child(even) { background: var(--color-primary-50); }
+
+.modalCantidad { font-family: var(--font-family); font-size: 12px; font-weight: 700; color: var(--color-primary-dark); text-align: center; }
+
+.modalNombre {
+  font-family: var(--font-family); font-size: 12px; font-weight: 500; color: var(--dark);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.modalPrecio { font-family: var(--font-family); font-size: 12px; font-weight: 600; color: var(--dark); white-space: nowrap; }
+
+.modalExtras {
+  display: block;
+  white-space: normal;
+  margin-top: 2px;
+}
+.modalExtraLinea {
+  display: block;
+  font-size: 10px;
+  color: var(--gray);
+  font-weight: 400;
+}
+.modalExtraLinea::before { content: "– "; }
+
+.modalTotales {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-3) var(--space-2);
+  background: var(--background);
+  border-radius: var(--radius-md);
+}
+
+.modalLineaTotal { display: flex; justify-content: space-between; align-items: center; }
+.modalTotalFinalLabel { font-family: var(--font-family); font-size: 14px; font-weight: 700; color: var(--dark); }
+.modalTotalFinalValor { font-family: var(--font-family); font-size: 18px; font-weight: 800; color: var(--dark); }
+.modalNotaAclaracion { margin: var(--space-1) 0 0; font-size: 11px; color: var(--gray); }
+.modalNota { font-size: 12px; color: var(--gray); font-style: italic; margin: 0; }

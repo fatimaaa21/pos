@@ -31,6 +31,125 @@ export interface DatosMesasPOS {
 }
 
 // ─────────────────────────────────────────────────────────────
+// aplicarLimiteInsumos
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Ajusta stockDisponible/bInfinito para que un producto se muestre agotado
+ * en el menú si ya no alcanza el insumo para producirlo — antes esto solo se
+ * detectaba hasta el momento de cobrar (Fase 1c de crearVenta), dejando que
+ * el empleado armara el pedido y fallara al final.
+ *
+ * Solo contempla receta fija (fkeCodInsumoMaestro): la receta resuelta por
+ * grupo de extras (fkeCodGrupoExtra) depende de qué opción elija el cliente
+ * en el momento, así que no se puede precalcular aquí — sigue validándose
+ * al vender.
+ */
+async function aplicarLimiteInsumos(
+  adminClient: ReturnType<typeof createAdminClient>,
+  fkeCodSucursal: string | null,
+  productos: ProductoConStock[],
+): Promise<ProductoConStock[]> {
+  if (!fkeCodSucursal || productos.length === 0) return productos;
+
+  const idsProductoSinPres = productos.filter((p) => !p.presentaciones?.length).map((p) => p.eCodProduct);
+  const idsPresentacion    = productos.flatMap((p) => (p.presentaciones ?? []).map((pr) => pr.eCodPresentacion));
+
+  if (idsProductoSinPres.length === 0 && idsPresentacion.length === 0) return productos;
+
+  const [recetaProductoRes, recetaPresRes] = await Promise.all([
+    idsProductoSinPres.length > 0
+      ? adminClient
+          .from("receta_insumos")
+          .select("fkeCodProduct, fkeCodInsumoMaestro, eCantidadNecesaria")
+          .in("fkeCodProduct", idsProductoSinPres)
+          .not("fkeCodInsumoMaestro", "is", null)
+      : Promise.resolve({ data: [] as any[] }),
+    idsPresentacion.length > 0
+      ? adminClient
+          .from("receta_insumos")
+          .select("fkeCodPresentacion, fkeCodInsumoMaestro, eCantidadNecesaria")
+          .in("fkeCodPresentacion", idsPresentacion)
+          .not("fkeCodInsumoMaestro", "is", null)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
+
+  type LineaReceta = { insumo: string; cantidad: number };
+  const recetaPorProducto     = new Map<string, LineaReceta[]>();
+  const recetaPorPresentacion = new Map<string, LineaReceta[]>();
+
+  for (const r of recetaProductoRes.data ?? []) {
+    const lista = recetaPorProducto.get(r.fkeCodProduct) ?? [];
+    lista.push({ insumo: r.fkeCodInsumoMaestro, cantidad: r.eCantidadNecesaria });
+    recetaPorProducto.set(r.fkeCodProduct, lista);
+  }
+  for (const r of recetaPresRes.data ?? []) {
+    const lista = recetaPorPresentacion.get(r.fkeCodPresentacion) ?? [];
+    lista.push({ insumo: r.fkeCodInsumoMaestro, cantidad: r.eCantidadNecesaria });
+    recetaPorPresentacion.set(r.fkeCodPresentacion, lista);
+  }
+
+  const insumoIds = [...new Set([
+    ...[...recetaPorProducto.values()].flat().map((l) => l.insumo),
+    ...[...recetaPorPresentacion.values()].flat().map((l) => l.insumo),
+  ])];
+
+  if (insumoIds.length === 0) return productos;
+
+  const { data: stocks } = await adminClient
+    .from("insumos_stock")
+    .select("fkeCodInsumoMaestro, eCantidadStock, bStateInsumoStock")
+    .in("fkeCodInsumoMaestro", insumoIds)
+    .eq("fkeCodSucursal", fkeCodSucursal);
+
+  const stockMap = new Map<string, number>();
+  for (const s of stocks ?? []) {
+    if (s.bStateInsumoStock) stockMap.set(s.fkeCodInsumoMaestro, s.eCantidadStock);
+  }
+
+  // Infinity = sin receta fija para esta clave, o receta cuyos insumos
+  // alcanzan de sobra — no limita el stock existente.
+  function maxUnidadesProducibles(lineas: LineaReceta[] | undefined): number {
+    if (!lineas || lineas.length === 0) return Infinity;
+    let max = Infinity;
+    for (const l of lineas) {
+      // Insumo no configurado en esta sucursal = no se puede producir nada.
+      const disponible = stockMap.get(l.insumo) ?? 0;
+      const posibles    = l.cantidad > 0 ? Math.floor(disponible / l.cantidad) : Infinity;
+      max = Math.min(max, posibles);
+    }
+    return max;
+  }
+
+  return productos.map((p) => {
+    if (p.presentaciones?.length) {
+      const presAjustadas = p.presentaciones.map((pr) => {
+        const limite = maxUnidadesProducibles(recetaPorPresentacion.get(pr.eCodPresentacion));
+        if (limite === Infinity) return pr;
+        return {
+          ...pr,
+          stockDisponible: Math.min(pr.bInfinito ? Number.MAX_SAFE_INTEGER : pr.stockDisponible, limite),
+          bInfinito: false,
+        };
+      });
+      const anyInfinito = presAjustadas.some((pr) => pr.bInfinito);
+      const total = anyInfinito
+        ? Number.MAX_SAFE_INTEGER
+        : presAjustadas.reduce((a, pr) => a + pr.stockDisponible, 0);
+      return { ...p, presentaciones: presAjustadas, stockDisponible: total, bInfinito: anyInfinito };
+    }
+
+    const limite = maxUnidadesProducibles(recetaPorProducto.get(p.eCodProduct));
+    if (limite === Infinity) return p;
+    return {
+      ...p,
+      stockDisponible: Math.min(p.bInfinito ? Number.MAX_SAFE_INTEGER : p.stockDisponible, limite),
+      bInfinito: false,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // obtenerDatosMenuPOS
 // ─────────────────────────────────────────────────────────────
 
@@ -336,9 +455,11 @@ export async function obtenerDatosMenuPOS(fkeCodCompany: string, fkeCodSucursal:
     };
   });
 
+  const productosAjustados = await aplicarLimiteInsumos(adminClient, fkeCodSucursal, productosConStock);
+
   return {
     categorias: (categorias as Categoria[]) ?? [],
-    productos:  productosConStock,
+    productos:  productosAjustados,
     metodosPago,
     aplicarIva,
   };
@@ -562,9 +683,11 @@ export async function obtenerDatosMesasPOS(fkeCodCompany: string, fkeCodSucursal
     };
   });
 
+  const productosAjustados = await aplicarLimiteInsumos(adminClient, fkeCodSucursal, productosConStock);
+
   return {
     categorias:        (categorias as Categoria[]) ?? [],
-    productos:         productosConStock,
+    productos:         productosAjustados,
     metodosPago,
     aplicarIva,
     tipo_negocio,

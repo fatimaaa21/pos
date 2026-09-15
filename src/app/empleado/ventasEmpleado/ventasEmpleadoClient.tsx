@@ -132,11 +132,12 @@ export function VentasEmpleadoClient({
     return new Date(venta.fhCreateVenta) >= new Date(turnoInicioTurno);
   }
 
-  async function handleCancelar(motivo: string) {
+  async function handleCancelar(motivo: string, bDesperdicio: boolean) {
     if (!ventaCancelar) return;
     const fd = new FormData();
     fd.append("eCodVenta",          ventaCancelar.eCodVenta);
     fd.append("tMotivoCancelacion", motivo);
+    fd.append("bDesperdicio",       String(bDesperdicio));
     const result = await cancelarVenta(fd);
     if (!result.error) setVentaCancelar(null);
     return result;
