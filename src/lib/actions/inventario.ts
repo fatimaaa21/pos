@@ -21,6 +21,120 @@ async function getPerfilActual(): Promise<{ fkeCodCompany: string } | null> {
   return { fkeCodCompany: perfil.fkeCodCompany };
 }
 
+/**
+ * Descuenta el insumo necesario para PRODUCIR `cantidad` unidades de un
+ * producto/presentación con inventario propio (ej. hornear 20 panes) —
+ * el insumo se gasta al producir el lote, no en cada venta individual
+ * (crearVenta/crearAutoconsumo se saltan su propio descuento cuando el
+ * producto no es ilimitado, justamente porque ya se descontó aquí).
+ *
+ * Solo contempla receta fija (fkeCodInsumoMaestro): la receta resuelta por
+ * grupo de extras no aplica a un lote de producción — depende de qué elija
+ * cada cliente al pedir, no de qué se hornea.
+ *
+ * Si no hay receta configurada para este producto/presentación, no hace
+ * nada (no todos los productos con inventario propio usan insumos).
+ */
+async function descontarInsumosProduccion(
+  adminClient: ReturnType<typeof createAdminClient>,
+  params: {
+    fkeCodProduct:      string;
+    fkeCodPresentacion: string | null;
+    cantidad:           number;
+    fkeCodSucursal:     string;
+    fkeCodInventory:    string;
+  }
+): Promise<{ error: string } | { ok: true }> {
+  const { fkeCodProduct, fkeCodPresentacion, cantidad, fkeCodSucursal, fkeCodInventory } = params;
+  if (cantidad <= 0) return { ok: true };
+
+  const { data: receta } = await adminClient
+    .from("receta_insumos")
+    .select("fkeCodInsumoMaestro, eCantidadNecesaria")
+    .eq(fkeCodPresentacion ? "fkeCodPresentacion" : "fkeCodProduct", fkeCodPresentacion ?? fkeCodProduct)
+    .not("fkeCodInsumoMaestro", "is", null);
+
+  if (!receta || receta.length === 0) return { ok: true };
+
+  const necesarioPorInsumo = new Map<string, number>();
+  for (const r of receta) {
+    if (!r.fkeCodInsumoMaestro) continue;
+    necesarioPorInsumo.set(
+      r.fkeCodInsumoMaestro,
+      (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + r.eCantidadNecesaria * cantidad
+    );
+  }
+
+  type Resuelto = { fkeCodInsumoStock: string; eCantidadADescontar: number; version: number; tNombre: string; tUnidad: string };
+  const resueltos: Resuelto[] = [];
+
+  for (const [fkeCodInsumoMaestro, cantidadNecesaria] of necesarioPorInsumo) {
+    const { data: stock } = await adminClient
+      .from("insumos_stock")
+      .select("eCodInsumoStock, eCantidadStock, version, insumos_maestro(tNombre, tUnidadReceta)")
+      .eq("fkeCodInsumoMaestro", fkeCodInsumoMaestro)
+      .eq("fkeCodSucursal", fkeCodSucursal)
+      .eq("bStateInsumoStock", true)
+      .maybeSingle();
+
+    const nombreInsumo = (stock as any)?.insumos_maestro?.tNombre ?? "insumo";
+
+    if (!stock) {
+      return { error: `Falta configurar el insumo "${nombreInsumo}" en esta sucursal` };
+    }
+    if (stock.eCantidadStock < cantidadNecesaria) {
+      return { error: `Stock insuficiente de "${nombreInsumo}" para producir ${cantidad} unidades` };
+    }
+
+    resueltos.push({
+      fkeCodInsumoStock:   stock.eCodInsumoStock,
+      eCantidadADescontar: cantidadNecesaria,
+      version:             stock.version,
+      tNombre:             nombreInsumo,
+      tUnidad:             (stock as any).insumos_maestro?.tUnidadReceta ?? "",
+    });
+  }
+
+  for (const r of resueltos) {
+    const { data: actual } = await adminClient
+      .from("insumos_stock")
+      .select("eCantidadStock, version")
+      .eq("eCodInsumoStock", r.fkeCodInsumoStock)
+      .single();
+
+    if (!actual) continue;
+
+    const { data: actualizado } = await adminClient
+      .from("insumos_stock")
+      .update({
+        eCantidadStock:      Math.max(0, actual.eCantidadStock - r.eCantidadADescontar),
+        version:             actual.version + 1,
+        fhUpdateInsumoStock: new Date().toISOString(),
+      })
+      .eq("eCodInsumoStock", r.fkeCodInsumoStock)
+      .eq("version", actual.version)
+      .select("eCodInsumoStock");
+
+    if (!actualizado || actualizado.length === 0) {
+      return {
+        error:
+          `No se pudo descontar el insumo "${r.tNombre}": otro movimiento lo modificó al mismo tiempo. ` +
+          "Intenta de nuevo.",
+      };
+    }
+
+    await adminClient.from("producto_insumos_consumidos").insert({
+      fkeCodInventory:       fkeCodInventory,
+      fkeCodInsumoStock:     r.fkeCodInsumoStock,
+      tNombreInsumoSnapshot: r.tNombre,
+      eCantidadDescontada:   r.eCantidadADescontar,
+      tUnidadSnapshot:       r.tUnidad,
+    });
+  }
+
+  return { ok: true };
+}
+
 export async function agregarStock(formData: FormData) {
   try {
     const perfil = await getPerfilActual();
@@ -104,6 +218,21 @@ export async function agregarStock(formData: FormData) {
 
     if (error) return { error: `Error al agregar stock: ${error.message}` };
 
+    if (!bIlimitado) {
+      const resultadoInsumos = await descontarInsumosProduccion(adminClient, {
+        fkeCodProduct,
+        fkeCodPresentacion,
+        cantidad:        eCantIngresada,
+        fkeCodSucursal,
+        fkeCodInventory: insertado.eCodInventory,
+      });
+
+      if ("error" in resultadoInsumos) {
+        await adminClient.from("inventario").delete().eq("eCodInventory", insertado.eCodInventory);
+        return { error: resultadoInsumos.error };
+      }
+    }
+
     const { data, error: vistaError } = await adminClient
       .from("vista_inventario")
       .select(`
@@ -142,12 +271,27 @@ export async function editarStock(formData: FormData) {
 
     const { data: actual, error: errorLectura } = await adminClient
       .from("inventario")
-      .select("eCantIngresada, fkeCodCompany")
+      .select("eCantIngresada, fkeCodCompany, fkeCodProduct, fkeCodPresentacion, fkeCodSucursal, bUnlimitedInventory")
       .eq("eCodInventory", eCodInventory)
       .single();
 
     if (errorLectura || !actual) return { error: "No se encontró el registro" };
     if (actual.fkeCodCompany !== perfil.fkeCodCompany) return { error: "No autorizado" };
+
+    // Las unidades que se agregan aquí se acaban de producir — mismo criterio
+    // que agregarStock: se descuenta el insumo de esta cantidad antes de
+    // sumarla, para no dejar el lote crecido sin haber gastado nada.
+    if (!actual.bUnlimitedInventory && !isNaN(eCantAgregar) && eCantAgregar > 0 && actual.fkeCodProduct) {
+      const resultadoInsumos = await descontarInsumosProduccion(adminClient, {
+        fkeCodProduct:      actual.fkeCodProduct,
+        fkeCodPresentacion: actual.fkeCodPresentacion,
+        cantidad:           eCantAgregar,
+        fkeCodSucursal:     actual.fkeCodSucursal,
+        fkeCodInventory:    eCodInventory,
+      });
+
+      if ("error" in resultadoInsumos) return { error: resultadoInsumos.error };
+    }
 
     const nuevaCantIngresada = actual.eCantIngresada + eCantAgregar;
 

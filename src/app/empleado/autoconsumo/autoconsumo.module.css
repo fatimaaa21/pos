@@ -1,0 +1,157 @@
+.page { display: flex; flex-direction: column; gap: var(--space-5); min-height: 100%; }
+
+.header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.headerTexto { display: flex; flex-direction: column; gap: 4px; }
+
+.titulo {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: 20px; font-weight: 700; color: var(--dark); margin: 0;
+}
+.tituloIcono { color: var(--color-primary); }
+
+.subtitulo { font-size: 13px; color: var(--gray); margin: 0; max-width: 560px; }
+
+/* ── Catálogo: mismo criterio que menu.module.css — deja el espacio a la
+   derecha para el panel fijo, en vez de un flex-row con el panel adentro. ── */
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-right: calc(300px + var(--space-4));
+}
+
+/* ── Panel — misma posición/tamaño que PedidoPanel (fijo, arriba a la
+   derecha), para que ambas pantallas del POS se vean consistentes. ── */
+.panel {
+  position: fixed;
+  top: 0; right: 0;
+  margin: 24px;
+  width: 300px;
+  height: 93vh;
+  background: white;
+  border-left: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  padding: var(--space-4);
+  z-index: 10;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) transparent;
+}
+
+.panelTitulo {
+  display: flex; align-items: center; gap: var(--space-2);
+  font-size: 12px; font-weight: 700; color: var(--gray);
+  text-transform: uppercase; letter-spacing: 0.05em; margin: 0;
+}
+
+.panelVacio {
+  padding: var(--space-5) var(--space-3);
+  text-align: center;
+  color: var(--gray);
+  font-size: 13px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.panelLista { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.itemFila {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--border-light);
+}
+
+.itemInfo { display: flex; flex-direction: column; min-width: 0; }
+.itemNombre { font-size: 13px; font-weight: 600; color: var(--dark); }
+.itemPres, .itemExtras { font-size: 11px; color: var(--gray); }
+
+.itemAcciones { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.btnCantidad {
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-default); border-radius: var(--radius-sm);
+  background: var(--white); color: var(--dark); cursor: pointer;
+}
+.btnCantidad:hover { background: var(--background); }
+
+.itemCantidad { font-size: 13px; font-weight: 700; color: var(--dark); min-width: 18px; text-align: center; }
+
+.btnQuitar {
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--color-error); cursor: pointer; margin-left: 4px;
+}
+
+.nota {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-family);
+  font-size: 12px;
+  color: var(--dark);
+  resize: vertical;
+}
+
+.error { font-size: 12px; color: var(--color-error); margin: 0; }
+
+.btnRegistrar {
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-family);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+.btnRegistrar:hover:not(:disabled) { opacity: 0.9; }
+.btnRegistrar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.historial { border-top: 1px solid var(--border-light); padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.historialTitulo { font-size: 12px; font-weight: 700; color: var(--gray); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+.historialItem { padding: var(--space-2) 0; border-bottom: 1px solid var(--border-light); }
+.historialHeader { display: flex; justify-content: space-between; }
+.historialHora { font-size: 11px; color: var(--gray); }
+.historialDetalle  { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 0 0; }
+.historialProducto { display: flex; flex-direction: column; gap: 1px; }
+.historialLinea     { font-size: 12px; color: var(--dark); margin: 0; }
+.historialExtras {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 12px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.historialExtras li {
+  font-size: 11px;
+  color: var(--gray);
+  position: relative;
+}
+.historialExtras li::before {
+  content: "–";
+  position: absolute;
+  left: -10px;
+  color: var(--border-strong, var(--gray));
+}
+.historialNota { font-size: 11px; color: var(--gray); font-style: italic; margin: 2px 0 0 0; }
+
+/* ── Tablet: panel más estrecho, mismo criterio que menu.module.css ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .layout { padding-right: calc(260px + var(--space-3)); }
+  .panel  { width: 260px; margin: 20px; height: calc(100vh - 40px); }
+}
+
+/* ── Mobile: sin panel fijo, todo apilado ── */
+@media (max-width: 768px) {
+  .layout { padding-right: 0; padding-bottom: var(--space-4); }
+  .panel {
+    position: static;
+    margin: 0;
+    width: 100%;
+    height: auto;
+  }
+}

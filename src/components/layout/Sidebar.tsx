@@ -18,6 +18,7 @@ import {
   ChefHat,
   CreditCard,
   Layers,
+  GlassWater,
 } from "lucide-react";
 import { tieneExtras } from "@/lib/utils/negocio";
 
@@ -29,10 +30,11 @@ const NAV_ADMIN_MASTER = [
   { icon: LayoutDashboard,  label: "Dashboard",      href: "/admin/dashboard"        },
   { icon: ClipboardList,    label: "Menú",           href: "/admin/menu"             },
   { icon: ReceiptText,      label: "Ventas",         href: "/admin/ventasAdmin"      },
-  { icon: Calculator,       label: "Cortes de caja", href: "/admin/cortes"           },
+  { icon: Calculator,       label: "Cortes de caja", href: "/admin/cortes",          iconSize: 20, iconStroke: 2.25 },
   { icon: ClipboardPenLine, label: "Inventario",     href: "/admin/inventario"       },
   { icon: ShoppingBasket,   label: "Insumos",        href: "/admin/insumos",         modulo: "insumos" },
   { icon: ChefHat,          label: "Recetas",        href: "/admin/insumos/recetas", modulo: "insumos" },
+  { icon: GlassWater,       label: "Autoconsumo",    href: "/admin/autoconsumo",     iconSize: 20, iconStroke: 2.25 },
   { icon: Package,          label: "Productos",      href: "/admin/productos"        },
   { icon: Layers,           label: "Extras",         href: "/admin/extras",          requiereExtras: true },
   { icon: BookOpenText,     label: "Catálogo",       href: "/admin/catalogo"         },
@@ -53,9 +55,10 @@ function buildNavEmpleado(_modulosActivos: string[]) {
   // "Mesas" ya no es un ítem aparte: cuando el módulo está activo,
   // /empleado/menu se convierte en el flujo de mesas automáticamente.
   const nav = [
-    { icon: ClipboardList,    label: "Menú",       href: "/empleado/menu"           },
-    { icon: ClipboardPenLine, label: "Inventario", href: "/empleado/inventario"     },
-    { icon: ReceiptText,      label: "Mis ventas", href: "/empleado/ventasEmpleado" },
+    { icon: ClipboardList,    label: "Menú",         href: "/empleado/menu"           },
+    { icon: ClipboardPenLine, label: "Inventario",   href: "/empleado/inventario"     },
+    { icon: GlassWater,       label: "Autoconsumo",  href: "/empleado/autoconsumo",   iconSize: 20, iconStroke: 2.25 },
+    { icon: ReceiptText,      label: "Mis ventas",   href: "/empleado/ventasEmpleado" },
   ];
   return nav;
 }
@@ -266,7 +269,11 @@ export function Sidebar({
               className={`${styles.navItem} ${pathname === item.href ? styles.navItemActive : ""}`}
               onClick={cerrarDrawer}
             >
-              <item.icon size={16} className={styles.navIcon} />
+              <item.icon
+                size={(item as { iconSize?: number }).iconSize ?? 16}
+                strokeWidth={(item as { iconStroke?: number }).iconStroke ?? 2}
+                className={styles.navIcon}
+              />
               <span>{item.label}</span>
             </Link>
           ))}

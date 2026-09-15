@@ -8,20 +8,21 @@ import { Modal, ModalField }     from "@/components/ui/Modal";
 interface Props {
   folio:       string;
   total:       number;
-  onConfirmar: (motivo: string) => Promise<{ error?: string } | void>;
+  onConfirmar: (motivo: string, bDesperdicio: boolean) => Promise<{ error?: string } | void>;
   onCerrar:    () => void;
 }
 
 export function ModalCancelarVenta({ folio, total, onConfirmar, onCerrar }: Props) {
-  const [motivo,  setMotivo]  = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [motivo,       setMotivo]       = useState("");
+  const [desperdicio,  setDesperdicio]  = useState(false);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
 
   async function handleConfirmar() {
     if (!motivo.trim()) { setError("El motivo es requerido"); return; }
     setLoading(true);
     setError(null);
-    const result = await onConfirmar(motivo.trim());
+    const result = await onConfirmar(motivo.trim(), desperdicio);
     setLoading(false);
     if (result && "error" in result && result.error) setError(result.error);
   }
@@ -63,7 +64,9 @@ export function ModalCancelarVenta({ folio, total, onConfirmar, onCerrar }: Prop
                 style: "currency", currency: "MXN",
               })}
             </strong>{" "}
-            y se restaurará el inventario automáticamente.
+            {desperdicio
+              ? " El producto no se restaurará al inventario (se registrará como merma)."
+              : " Se restaurará el inventario e insumos automáticamente."}
           </p>
         </div>
       </div>
@@ -92,6 +95,26 @@ export function ModalCancelarVenta({ folio, total, onConfirmar, onCerrar }: Prop
           autoFocus
         />
       </ModalField>
+
+      {/* ¿Se preparó/entregó ya? */}
+      <label style={{
+        display: "flex", alignItems: "flex-start", gap: "var(--space-2)",
+        padding: "var(--space-3)",
+        border: "1px solid var(--border-default)",
+        borderRadius: "var(--radius-md)",
+        cursor: "pointer",
+      }}>
+        <input
+          type="checkbox"
+          checked={desperdicio}
+          onChange={(e) => setDesperdicio(e.target.checked)}
+          style={{ marginTop: 2, flexShrink: 0 }}
+        />
+        <span style={{ fontSize: 12, color: "var(--dark)" }}>
+          <strong>El producto ya se preparó/entregó y no se puede recuperar.</strong>
+          {" "}No restaurar inventario ni insumos — se registrará como merma en su lugar.
+        </span>
+      </label>
     </Modal>
   );
 }

@@ -6,7 +6,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import { crearVenta }        from "@/lib/actions/ventas";
 import { getSucursalContext } from "@/lib/utils/sucursal";
-import { validarExtrasSeleccionados, firmaExtras, type ExtraSeleccionado } from "@/lib/utils/extras";
+import { validarExtrasSeleccionados, firmaExtras, type ExtraSeleccionado, type ExtraResuelto } from "@/lib/utils/extras";
+import { restaurarInsumosDeDetalle } from "@/lib/utils/insumosOrdenMesa";
 import type {
   MesaConEstado,
   OrdenMesaConDetalle,
@@ -32,6 +33,201 @@ async function getPerfilActual() {
     .single();
 
   return perfil ? { ...perfil, uid: user.id } : null;
+}
+
+/** Sucursal de una orden vía su mesa — más confiable que el contexto del
+ *  usuario actual (que puede ser ambiguo para un admin con varias sucursales
+ *  y "todas" seleccionado), ya que una mesa siempre pertenece a una sola
+ *  sucursal. Mismo criterio que usa abrirOrdenMesa. */
+async function getSucursalDeOrden(
+  adminClient: ReturnType<typeof createAdminClient>,
+  eCodOrden: string
+): Promise<string | null> {
+  const { data: orden } = await adminClient
+    .from("ordenes_mesa")
+    .select("fkeCodMesa")
+    .eq("eCodOrden", eCodOrden)
+    .single();
+
+  if (!orden?.fkeCodMesa) return null;
+
+  const { data: mesa } = await adminClient
+    .from("mesas")
+    .select("fkeCodSucursal")
+    .eq("eCodMesa", orden.fkeCodMesa)
+    .single();
+
+  return mesa?.fkeCodSucursal ?? null;
+}
+
+type InsumoADescontar = {
+  fkeCodInsumoStock:     string;
+  eCantidadADescontar:   number;
+  version:               number;
+  tNombreInsumoSnapshot: string;
+  tUnidadSnapshot:       string;
+};
+
+/**
+ * ¿El producto/presentación se prepara al momento (sin inventario propio,
+ * bUnlimitedInventory = true) o tiene su propio inventario por lote (ej. pan
+ * horneado, bUnlimitedInventory = false)? Solo el primer caso descuenta
+ * insumo aquí — el segundo ya lo descontó al producirse (agregarStock en
+ * inventario.ts). Si no hay ningún lote configurado, se trata como "no
+ * aplica" (mismo criterio conservador que ya tenía agregarItemOrden, que
+ * tampoco valida inventario al agregar — solo al cobrar).
+ */
+async function esProductoPreparadoAlMomento(
+  adminClient: ReturnType<typeof createAdminClient>,
+  eCodProduct: string,
+  eCodPresentacion: string | null | undefined,
+  fkeCodSucursal: string
+): Promise<boolean> {
+  let q = adminClient
+    .from("vista_inventario")
+    .select("bUnlimitedInventory")
+    .eq("fkeCodProduct", eCodProduct)
+    .eq("fkeCodSucursal", fkeCodSucursal)
+    .eq("bStateInventory", true);
+
+  q = eCodPresentacion ? q.eq("fkeCodPresentacion", eCodPresentacion) : q.is("fkeCodPresentacion", null);
+
+  const { data: lotes } = await q.limit(10);
+  if (!lotes || lotes.length === 0) return false;
+  return lotes.some((l) => l.bUnlimitedInventory);
+}
+
+/**
+ * Resuelve cuánto insumo hace falta para `cantidad` unidades de un producto
+ * (receta fija + receta por grupo de extras + receta propia de cada extra) y
+ * lo valida contra insumos_stock — mismo criterio que la Fase 1c de
+ * crearVenta en ventas.ts, adaptado para usarse ANTES de cobrar (al mandar
+ * el item a cocina).
+ */
+async function resolverInsumosDeItem(
+  adminClient: ReturnType<typeof createAdminClient>,
+  params: {
+    eCodProduct:       string;
+    eCodPresentacion?: string | null;
+    cantidad:          number;
+    extras:            ExtraResuelto[];
+    fkeCodSucursal:    string;
+  }
+): Promise<{ error: string } | { resueltos: InsumoADescontar[] }> {
+  const { eCodProduct, eCodPresentacion, cantidad, extras, fkeCodSucursal } = params;
+
+  const { data: receta } = await adminClient
+    .from("receta_insumos")
+    .select("fkeCodInsumoMaestro, fkeCodGrupoExtra, eCantidadNecesaria")
+    .eq(eCodPresentacion ? "fkeCodPresentacion" : "fkeCodProduct", eCodPresentacion ?? eCodProduct);
+
+  const necesarioPorInsumo = new Map<string, number>();
+
+  for (const r of receta ?? []) {
+    if (r.fkeCodInsumoMaestro) {
+      necesarioPorInsumo.set(
+        r.fkeCodInsumoMaestro,
+        (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + r.eCantidadNecesaria * cantidad
+      );
+      continue;
+    }
+    if (!r.fkeCodGrupoExtra) continue;
+    for (const extra of extras) {
+      if (extra.fkeCodGrupoExtra !== r.fkeCodGrupoExtra) continue;
+      if (!extra.fkeCodInsumoMaestro) continue;
+      const cant = r.eCantidadNecesaria * extra.eCantidad * cantidad;
+      necesarioPorInsumo.set(extra.fkeCodInsumoMaestro, (necesarioPorInsumo.get(extra.fkeCodInsumoMaestro) ?? 0) + cant);
+    }
+  }
+
+  for (const extra of extras) {
+    const { data: recetaOpcion } = await adminClient
+      .from("receta_insumos")
+      .select("fkeCodInsumoMaestro, eCantidadNecesaria")
+      .eq("fkeCodOpcionExtra", extra.fkeCodOpcionExtra);
+
+    for (const r of recetaOpcion ?? []) {
+      if (!r.fkeCodInsumoMaestro) continue;
+      const cant = r.eCantidadNecesaria * extra.eCantidad * cantidad;
+      necesarioPorInsumo.set(r.fkeCodInsumoMaestro, (necesarioPorInsumo.get(r.fkeCodInsumoMaestro) ?? 0) + cant);
+    }
+  }
+
+  if (necesarioPorInsumo.size === 0) return { resueltos: [] };
+
+  const resueltos: InsumoADescontar[] = [];
+
+  for (const [fkeCodInsumoMaestro, cantidadNecesaria] of necesarioPorInsumo) {
+    const { data: stock } = await adminClient
+      .from("insumos_stock")
+      .select("eCodInsumoStock, eCantidadStock, version, insumos_maestro(tNombre, tUnidadReceta)")
+      .eq("fkeCodInsumoMaestro", fkeCodInsumoMaestro)
+      .eq("fkeCodSucursal", fkeCodSucursal)
+      .eq("bStateInsumoStock", true)
+      .maybeSingle();
+
+    const nombreInsumo = (stock as any)?.insumos_maestro?.tNombre ?? "insumo";
+
+    if (!stock) return { error: `Falta configurar el insumo "${nombreInsumo}" en esta sucursal` };
+    if (stock.eCantidadStock < cantidadNecesaria) {
+      return { error: `Stock insuficiente de "${nombreInsumo}" para preparar este pedido` };
+    }
+
+    resueltos.push({
+      fkeCodInsumoStock:     stock.eCodInsumoStock,
+      eCantidadADescontar:   cantidadNecesaria,
+      version:               stock.version,
+      tNombreInsumoSnapshot: nombreInsumo,
+      tUnidadSnapshot:       (stock as any).insumos_maestro?.tUnidadReceta ?? "",
+    });
+  }
+
+  return { resueltos };
+}
+
+/** Aplica el descuento de insumos ya resueltos (optimistic lock, igual que
+ *  Fase 5 de crearVenta) y registra el consumo ligado a la línea de orden. */
+async function descontarYRegistrarInsumos(
+  adminClient: ReturnType<typeof createAdminClient>,
+  eCodDetalle: string,
+  resueltos: InsumoADescontar[]
+): Promise<{ error: string } | { ok: true }> {
+  for (const r of resueltos) {
+    const { data: actual } = await adminClient
+      .from("insumos_stock")
+      .select("eCantidadStock, version")
+      .eq("eCodInsumoStock", r.fkeCodInsumoStock)
+      .single();
+
+    if (!actual) continue;
+
+    const { data: actualizado } = await adminClient
+      .from("insumos_stock")
+      .update({
+        eCantidadStock:      Math.max(0, actual.eCantidadStock - r.eCantidadADescontar),
+        version:             actual.version + 1,
+        fhUpdateInsumoStock: new Date().toISOString(),
+      })
+      .eq("eCodInsumoStock", r.fkeCodInsumoStock)
+      .eq("version", actual.version)
+      .select("eCodInsumoStock");
+
+    if (!actualizado || actualizado.length === 0) {
+      return {
+        error: `No se pudo descontar el insumo "${r.tNombreInsumoSnapshot}": otro movimiento lo modificó al mismo tiempo. Intenta de nuevo.`,
+      };
+    }
+
+    await adminClient.from("orden_detalle_insumos_consumidos").insert({
+      fkeCodDetalle:         eCodDetalle,
+      fkeCodInsumoStock:     r.fkeCodInsumoStock,
+      tNombreInsumoSnapshot: r.tNombreInsumoSnapshot,
+      eCantidadDescontada:   r.eCantidadADescontar,
+      tUnidadSnapshot:       r.tUnidadSnapshot,
+    });
+  }
+
+  return { ok: true };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -294,6 +490,17 @@ export async function cerrarOrdenMesa(
   }
   if (orden.tEstado !== "abierta") {
     return { error: "La orden ya no está abierta" };
+  }
+
+  // Restaurar el insumo de cada línea antes de cancelar la orden — de lo
+  // contrario se pierde para siempre (nunca se cobró ni se va a cobrar).
+  const { data: lineas } = await adminClient
+    .from("ordenes_mesa_detalle")
+    .select("eCodDetalle")
+    .eq("fkeCodOrden", eCodOrden);
+
+  for (const linea of lineas ?? []) {
+    await restaurarInsumosDeDetalle(adminClient, linea.eCodDetalle);
   }
 
   const { error } = await adminClient
@@ -657,6 +864,9 @@ export async function agregarItemOrden(
       }
     }
 
+    let eCodDetalle: string;
+    let esLineaNueva: boolean;
+
     if (itemExistente) {
       const updateData: Record<string, unknown> = {
         eCantidad: itemExistente.eCantidad + item.eCantidad,
@@ -669,6 +879,8 @@ export async function agregarItemOrden(
         .eq("eCodDetalle", itemExistente.eCodDetalle);
 
       if (error) return { error: `Error al actualizar cantidad: ${error.message}` };
+      eCodDetalle  = itemExistente.eCodDetalle;
+      esLineaNueva = false;
     } else {
       const { data: nuevoDetalle, error } = await adminClient
         .from("ordenes_mesa_detalle")
@@ -704,6 +916,54 @@ export async function agregarItemOrden(
           // el mesero vería "café" cuando el cliente pidió "café con avena".
           await adminClient.from("ordenes_mesa_detalle").delete().eq("eCodDetalle", nuevoDetalle.eCodDetalle);
           return { error: `Error al guardar extras: ${errorExtras.message}` };
+        }
+      }
+
+      eCodDetalle  = nuevoDetalle.eCodDetalle;
+      esLineaNueva = true;
+    }
+
+    // ── Descontar insumo AHORA (no hasta cobrar) — solo para productos que
+    // se preparan al momento (sin inventario propio). Los que tienen
+    // inventario por lote (ej. pan) ya descontaron su insumo al producirse.
+    const fkeCodSucursal = await getSucursalDeOrden(adminClient, eCodOrden);
+
+    if (fkeCodSucursal) {
+      const preparadoAlMomento = await esProductoPreparadoAlMomento(
+        adminClient, item.eCodProduct, item.eCodPresentacion, fkeCodSucursal
+      );
+
+      if (preparadoAlMomento) {
+        const resolucion = await resolverInsumosDeItem(adminClient, {
+          eCodProduct:      item.eCodProduct,
+          eCodPresentacion: item.eCodPresentacion,
+          cantidad:         item.eCantidad,
+          extras,
+          fkeCodSucursal,
+        });
+
+        async function revertirLinea() {
+          if (esLineaNueva) {
+            await adminClient.from("ordenes_mesa_detalle").delete().eq("eCodDetalle", eCodDetalle);
+          } else if (itemExistente) {
+            await adminClient
+              .from("ordenes_mesa_detalle")
+              .update({ eCantidad: itemExistente.eCantidad })
+              .eq("eCodDetalle", eCodDetalle);
+          }
+        }
+
+        if ("error" in resolucion) {
+          await revertirLinea();
+          return resolucion;
+        }
+
+        if (resolucion.resueltos.length > 0) {
+          const resultadoDescuento = await descontarYRegistrarInsumos(adminClient, eCodDetalle, resolucion.resueltos);
+          if ("error" in resultadoDescuento) {
+            await revertirLinea();
+            return resultadoDescuento;
+          }
         }
       }
     }
@@ -765,7 +1025,7 @@ export async function actualizarCantidadItem(
 
   const { data: detalle } = await adminClient
     .from("ordenes_mesa_detalle")
-    .select("fkeCodOrden")
+    .select("fkeCodOrden, fkeCodProduct, fkeCodPresentacion, eCantidad")
     .eq("eCodDetalle", eCodDetalle)
     .single();
 
@@ -781,6 +1041,80 @@ export async function actualizarCantidadItem(
     return { error: "Sin acceso" };
   }
   if (orden.tEstado !== "abierta") return { error: "La orden ya no está abierta" };
+
+  // ── Reajustar insumo antes de cambiar la cantidad — solo para productos
+  // que se preparan al momento. Se restaura TODO lo consumido por esta línea
+  // y se vuelve a calcular desde cero para la nueva cantidad: más simple y
+  // seguro que llevar un delta, y evita quedarse con números negativos si el
+  // insumo cambió de configuración entre medio.
+  const fkeCodSucursal = await getSucursalDeOrden(adminClient, detalle.fkeCodOrden);
+
+  if (fkeCodSucursal) {
+    const preparadoAlMomento = await esProductoPreparadoAlMomento(
+      adminClient, detalle.fkeCodProduct, detalle.fkeCodPresentacion, fkeCodSucursal
+    );
+
+    if (preparadoAlMomento) {
+      const { data: consumoViejo } = await adminClient
+        .from("orden_detalle_insumos_consumidos")
+        .select("fkeCodInsumoStock, eCantidadDescontada, tNombreInsumoSnapshot, tUnidadSnapshot")
+        .eq("fkeCodDetalle", eCodDetalle);
+
+      await restaurarInsumosDeDetalle(adminClient, eCodDetalle);
+
+      const { data: extrasCrudos } = await adminClient
+        .from("ordenes_mesa_detalle_extras")
+        .select("fkeCodOpcionExtra, eCantidadSeleccionada")
+        .eq("fkeCodDetalle", eCodDetalle);
+
+      const resultadoExtras = await validarExtrasSeleccionados(
+        adminClient,
+        detalle.fkeCodProduct,
+        (extrasCrudos ?? []).map((e) => ({ eCodOpcionExtra: e.fkeCodOpcionExtra, eCantidad: e.eCantidadSeleccionada }))
+      );
+
+      // Reinsertar exactamente el consumo restaurado — recupera el estado
+      // previo sin volver a resolver receta/stock (que ya sabemos válidos).
+      async function reaplicarConsumoViejo() {
+        for (const c of consumoViejo ?? []) {
+          if (!c.fkeCodInsumoStock) continue;
+          await descontarYRegistrarInsumos(adminClient, eCodDetalle, [{
+            fkeCodInsumoStock:     c.fkeCodInsumoStock,
+            eCantidadADescontar:   c.eCantidadDescontada,
+            version:               0, // no se usa: descontarYRegistrarInsumos relee la versión actual
+            tNombreInsumoSnapshot: c.tNombreInsumoSnapshot,
+            tUnidadSnapshot:       c.tUnidadSnapshot,
+          }]);
+        }
+      }
+
+      if ("error" in resultadoExtras) {
+        await reaplicarConsumoViejo();
+        return resultadoExtras;
+      }
+
+      const resolucion = await resolverInsumosDeItem(adminClient, {
+        eCodProduct:      detalle.fkeCodProduct,
+        eCodPresentacion: detalle.fkeCodPresentacion,
+        cantidad:         eCantidad,
+        extras:           resultadoExtras.extras,
+        fkeCodSucursal,
+      });
+
+      if ("error" in resolucion) {
+        await reaplicarConsumoViejo();
+        return resolucion;
+      }
+
+      if (resolucion.resueltos.length > 0) {
+        const resultadoDescuento = await descontarYRegistrarInsumos(adminClient, eCodDetalle, resolucion.resueltos);
+        if ("error" in resultadoDescuento) {
+          await reaplicarConsumoViejo();
+          return resultadoDescuento;
+        }
+      }
+    }
+  }
 
   const { error } = await adminClient
     .from("ordenes_mesa_detalle")
@@ -823,6 +1157,10 @@ export async function eliminarItemOrden(
     return { error: "Sin acceso" };
   }
   if (orden.tEstado !== "abierta") return { error: "La orden ya no está abierta" };
+
+  // Restaurar cualquier insumo que se haya descontado para esta línea antes
+  // de borrarla — si no, el insumo quedaría "perdido" para siempre.
+  await restaurarInsumosDeDetalle(adminClient, eCodDetalle);
 
   const { error } = await adminClient
     .from("ordenes_mesa_detalle")
@@ -928,6 +1266,11 @@ export async function cobrarOrdenMesa(
     cantidad:            d.eCantidad,
     precioUnitario:      d.ePrecio,
     extrasSeleccionados: extrasPorDetalleOrden.get(d.eCodDetalle),
+    // El insumo de los productos preparados al momento ya se descontó al
+    // mandarlos a cocina (agregarItemOrden) — crearVenta no debe volver a
+    // tocarlo aquí. Los productos con inventario propio se saltan su propio
+    // descuento de insumo sin importar esta bandera (ver crearVenta).
+    bInsumoYaDescontado: true,
   }));
 
   const resultado = await crearVenta(items, fkeMetodoPago, true, cargoBillar);
@@ -2149,6 +2492,17 @@ export async function limpiarOrdenMesa(
 
   if (!orden || orden.fkeCodCompany !== perfil.fkeCodCompany) return { error: "Sin acceso" };
   if (orden.tEstado !== "abierta") return { error: "La orden ya no está abierta" };
+
+  // Restaurar insumo de cada línea antes de vaciar la orden — mismo criterio
+  // que cerrarOrdenMesa.
+  const { data: lineas } = await adminClient
+    .from("ordenes_mesa_detalle")
+    .select("eCodDetalle")
+    .eq("fkeCodOrden", eCodOrden);
+
+  for (const linea of lineas ?? []) {
+    await restaurarInsumosDeDetalle(adminClient, linea.eCodDetalle);
+  }
 
   const { error } = await adminClient
     .from("ordenes_mesa_detalle")

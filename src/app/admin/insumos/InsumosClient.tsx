@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Pencil, Trash2, PlusCircle, ShoppingCart, Plus, History } from "lucide-react";
+import { Eye, Pencil, Trash2, PlusCircle, ShoppingCart, Plus, History, TriangleAlert } from "lucide-react";
 import type { InsumoConStock } from "@/types";
 import pageHeaderStyles from "@/components/ui/PageHeader.module.css";
 import styles from "./insumos.module.css";
@@ -16,6 +16,7 @@ import { ModalEditarInsumo } from "./ModalEditarInsumo";
 import { ModalAjustarStockInsumo } from "./ModalAjustarStockInsumo";
 import { ModalListaCompra } from "./ModalListaCompra";
 import { ModalHistorialCompras } from "./ModalHistorialCompras";
+import { ModalHistorialMermas } from "./ModalHistorialMermas";
 import { ToastConfirmarEliminar } from "@/components/ui/ToastConfirmarEliminar/ToastConfirmarEliminar";
 import { StatCards } from "@/components/ui/Statscards";
 import toast from "react-hot-toast";
@@ -49,6 +50,7 @@ export function InsumosClient({
   const [modalAgregarExistente, setModalAgregarExistente] = useState(false);
   const [modalListaCompra, setModalListaCompra] = useState(false);
   const [modalHistorial, setModalHistorial]     = useState(false);
+  const [modalMermas, setModalMermas]           = useState(false);
   const [insumoEditar, setInsumoEditar]       = useState<InsumoConStock | null>(null);
   const [insumoAjustarStock, setInsumoAjustarStock] = useState<InsumoConStock | null>(null);
   const [toggleando, setToggleando]           = useState<string | null>(null);
@@ -223,6 +225,10 @@ export function InsumosClient({
             <History size={16} />
             Historial
           </button>
+          <button className={styles.botonSecundario} onClick={() => setModalMermas(true)}>
+            <TriangleAlert size={16} />
+            Mermas
+          </button>
           <button className={styles.botonSecundario} onClick={() => setModalListaCompra(true)}>
             <ShoppingCart size={16} />
             Lista de compra
@@ -301,6 +307,9 @@ export function InsumosClient({
       )}
       {modalHistorial && (
         <ModalHistorialCompras onClose={() => setModalHistorial(false)} />
+      )}
+      {modalMermas && (
+        <ModalHistorialMermas onClose={() => setModalMermas(false)} />
       )}
       {insumoAEliminar && (
         <ToastConfirmarEliminar

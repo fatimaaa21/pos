@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath }    from "next/cache";
 import { resolverSucursalVenta } from "@/lib/utils/sucursal";
 import { validarExtrasSeleccionados, type ExtraResuelto } from "@/lib/utils/extras";
+import { restaurarInsumosDeVentaMesa } from "@/lib/utils/insumosOrdenMesa";
+import { registrarMermaProducto, registrarMermaInsumo } from "@/lib/utils/mermas";
 import type { MetodoPago }   from "@/types";
 
 interface ItemVenta {
@@ -20,6 +22,13 @@ interface ItemVenta {
    *  server-side contra opciones_extra — nunca se confía en un precio o
    *  nombre que venga del cliente. */
   extrasSeleccionados?: { eCodOpcionExtra: string; eCantidad: number }[];
+  /** true cuando el insumo de este item YA se descontó antes de llegar aquí
+   *  (mesas.ts lo descuenta al mandar el item a cocina, no hasta cobrar) —
+   *  evita descontarlo dos veces. Los productos con inventario propio
+   *  (bUnlimitedInventory = false) nunca vuelven a tocar insumos aquí sin
+   *  importar este flag: su receta ya se descontó al producirlos
+   *  (ver agregarStock en inventario.ts). */
+  bInsumoYaDescontado?: boolean;
 }
 
 export async function crearVenta(
@@ -275,6 +284,16 @@ export async function crearVenta(
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
       const resueltos: InsumoADescontar[] = [];
+
+      // Saltar por completo si: (a) el producto tiene inventario propio
+      // (bUnlimitedInventory === false) — su receta ya se descontó al
+      // producirlo, no al venderlo (ver agregarStock); o (b) el insumo de
+      // este item ya se descontó río arriba (mesas.ts, al mandarlo a
+      // cocina) — mandado con bInsumoYaDescontado.
+      if (!lotesPorItem[idx].bUnlimitedInventory || item.bInsumoYaDescontado) {
+        insumosPorItem.push(resueltos);
+        continue;
+      }
 
       const { data: receta } = await adminClient
         .from("receta_insumos")
@@ -630,6 +649,9 @@ export async function cancelarVenta(formData: FormData) {
 
     const eCodVenta          = formData.get("eCodVenta")          as string;
     const tMotivoCancelacion = (formData.get("tMotivoCancelacion") as string)?.trim();
+    // Si el producto ya se preparó/entregó y no se puede recuperar, no se
+    // restaura inventario/insumo — se registra como merma en su lugar.
+    const bDesperdicio       = formData.get("bDesperdicio") === "true";
 
     if (!tMotivoCancelacion) return { error: "El motivo de cancelación es requerido" };
 
@@ -674,7 +696,7 @@ export async function cancelarVenta(formData: FormData) {
 
     const { data: detalles } = await adminClient
       .from("detalle_venta")
-      .select("fkeCodProduct, fkeCodPresentacion, eCantidad")
+      .select("fkeCodProduct, fkeCodPresentacion, eCantidad, productos(tNameProduct)")
       .eq("fkeCodVenta", eCodVenta);
 
     const { error: cancelError } = await adminClient
@@ -689,7 +711,16 @@ export async function cancelarVenta(formData: FormData) {
 
     if (cancelError) return { error: `Error al cancelar: ${cancelError.message}` };
 
-    // Restaurar inventario (solo productos por unidad)
+    const mermaCtx = {
+      fkeCodVenta:    eCodVenta,
+      fkeCodCompany:  venta.fkeCodCompany,
+      fkeCodSucursal: venta.fkeCodSucursal,
+      fkeCodUser:     user.id,
+      tMotivo:        tMotivoCancelacion,
+    };
+
+    // Restaurar inventario (solo productos por unidad) — o registrar merma
+    // en vez de restaurar, si el producto ya se preparó/entregó.
     for (const detalle of detalles ?? []) {
       let q = adminClient
         .from("inventario")
@@ -704,6 +735,17 @@ export async function cancelarVenta(formData: FormData) {
       const { data: lote } = await q.maybeSingle();
       if (!lote || lote.bUnlimitedInventory) continue;
 
+      if (bDesperdicio) {
+        await registrarMermaProducto(adminClient, {
+          ...mermaCtx,
+          fkeCodProduct:      detalle.fkeCodProduct,
+          fkeCodPresentacion: detalle.fkeCodPresentacion,
+          tNombreSnapshot:    (detalle as any).productos?.tNameProduct ?? "producto",
+          eCantidad:          detalle.eCantidad,
+        });
+        continue;
+      }
+
       await adminClient
         .from("inventario")
         .update({
@@ -716,13 +758,25 @@ export async function cancelarVenta(formData: FormData) {
     }
 
     // Restaurar insumos consumidos por receta — lee del snapshot, NO de la
-    // receta actual (que pudo haber cambiado desde que se vendió).
+    // receta actual (que pudo haber cambiado desde que se vendió). O
+    // registrar merma en vez de restaurar, mismo criterio que arriba.
     const { data: consumos } = await adminClient
       .from("venta_insumos_consumidos")
-      .select("fkeCodInsumoStock, eCantidadDescontada")
+      .select("fkeCodInsumoStock, eCantidadDescontada, tNombreInsumoSnapshot, tUnidadSnapshot")
       .eq("fkeCodVenta", eCodVenta);
 
     for (const consumo of consumos ?? []) {
+      if (bDesperdicio) {
+        await registrarMermaInsumo(adminClient, {
+          ...mermaCtx,
+          fkeCodInsumoStock: consumo.fkeCodInsumoStock,
+          tNombreSnapshot:   consumo.tNombreInsumoSnapshot,
+          eCantidad:         consumo.eCantidadDescontada,
+          tUnidadSnapshot:   consumo.tUnidadSnapshot,
+        });
+        continue;
+      }
+
       // Reintenta hasta 3 veces si hay conflicto de versión con otra
       // operación concurrente sobre el mismo insumo (venta o cancelación).
       let intento = 0;
@@ -761,6 +815,17 @@ export async function cancelarVenta(formData: FormData) {
       // concurrencia muy raro; no hay una buena forma de evitarlo sin
       // mover todo esto a una transacción real de Postgres.
     }
+
+    // Si la venta vino de una mesa, el insumo de sus productos preparados al
+    // momento (café, etc.) se descontó al mandarlos a cocina, no aquí — por
+    // eso venta_insumos_consumidos está vacío para esos items. Se restaura
+    // (o se registra como merma) por separado desde las líneas de la orden.
+    await restaurarInsumosDeVentaMesa(eCodVenta, bDesperdicio ? {
+      fkeCodCompany:  venta.fkeCodCompany,
+      fkeCodSucursal: venta.fkeCodSucursal,
+      fkeCodUser:     user.id,
+      tMotivo:        tMotivoCancelacion,
+    } : undefined);
 
     revalidatePath("/admin/ventasAdmin");
     revalidatePath("/empleado/ventasEmpleado");

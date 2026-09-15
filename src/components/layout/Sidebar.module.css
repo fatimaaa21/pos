@@ -99,7 +99,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 8px;
+  padding: 15px 8px;
   border-radius: 8px;
   color: var(--dark);
   font-size: 12px;
@@ -444,7 +444,7 @@
 
   .navItem {
     justify-content: center;
-    padding: 10px;
+    padding: 12px;
     width: 40px;
     gap: 0;
     position: relative;
